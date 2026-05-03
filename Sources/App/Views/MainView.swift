@@ -18,8 +18,6 @@ struct MainView: View {
 
             // Detail
             VStack(spacing: 0) {
-                Spacer()
-                    .frame(height: 28)  // Match sidebar header for title bar clearance
                 if let session = controller.workspace.activeSession {
                     SessionDetailView(session: session)
                 } else {
