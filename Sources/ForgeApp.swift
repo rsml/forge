@@ -16,8 +16,7 @@ struct ForgeApp: App {
                     debugServer.start(controller: controller)
                 }
         }
-        .windowStyle(.titleBar)
-        .windowToolbarStyle(.unified(showsTitle: false))
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1200, height: 800)
         .commands {
             ForgeMenuCommands(controller: controller)
