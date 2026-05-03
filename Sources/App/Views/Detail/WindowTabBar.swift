@@ -54,6 +54,9 @@ struct WindowTab: View {
             Text("\(window.index): \(window.name)")
                 .font(.system(.caption, weight: isActive ? .semibold : .regular))
                 .lineLimit(1)
+
+            // Blue dot if any pane in this window needs attention
+            AttentionDot(needsAttention: window.needsAttention, size: 6)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

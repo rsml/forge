@@ -11,6 +11,10 @@ final class Window: Identifiable {
     var active: Bool
     var panes: [Pane] = []
 
+    var needsAttention: Bool {
+        panes.contains { $0.needsAttention }
+    }
+
     init(id: String, sessionId: String, index: Int, name: String, active: Bool = false) {
         self.id = id
         self.sessionId = sessionId

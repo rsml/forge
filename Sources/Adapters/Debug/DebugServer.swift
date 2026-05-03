@@ -230,7 +230,7 @@ final class DebugServer {
                 "windowCount": session.windowCount,
                 "attached": session.attached,
                 "path": session.path ?? "",
-                "aggregateStatus": session.aggregateStatus.rawValue,
+                "needsAttention": session.needsAttention,
                 "windows": windows
             ]
         }

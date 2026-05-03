@@ -11,12 +11,9 @@ final class Session: Identifiable {
     var path: String?
     var windows: [Window] = []
 
-    var aggregateStatus: PaneStatus {
-        let all = windows.flatMap { $0.panes.map(\.status) }
-        if all.contains(.needsAttention) { return .needsAttention }
-        if all.contains(.error) { return .error }
-        if all.contains(.running) { return .running }
-        return .idle
+    /// True if any window/pane in this session needs attention
+    var needsAttention: Bool {
+        windows.contains { $0.needsAttention }
     }
 
     init(id: String, name: String, windowCount: Int = 0, attached: Bool = false, path: String? = nil) {

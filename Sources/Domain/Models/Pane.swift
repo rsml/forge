@@ -28,6 +28,11 @@ final class Pane: Identifiable {
     var status: PaneStatus
     var hasBell: Bool = false
 
+    /// True if this pane needs user attention (bell, idle agent, error)
+    var needsAttention: Bool {
+        hasBell || status == .needsAttention || status == .error
+    }
+
     init(id: String, windowId: String, index: Int, active: Bool = false,
          currentCommand: String = "", currentPath: String = "",
          width: Int = 80, height: Int = 24, pid: Int = 0) {

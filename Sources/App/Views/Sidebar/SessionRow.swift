@@ -3,10 +3,12 @@ import SwiftUI
 struct SessionRow: View {
     var session: Session
     @Binding var isExpanded: Bool
+    var onSelectWindow: (Window) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
+                // Chevron toggle
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         isExpanded.toggle()
@@ -18,9 +20,10 @@ struct SessionRow: View {
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
                 .buttonStyle(.plain)
-                .frame(width: 16, height: 16)
+                .frame(width: 12, height: 12)
 
-                StatusDot(status: session.aggregateStatus)
+                // Attention indicator (blue if any child needs attention)
+                AttentionDot(needsAttention: session.needsAttention, size: 8)
 
                 Text(session.name)
                     .font(.system(.body, weight: .medium))
@@ -31,7 +34,7 @@ struct SessionRow: View {
                 if session.windowCount > 1 {
                     Text("\(session.windowCount)")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.tertiary)
                 }
             }
 
@@ -39,9 +42,13 @@ struct SessionRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(session.windows) { window in
                         WindowRow(window: window)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                onSelectWindow(window)
+                            }
                     }
                 }
-                .padding(.leading, 28)
+                .padding(.leading, 24)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
@@ -54,8 +61,8 @@ struct WindowRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
-            HStack(spacing: 6) {
-                Image(systemName: "rectangle.split.3x1")
+            HStack(spacing: 5) {
+                Image(systemName: "terminal")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
@@ -63,12 +70,11 @@ struct WindowRow: View {
                     .font(.caption)
                     .lineLimit(1)
 
-                if window.active {
-                    Circle()
-                        .fill(.blue)
-                        .frame(width: 4, height: 4)
+                if window.needsAttention {
+                    AttentionDot(needsAttention: true, size: 5)
                 }
             }
+            .padding(.vertical, 2)
 
             ForEach(window.panes) { pane in
                 PaneRow(pane: pane)
@@ -81,14 +87,14 @@ struct PaneRow: View {
     var pane: Pane
 
     var body: some View {
-        HStack(spacing: 6) {
-            StatusDot(status: pane.status, size: 6)
+        HStack(spacing: 5) {
+            AttentionDot(needsAttention: pane.needsAttention, size: 5)
 
             Text(pane.currentCommand)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.tertiary)
                 .lineLimit(1)
         }
-        .padding(.leading, 16)
+        .padding(.leading, 14)
     }
 }

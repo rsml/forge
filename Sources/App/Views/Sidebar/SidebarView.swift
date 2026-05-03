@@ -13,26 +13,20 @@ struct SidebarView: View {
                     session: session,
                     isExpanded: Binding(
                         get: { expandedSessions.contains(session.id) },
-                        set: { newValue in
-                            if newValue {
-                                expandedSessions.insert(session.id)
-                            } else {
-                                expandedSessions.remove(session.id)
-                            }
-                        }
-                    )
+                        set: { if $0 { expandedSessions.insert(session.id) } else { expandedSessions.remove(session.id) } }
+                    ),
+                    onSelectWindow: { window in
+                        controller.selectSession(session)
+                        controller.selectWindow(window)
+                    }
                 )
                 .tag(session.id)
                 .contextMenu {
                     Button("Rename...") {}
                     Divider()
-                    Button("New Window") {
-                        controller.addWindow(in: session)
-                    }
+                    Button("New Window") { controller.addWindow(in: session) }
                     Divider()
-                    Button("Close Session", role: .destructive) {
-                        controller.removeSession(session)
-                    }
+                    Button("Close Session", role: .destructive) { controller.removeSession(session) }
                 }
             }
             .onMove { source, destination in
@@ -40,24 +34,17 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
-        .safeAreaInset(edge: .bottom) {
-            HStack {
-                Button {
-                    showNewProject = true
-                } label: {
-                    Label("New Project", systemImage: "plus")
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button { showNewProject = true } label: {
+                    Image(systemName: "plus")
                 }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                Spacer()
+                .help("New Project")
             }
-            .background(.bar)
         }
         .sheet(isPresented: $showNewProject) {
             ProjectPickerView()
         }
-        .navigationTitle("Forge")
         .onChange(of: selection) { _, newId in
             if let newId, let session = controller.workspace.session(byId: newId) {
                 controller.selectSession(session)

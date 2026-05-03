@@ -13,7 +13,7 @@ struct MainView: View {
                 ContentUnavailableView(
                     "No Project Selected",
                     systemImage: "hammer.fill",
-                    description: Text("Press \u{2318}O to open a project, or click + in the sidebar.")
+                    description: Text("Click + to open a project.")
                 )
             }
         }
