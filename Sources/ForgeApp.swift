@@ -3,15 +3,15 @@ import SwiftUI
 @main
 struct ForgeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @State private var tmux = TmuxController()
+    @State private var controller = WorkspaceController(tmux: TmuxAdapter())
 
     var body: some Scene {
-        Window("Forge", id: "main") {
+        SwiftUI.Window("Forge", id: "main") {
             MainView()
-                .environment(tmux)
+                .environment(controller)
                 .frame(minWidth: 800, minHeight: 500)
                 .onAppear {
-                    tmux.connect()
+                    controller.connect()
                 }
         }
         .windowStyle(.automatic)
@@ -21,7 +21,7 @@ struct ForgeApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        return true
+        true
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -31,10 +31,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         alert.addButton(withTitle: "Quit")
         alert.addButton(withTitle: "Cancel")
         alert.alertStyle = .warning
-
-        if alert.runModal() == .alertFirstButtonReturn {
-            return .terminateNow
-        }
-        return .terminateCancel
+        return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
     }
 }

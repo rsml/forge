@@ -1,0 +1,47 @@
+import Foundation
+
+struct ForgeConfig: Codable {
+    var projects: [ProjectConfig]
+    var recentDirectories: [String]
+    var theme: ThemeConfig?
+
+    struct ProjectConfig: Codable {
+        var name: String
+        var path: String
+        var color: String?
+        var pinned: Bool?
+        var sortOrder: Int?
+    }
+
+    struct ThemeConfig: Codable {
+        var source: String?
+    }
+
+    static let defaultConfig = ForgeConfig(
+        projects: [],
+        recentDirectories: [],
+        theme: ThemeConfig(source: "ghostty-seti")
+    )
+
+    static var configURL: URL {
+        URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent(".config/forge/config.json")
+    }
+
+    static func load() -> ForgeConfig {
+        guard let data = try? Data(contentsOf: configURL),
+              let config = try? JSONDecoder().decode(ForgeConfig.self, from: data) else {
+            return defaultConfig
+        }
+        return config
+    }
+
+    func save() {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(self) else { return }
+        let dir = ForgeConfig.configURL.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? data.write(to: ForgeConfig.configURL)
+    }
+}

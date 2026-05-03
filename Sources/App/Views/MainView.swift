@@ -1,13 +1,13 @@
 import SwiftUI
 
 struct MainView: View {
-    @Environment(TmuxController.self) var tmux
+    @Environment(WorkspaceController.self) var controller
 
     var body: some View {
         NavigationSplitView {
             SidebarView()
         } detail: {
-            if let session = tmux.state.activeSession {
+            if let session = controller.workspace.activeSession {
                 SessionDetailView(session: session)
             } else {
                 ContentUnavailableView(
