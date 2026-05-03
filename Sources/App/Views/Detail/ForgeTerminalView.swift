@@ -11,7 +11,7 @@ struct ForgeTerminalView: NSViewRepresentable {
 
         terminal.nativeForegroundColor = NSColor(red: 0.77, green: 0.78, blue: 0.78, alpha: 1.0)
         terminal.nativeBackgroundColor = NSColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0)
-        terminal.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        terminal.font = resolveTerminalFont(size: 13)
 
         let tmuxPath = findTmux()
 
@@ -29,6 +29,52 @@ struct ForgeTerminalView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: LocalProcessTerminalView, context: Context) {}
+
+    /// Resolves the best available monospaced font with Nerd Font glyph coverage.
+    ///
+    /// Priority:
+    /// 1. Font declared in ~/.config/ghostty/config (`font-family = ...`)
+    /// 2. Common Nerd Font families installed on the system
+    /// 3. System monospaced font (final fallback, no Nerd Font glyphs)
+    private func resolveTerminalFont(size: CGFloat) -> NSFont {
+        let fallbacks = [
+            "MesloLGS NF",
+            "MesloLGM Nerd Font",
+            "JetBrainsMono Nerd Font",
+            "JetBrains Mono NL",
+            "FiraCode Nerd Font",
+            "Hack Nerd Font",
+            "SauceCodePro Nerd Font",
+            "DejaVuSansMono Nerd Font",
+        ]
+        let candidates = (ghosttyFontFamily().map { [$0] } ?? []) + fallbacks
+
+        for family in candidates {
+            if let font = NSFont(name: family, size: size) {
+                return font
+            }
+        }
+
+        return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+
+    /// Parses `font-family = <name>` from the Ghostty config file, if present.
+    private func ghosttyFontFamily() -> String? {
+        let configPath = (NSHomeDirectory() as NSString)
+            .appendingPathComponent(".config/ghostty/config")
+        guard let contents = try? String(contentsOfFile: configPath, encoding: .utf8) else {
+            return nil
+        }
+        for line in contents.split(separator: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("font-family"), trimmed.contains("=") else { continue }
+            let parts = trimmed.split(separator: "=", maxSplits: 1)
+            guard parts.count == 2 else { continue }
+            let value = parts[1].trimmingCharacters(in: .whitespaces)
+            if !value.isEmpty { return value }
+        }
+        return nil
+    }
 
     private func findTmux() -> String {
         ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
