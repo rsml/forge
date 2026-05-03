@@ -16,7 +16,7 @@ struct ForgeTerminalView: NSViewRepresentable {
         let tmuxPath = findTmux()
         terminal.startProcess(
             executable: tmuxPath,
-            args: [tmuxPath, "attach-session", "-t", sessionName],
+            args: ["attach-session", "-t", sessionName],
             environment: buildEnvironment(),
             execName: "tmux"
         )

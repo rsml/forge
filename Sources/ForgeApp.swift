@@ -4,6 +4,7 @@ import SwiftUI
 struct ForgeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var controller = WorkspaceController(tmux: TmuxAdapter())
+    @State private var debugServer = DebugServer()
 
     var body: some Scene {
         SwiftUI.Window("Forge", id: "main") {
@@ -12,6 +13,7 @@ struct ForgeApp: App {
                 .frame(minWidth: 800, minHeight: 500)
                 .onAppear {
                     controller.connect()
+                    debugServer.start(controller: controller)
                 }
         }
         .windowStyle(.automatic)
