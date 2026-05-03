@@ -15,8 +15,10 @@ struct ForgeApp: App {
                     controller.connect()
                     debugServer.start(controller: controller)
                 }
+                .navigationTitle(controller.workspace.activeSession?.name ?? "Forge")
         }
-        .windowStyle(.automatic)
+        .windowStyle(.titleBar)
+        .windowToolbarStyle(.unified(showsTitle: false))
         .defaultSize(width: 1200, height: 800)
     }
 }

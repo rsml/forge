@@ -14,11 +14,15 @@ struct ForgeTerminalView: NSViewRepresentable {
         terminal.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
 
         let tmuxPath = findTmux()
+
+        // Hide tmux status bar — Forge provides the tab UI
+        let shell = "/bin/zsh"
+        let cmd = "\(tmuxPath) set-option -g status off 2>/dev/null; \(tmuxPath) attach-session -t \(sessionName)"
         terminal.startProcess(
-            executable: tmuxPath,
-            args: ["attach-session", "-t", sessionName],
+            executable: shell,
+            args: ["-c", cmd],
             environment: buildEnvironment(),
-            execName: "tmux"
+            execName: "zsh"
         )
 
         return terminal

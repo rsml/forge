@@ -30,12 +30,6 @@ struct SessionRow: View {
                     .lineLimit(1)
 
                 Spacer()
-
-                if session.windowCount > 1 {
-                    Text("\(session.windowCount)")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
             }
 
             if isExpanded {
