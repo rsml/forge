@@ -10,8 +10,11 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Top area — sits beside traffic lights, has + button
+            // Top area — traffic lights sit here, + button on the right
             HStack {
+                // Left space for traffic lights (close/min/fullscreen ~68px)
+                Spacer()
+                    .frame(width: 68)
                 Spacer()
                 Button { showNewProject = true } label: {
                     Image(systemName: "plus")
