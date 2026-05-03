@@ -3,12 +3,14 @@ import SwiftUI
 struct SessionRow: View {
     var session: Session
     @Binding var isExpanded: Bool
+    var isRenaming: Bool
+    @Binding var renameText: String
+    var onRenameCommit: () -> Void
     var onSelectWindow: (Window) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                // Chevron toggle
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         isExpanded.toggle()
@@ -22,12 +24,17 @@ struct SessionRow: View {
                 .buttonStyle(.plain)
                 .frame(width: 12, height: 12)
 
-                // Attention indicator (blue if any child needs attention)
                 AttentionDot(needsAttention: session.needsAttention, size: 8)
 
-                Text(session.name)
-                    .font(.system(.body, weight: .medium))
-                    .lineLimit(1)
+                if isRenaming {
+                    TextField("Project name", text: $renameText, onCommit: onRenameCommit)
+                        .textFieldStyle(.plain)
+                        .font(.system(.body, weight: .medium))
+                } else {
+                    Text(session.name)
+                        .font(.system(.body, weight: .medium))
+                        .lineLimit(1)
+                }
 
                 Spacer()
             }
@@ -35,7 +42,7 @@ struct SessionRow: View {
             if isExpanded {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(session.windows) { window in
-                        WindowRow(window: window)
+                        TabRow(window: window)
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 onSelectWindow(window)
@@ -50,7 +57,8 @@ struct SessionRow: View {
     }
 }
 
-struct WindowRow: View {
+/// A tab row inside a project's expanded sidebar view
+struct TabRow: View {
     var window: Window
 
     var body: some View {

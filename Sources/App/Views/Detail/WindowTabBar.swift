@@ -19,7 +19,7 @@ struct WindowTabBar: View {
                         .contextMenu {
                             Button("Rename...") {}
                             Divider()
-                            Button("Close Window", role: .destructive) {
+                            Button("Close Tab", role: .destructive) {
                                 controller.removeWindow(window)
                             }
                         }
@@ -39,8 +39,9 @@ struct WindowTabBar: View {
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 8)
+            .help("New Tab")
         }
-        .frame(height: 32)
+        .frame(height: 28)
         .background(Color(nsColor: .controlBackgroundColor))
     }
 }
@@ -55,11 +56,10 @@ struct WindowTab: View {
                 .font(.system(.caption, weight: isActive ? .semibold : .regular))
                 .lineLimit(1)
 
-            // Blue dot if any pane in this window needs attention
             AttentionDot(needsAttention: window.needsAttention, size: 6)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
         .background(isActive ? Color.accentColor.opacity(0.15) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 4))
     }

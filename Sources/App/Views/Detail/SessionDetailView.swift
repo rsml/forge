@@ -9,5 +9,6 @@ struct SessionDetailView: View {
             WindowTabBar(session: session)
             TerminalArea(session: session)
         }
+        .toolbar(.hidden, for: .automatic)
     }
 }

@@ -10,11 +10,13 @@ struct MainView: View {
             if let session = controller.workspace.activeSession {
                 SessionDetailView(session: session)
             } else {
-                ContentUnavailableView(
-                    "No Project Selected",
-                    systemImage: "hammer.fill",
-                    description: Text("Click + to open a project.")
-                )
+                VStack {
+                    Spacer()
+                    Text("Click + to open a project")
+                        .foregroundStyle(.secondary)
+                        .font(.body)
+                    Spacer()
+                }
             }
         }
         .navigationSplitViewStyle(.balanced)

@@ -15,13 +15,71 @@ struct ForgeApp: App {
                     controller.connect()
                     debugServer.start(controller: controller)
                 }
-                .navigationTitle(controller.workspace.activeSession?.name ?? "Forge")
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
         .defaultSize(width: 1200, height: 800)
+        .commands {
+            ForgeMenuCommands(controller: controller)
+        }
     }
 }
+
+// MARK: - Menu Bar
+
+struct ForgeMenuCommands: Commands {
+    let controller: WorkspaceController
+
+    var body: some Commands {
+        // Replace "New Window" in File menu
+        CommandGroup(replacing: .newItem) {
+            Button("New Project...") {
+                NotificationCenter.default.post(name: .forgeNewProject, object: nil)
+            }
+            .keyboardShortcut("o")
+
+            Button("New Tab") {
+                if let session = controller.workspace.activeSession {
+                    controller.addWindow(in: session)
+                }
+            }
+            .keyboardShortcut("t")
+
+            Divider()
+
+            Button("Close Tab") {
+                if let session = controller.workspace.activeSession,
+                   let windowId = controller.workspace.activeWindowId,
+                   let window = session.windows.first(where: { $0.id == windowId }) {
+                    controller.removeWindow(window)
+                }
+            }
+            .keyboardShortcut("w")
+        }
+
+        CommandGroup(after: .appSettings) {
+            Button("Settings...") {
+                openSettings()
+            }
+            .keyboardShortcut(",")
+        }
+    }
+
+    private func openSettings() {
+        let configURL = ForgeConfig.configURL
+        // Ensure file exists
+        if !FileManager.default.fileExists(atPath: configURL.path) {
+            ForgeConfig.defaultConfig.save()
+        }
+        NSWorkspace.shared.open(configURL)
+    }
+}
+
+extension Notification.Name {
+    static let forgeNewProject = Notification.Name("forgeNewProject")
+}
+
+// MARK: - App Delegate
 
 final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
