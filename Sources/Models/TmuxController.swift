@@ -1,6 +1,28 @@
 import Foundation
 import Observation
 
+/// Simple file logger for debugging
+enum ForgeLog {
+    static let logFile = "/tmp/forge.log"
+
+    static func log(_ message: String) {
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let line = "[\(timestamp)] \(message)\n"
+        print(line, terminator: "")
+        if let data = line.data(using: .utf8) {
+            if FileManager.default.fileExists(atPath: logFile) {
+                if let handle = FileHandle(forWritingAtPath: logFile) {
+                    handle.seekToEndOfFile()
+                    handle.write(data)
+                    handle.closeFile()
+                }
+            } else {
+                FileManager.default.createFile(atPath: logFile, contents: data)
+            }
+        }
+    }
+}
+
 /// Manages the connection to the tmux server via control mode.
 /// Parses the control mode protocol and keeps TmuxState in sync.
 @Observable
@@ -27,21 +49,21 @@ final class TmuxController {
 
     func connect() {
         Task {
-            print("[Forge] Connecting to tmux server...")
-            print("[Forge] Using tmux at: \(tmuxPath)")
+            ForgeLog.log("[Forge] Connecting to tmux server...")
+            ForgeLog.log("[Forge] Using tmux at: \(tmuxPath)")
 
             await ensureServer()
             await refreshState()
 
-            print("[Forge] Found \(state.sessions.count) sessions")
+            ForgeLog.log("[Forge] Found \(state.sessions.count) sessions")
             for s in state.sessions {
-                print("[Forge]   - \(s.name) (id=\(s.id), windows=\(s.windowCount))")
+                ForgeLog.log("[Forge]   - \(s.name) (id=\(s.id), windows=\(s.windowCount))")
             }
 
             startControlMode()
             startPeriodicRefresh()
             state.connected = true
-            print("[Forge] Connected.")
+            ForgeLog.log("[Forge] Connected.")
         }
     }
 
@@ -80,12 +102,12 @@ final class TmuxController {
                     let errOutput = String(data: errData, encoding: .utf8) ?? ""
 
                     if process.terminationStatus != 0 && !errOutput.isEmpty {
-                        print("[Forge] tmux \(args.joined(separator: " ")) failed: \(errOutput.trimmingCharacters(in: .whitespacesAndNewlines))")
+                        ForgeLog.log("[Forge] tmux \(args.joined(separator: " ")) failed: \(errOutput.trimmingCharacters(in: .whitespacesAndNewlines))")
                     }
 
                     continuation.resume(returning: output)
                 } catch {
-                    print("[Forge] tmux exec error: \(error)")
+                    ForgeLog.log("[Forge] tmux exec error: \(error)")
                     continuation.resume(returning: nil)
                 }
             }
@@ -97,7 +119,7 @@ final class TmuxController {
     private func ensureServer() async {
         let result = await run("list-sessions", "-F", "#{session_id}")
         if result == nil || result?.isEmpty == true {
-            print("[Forge] No tmux server running, creating default session...")
+            ForgeLog.log("[Forge] No tmux server running, creating default session...")
             _ = await run("new-session", "-d", "-s", "forge-default")
         }
     }
@@ -116,14 +138,14 @@ final class TmuxController {
         let format = "#{session_id}\t#{session_name}\t#{session_windows}\t#{session_attached}\t#{session_path}"
         guard let output = await run("list-sessions", "-F", format),
               !output.isEmpty else {
-            print("[Forge] No sessions returned from list-sessions")
+            ForgeLog.log("[Forge] No sessions returned from list-sessions")
             return
         }
 
         let infos = output.split(separator: "\n").compactMap { line -> TmuxSessionInfo? in
             let parts = line.split(separator: "\t", maxSplits: 4, omittingEmptySubsequences: false).map(String.init)
             guard parts.count >= 5 else {
-                print("[Forge] Skipping malformed session line: \(line)")
+                ForgeLog.log("[Forge] Skipping malformed session line: \(line)")
                 return nil
             }
             return TmuxSessionInfo(
@@ -228,9 +250,9 @@ final class TmuxController {
 
         do {
             try process.run()
-            print("[Forge] Control mode started.")
+            ForgeLog.log("[Forge] Control mode started.")
         } catch {
-            print("[Forge] Failed to start control mode: \(error)")
+            ForgeLog.log("[Forge] Failed to start control mode: \(error)")
             return
         }
 
@@ -246,7 +268,7 @@ final class TmuxController {
                     await self.handleControlOutput(text)
                 }
             }
-            print("[Forge] Control mode reader exited.")
+            ForgeLog.log("[Forge] Control mode reader exited.")
         }
     }
 
@@ -265,7 +287,7 @@ final class TmuxController {
         let parts = line.split(separator: " ", maxSplits: 1).map(String.init)
         guard let notification = parts.first else { return }
 
-        print("[Forge] Control: \(notification)")
+        ForgeLog.log("[Forge] Control: \(notification)")
 
         switch notification {
         case "%sessions-changed",
@@ -287,7 +309,7 @@ final class TmuxController {
 
     func sendCommand(_ command: String) {
         guard let stdin else {
-            print("[Forge] Cannot send command, no stdin: \(command)")
+            ForgeLog.log("[Forge] Cannot send command, no stdin: \(command)")
             return
         }
         let data = (command + "\n").data(using: .utf8)!
@@ -334,9 +356,9 @@ final class TmuxController {
     }
 
     func newSession(name: String, path: String) async {
-        print("[Forge] Creating session '\(name)' at \(path)")
+        ForgeLog.log("[Forge] Creating session '\(name)' at \(path)")
         let result = await run("new-session", "-d", "-s", name, "-c", path)
-        print("[Forge] new-session result: \(result ?? "nil")")
+        ForgeLog.log("[Forge] new-session result: \(result ?? "nil")")
         await refreshState()
         // Select the new session
         if let session = state.sessions.first(where: { $0.name == name }) {
