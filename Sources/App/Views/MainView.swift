@@ -23,6 +23,10 @@ struct MainView: View {
         }
     }
 
+    private var themeForeground: Color? {
+        ForgeConfigStore.shared.resolvedTheme?.foreground
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             if sidebarPosition == "right" {
@@ -66,6 +70,7 @@ struct MainView: View {
                 }
             }
         }
+        .foregroundStyle(themeForeground ?? Color.primary)
         .ignoresSafeArea()
         .onAppear {
             CommandRegistry.shared.setup(controller: controller)

@@ -307,6 +307,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         window.titleVisibility = .hidden
         window.styleMask.insert(.fullSizeContentView)
         window.isMovableByWindowBackground = false
+        // Set window background to match theme so traffic light area is themed
+        if let theme = ForgeConfigStore.shared.resolvedTheme {
+            window.backgroundColor = NSColor(theme.background)
+        }
     }
 
     @MainActor private func cleanUpMenuBar() {

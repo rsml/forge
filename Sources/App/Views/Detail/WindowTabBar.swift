@@ -10,7 +10,8 @@ struct WindowTabBar: View {
     @State private var renameText = ""
 
     private var tabBarOnBottom: Bool {
-        let pos = ForgeConfigStore.shared.config.terminal?.tabBarPosition ??
+        let pos = ForgeConfigStore.shared.config.general?.tabBarPosition ??
+                  ForgeConfigStore.shared.config.terminal?.tabBarPosition ??
                   ForgeConfigStore.shared.config.appearance?.tabBarPosition ?? "top"
         return pos == "bottom"
     }
@@ -156,7 +157,7 @@ struct TitleBarRow: View {
                 }
             }
             .font(.system(.caption))
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(.secondary)
             .frame(maxHeight: .infinity)
         }
     }
