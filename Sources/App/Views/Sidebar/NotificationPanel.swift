@@ -40,6 +40,7 @@ struct NotificationPanel: View {
                     ForEach(attentionItems, id: \.window.id) { item in
                         Button {
                             controller.selectSession(item.session)
+                            // selectWindow automatically clears hasBell for this window's panes
                             controller.selectWindow(item.window)
                             close()
                         } label: {
@@ -68,6 +69,7 @@ struct NotificationPanel: View {
                 if let latest = attentionItems.first {
                     Button("Jump to Latest") {
                         controller.selectSession(latest.session)
+                        // selectWindow automatically clears hasBell for this window's panes
                         controller.selectWindow(latest.window)
                         close()
                     }
@@ -78,7 +80,6 @@ struct NotificationPanel: View {
             }
             .padding(16)
         }
-        .frame(width: 350, height: 400)
     }
 
     private func close() {

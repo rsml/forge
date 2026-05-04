@@ -82,6 +82,10 @@ final class WorkspaceController {
 
     func selectWindow(_ window: Window) {
         workspace.activeWindowId = window.id
+        // Clear bell state for all panes in this window
+        for pane in window.panes {
+            pane.hasBell = false
+        }
         Task { await tmux.selectWindow(id: window.id) }
         saveUIState()
     }
@@ -192,16 +196,22 @@ final class WorkspaceController {
         ForgeLog.log("[control] \(event)")
 
         if event.hasPrefix("%bell") {
-            // %bell %<window_id> — mark panes in that window as having bell
+            // %bell <window_id> — mark panes in that window as having bell
             let parts = event.split(separator: " ")
             if parts.count >= 2 {
                 let windowId = String(parts[1])
+                var found = false
                 for session in workspace.sessions {
                     if let window = session.windows.first(where: { $0.id == windowId }) {
                         for pane in window.panes {
                             pane.hasBell = true
                         }
+                        found = true
+                        break
                     }
+                }
+                if !found {
+                    ForgeLog.log("[control] Bell event for unknown window: \(windowId)")
                 }
             }
         }
