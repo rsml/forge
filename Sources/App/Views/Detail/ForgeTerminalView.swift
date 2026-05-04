@@ -17,11 +17,26 @@ struct ForgeTerminalView: NSViewRepresentable {
             }
         }
 
-        terminal.nativeForegroundColor = NSColor(red: 0.77, green: 0.78, blue: 0.78, alpha: 1.0)
-        terminal.nativeBackgroundColor = NSColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0)
-        let configFontFamily = ForgeConfigStore.shared.config.terminal?.fontFamily ?? ForgeConfigStore.shared.config.appearance?.fontFamily
-        let configFontSize = ForgeConfigStore.shared.config.terminal?.fontSize ?? ForgeConfigStore.shared.config.appearance?.fontSize ?? 13
+        let configFontFamily = ForgeConfigStore.shared.config.terminalFont?.family ??
+                               ForgeConfigStore.shared.config.terminal?.fontFamily ??
+                               ForgeConfigStore.shared.config.appearance?.fontFamily
+        let configFontSize = ForgeConfigStore.shared.config.terminalFont?.size ??
+                             ForgeConfigStore.shared.config.terminal?.fontSize ??
+                             ForgeConfigStore.shared.config.appearance?.fontSize ?? 13
         terminal.font = resolveTerminalFont(family: configFontFamily, size: CGFloat(configFontSize))
+
+        // Apply theme colors
+        if let theme = Self.resolveTheme() {
+            terminal.nativeForegroundColor = NSColor(theme.foreground)
+            terminal.nativeBackgroundColor = NSColor(theme.background)
+            let palette = theme.ansiColors.prefix(16).map { Self.swiftUIColorToTermColor($0) }
+            if palette.count == 16 {
+                terminal.installColors(palette)
+            }
+        } else {
+            terminal.nativeForegroundColor = NSColor(red: 0.77, green: 0.78, blue: 0.78, alpha: 1.0)
+            terminal.nativeBackgroundColor = NSColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0)
+        }
 
         let tmuxPath = findTmux()
         let configArg: String
@@ -60,6 +75,50 @@ struct ForgeTerminalView: NSViewRepresentable {
                 scroller.isHidden = true
             }
         }
+
+        // Reactive font update
+        let configFontFamily = ForgeConfigStore.shared.config.terminalFont?.family ??
+                               ForgeConfigStore.shared.config.terminal?.fontFamily ??
+                               ForgeConfigStore.shared.config.appearance?.fontFamily
+        let configFontSize = ForgeConfigStore.shared.config.terminalFont?.size ??
+                             ForgeConfigStore.shared.config.terminal?.fontSize ??
+                             ForgeConfigStore.shared.config.appearance?.fontSize ?? 13
+        let newFont = resolveTerminalFont(family: configFontFamily, size: CGFloat(configFontSize))
+        if nsView.font != newFont {
+            nsView.font = newFont
+        }
+
+        // Reactive theme update
+        if let theme = Self.resolveTheme() {
+            let newFg = NSColor(theme.foreground)
+            let newBg = NSColor(theme.background)
+            if nsView.nativeForegroundColor != newFg { nsView.nativeForegroundColor = newFg }
+            if nsView.nativeBackgroundColor != newBg { nsView.nativeBackgroundColor = newBg }
+        }
+    }
+
+    /// Looks up the selected theme from config and parses it.
+    private static func resolveTheme() -> ThemeDefinition? {
+        guard let themeId = ForgeConfigStore.shared.config.theme?.source else { return nil }
+        let searchPaths = [
+            "/Applications/Ghostty.app/Contents/Resources/ghostty/themes",
+            (NSHomeDirectory() as NSString).appendingPathComponent(".config/ghostty/themes"),
+        ]
+        for searchPath in searchPaths {
+            let path = (searchPath as NSString).appendingPathComponent(themeId)
+            if let theme = ThemeParser.parseThemeFile(path: path, id: themeId) {
+                return theme
+            }
+        }
+        return nil
+    }
+
+    /// Converts a SwiftUI Color to SwiftTerm's Color (UInt16 components, 0-65535).
+    private static func swiftUIColorToTermColor(_ color: SwiftUI.Color) -> SwiftTerm.Color {
+        let nsColor = NSColor(color).usingColorSpace(.deviceRGB) ?? NSColor(color)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        nsColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return SwiftTerm.Color(red: UInt16(r * 65535), green: UInt16(g * 65535), blue: UInt16(b * 65535))
     }
 
     /// Resolves the best available monospaced font with Nerd Font glyph coverage.

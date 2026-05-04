@@ -26,7 +26,7 @@ struct ThemeSettingsPane: View {
                     .textFieldStyle(.plain)
             }
             .padding(10)
-            .background(Color(nsColor: .controlBackgroundColor))
+            .background(Color(nsColor: .textBackgroundColor).opacity(0.5))
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .padding(.horizontal, 16)
             .padding(.top, 12)

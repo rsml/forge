@@ -11,23 +11,30 @@ struct ThemePreviewCard: View {
                 RoundedRectangle(cornerRadius: 6)
                     .fill(theme.background)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(0..<3, id: \.self) { row in
-                        HStack(spacing: 4) {
-                            ForEach(0..<4, id: \.self) { col in
-                                let idx = row * 4 + col
-                                let color = idx < theme.ansiColors.count ? theme.ansiColors[idx] : theme.foreground
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(color)
-                                    .frame(height: 4)
-                            }
-                        }
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 0) {
+                        Text("~ ")
+                            .foregroundStyle(colorAt(2))
+                        Text("$ ")
+                            .foregroundStyle(theme.foreground)
+                        Text("ls -la")
+                            .foregroundStyle(theme.foreground)
                     }
-                    Text("~/project $")
-                        .font(.system(size: 8, design: .monospaced))
-                        .foregroundStyle(theme.foreground)
+
+                    HStack(spacing: 0) {
+                        Text("src/")
+                            .foregroundStyle(colorAt(4))
+                        Text("  ")
+                        Text("README")
+                            .foregroundStyle(theme.foreground)
+                    }
+
+                    Text("error: not found")
+                        .foregroundStyle(colorAt(1))
                 }
+                .font(.system(size: 7, design: .monospaced))
                 .padding(8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             .frame(height: 70)
             .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -44,5 +51,9 @@ struct ThemePreviewCard: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { onSelect() }
+    }
+
+    private func colorAt(_ index: Int) -> Color {
+        index < theme.ansiColors.count ? theme.ansiColors[index] : theme.foreground
     }
 }

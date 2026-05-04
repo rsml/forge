@@ -7,6 +7,8 @@ struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "gearshape") }
             ThemeSettingsPane()
                 .tabItem { Label("Theme", systemImage: "paintbrush.fill") }
+            FontSettingsPane()
+                .tabItem { Label("Fonts", systemImage: "textformat") }
             TerminalSettingsPane()
                 .tabItem { Label("Terminal", systemImage: "terminal") }
             ShortcutsSettingsPane()
