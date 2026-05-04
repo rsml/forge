@@ -84,6 +84,11 @@ final class TmuxAdapter: TmuxPort {
         _ = await runner.run("source-file", path)
     }
 
+    func clearHistory(pane: String) async {
+        controlMode.send("clear-history -t \(pane)")
+        controlMode.send("send-keys -t \(pane) C-l")
+    }
+
     func startControlMode(onEvent: @escaping @Sendable (String) -> Void) {
         controlMode.start(onEvent: onEvent)
     }

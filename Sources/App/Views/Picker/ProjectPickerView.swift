@@ -8,6 +8,7 @@ struct ProjectPickerView: View {
     @State private var selectedPath: String?
     @State private var recentPaths: [String] = []
     @State private var errorMessage: String?
+    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -17,6 +18,7 @@ struct ProjectPickerView: View {
                 TextField("Filter recent projects...", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.title3)
+                    .focused($isSearchFocused)
                     .onSubmit { openProject() }
             }
             .padding(16)
@@ -78,6 +80,13 @@ struct ProjectPickerView: View {
         .onKeyPress(.escape) { close(); return .handled }
         .onAppear {
             recentPaths = ForgeConfig.load().recentDirectories
+            // Auto-select first item
+            if selectedPath == nil, let first = recentPaths.first {
+                selectedPath = first
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                isSearchFocused = true
+            }
         }
     }
 

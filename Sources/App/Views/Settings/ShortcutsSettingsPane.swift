@@ -14,31 +14,24 @@ struct ShortcutsSettingsPane: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 24) {
                 ForEach(categories, id: \.self) { category in
                     let group = KeyboardShortcuts.allDefaults.filter { $0.category == category }
                     if !group.isEmpty {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(category)
-                                .font(.headline)
-                                .padding(.bottom, 4)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(category.uppercased())
+                                .font(.system(size: 11, weight: .semibold, design: .default))
+                                .tracking(1.2)
+                                .foregroundStyle(.secondary)
+                                .padding(.bottom, 2)
 
-                            LazyVGrid(columns: [
-                                GridItem(.flexible(), alignment: .leading),
-                                GridItem(.fixed(200), alignment: .trailing),
-                            ], spacing: 6) {
-                                ForEach(group, id: \.id) { entry in
+                            ForEach(group, id: \.id) { entry in
+                                HStack(spacing: 0) {
                                     Text(entry.shortcut.label)
+                                        .font(.system(size: 13))
+                                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                                    HStack(spacing: 6) {
-                                        let currentHint = resolveHint(id: entry.id, default: entry.shortcut)
-                                        ShortcutRecorder(
-                                            current: currentHint,
-                                            isRecording: recordingId == entry.id,
-                                            onStartRecording: { startRecording(entry.id) },
-                                            onCancel: { stopRecording() }
-                                        )
-
+                                    HStack(spacing: 8) {
                                         if conflicts.contains(entry.id) {
                                             Image(systemName: "exclamationmark.triangle.fill")
                                                 .foregroundStyle(.yellow)
@@ -46,19 +39,28 @@ struct ShortcutsSettingsPane: View {
                                                 .help("Conflicts with another shortcut")
                                         }
 
+                                        ShortcutRecorder(
+                                            current: resolveHint(id: entry.id, default: entry.shortcut),
+                                            isRecording: recordingId == entry.id,
+                                            onStartRecording: { startRecording(entry.id) },
+                                            onCancel: { stopRecording() }
+                                        )
+
                                         Button {
                                             store.update { $0.shortcuts?.removeValue(forKey: entry.id) }
                                             detectConflicts()
                                         } label: {
                                             Image(systemName: "xmark.circle.fill")
-                                                .foregroundStyle(.secondary)
+                                                .foregroundStyle(.tertiary)
                                                 .font(.system(size: 14))
                                         }
                                         .buttonStyle(.plain)
                                         .opacity(shortcuts[entry.id] != nil ? 1 : 0.3)
                                         .disabled(shortcuts[entry.id] == nil)
                                     }
+                                    .frame(width: 200, alignment: .trailing)
                                 }
+                                .padding(.vertical, 3)
                             }
                         }
                     }
@@ -75,7 +77,7 @@ struct ShortcutsSettingsPane: View {
                     .foregroundStyle(.red)
                 }
             }
-            .padding(20)
+            .padding(24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { detectConflicts() }

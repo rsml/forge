@@ -9,8 +9,8 @@ enum KeyboardShortcuts {
     static var newTab: Shortcut { resolve("newTab", default: Shortcut("t", modifiers: .command, label: "New Tab")) }
     static var closePane: Shortcut { resolve("closePane", default: Shortcut("w", modifiers: .command, label: "Close Pane")) }
     static var closeProject: Shortcut { resolve("closeProject", default: Shortcut("w", modifiers: [.command, .shift], label: "Close Project")) }
-    static var renameTab: Shortcut { resolve("renameTab", default: Shortcut("r", modifiers: [.command, .shift], label: "Rename Tab")) }
-    static var renameProject: Shortcut { resolve("renameProject", default: Shortcut("r", modifiers: [.command, .option], label: "Rename Project")) }
+    static var renameTab: Shortcut { resolve("renameTab", default: Shortcut("t", modifiers: [.command, .shift], label: "Rename Tab")) }
+    static var renameProject: Shortcut { resolve("renameProject", default: Shortcut("p", modifiers: [.command, .shift], label: "Rename Project")) }
 
     // MARK: - View
     static var toggleSidebar: Shortcut { resolve("toggleSidebar", default: Shortcut("b", modifiers: .command, label: "Toggle Sidebar")) }
@@ -33,6 +33,7 @@ enum KeyboardShortcuts {
 
     // MARK: - App
     static var settings: Shortcut { resolve("settings", default: Shortcut(",", modifiers: .command, label: "Settings")) }
+    static var clearScrollback: Shortcut { resolve("clearScrollback", default: Shortcut("k", modifiers: .command, label: "Clear Scrollback")) }
 
     // MARK: - All Defaults (for settings UI)
     static let allDefaults: [(id: String, shortcut: Shortcut, category: String)] = [
@@ -40,8 +41,8 @@ enum KeyboardShortcuts {
         ("newTab", Shortcut("t", modifiers: .command, label: "New Tab"), "File"),
         ("closePane", Shortcut("w", modifiers: .command, label: "Close Pane"), "File"),
         ("closeProject", Shortcut("w", modifiers: [.command, .shift], label: "Close Project"), "File"),
-        ("renameTab", Shortcut("r", modifiers: [.command, .shift], label: "Rename Tab"), "File"),
-        ("renameProject", Shortcut("r", modifiers: [.command, .option], label: "Rename Project"), "File"),
+        ("renameTab", Shortcut("t", modifiers: [.command, .shift], label: "Rename Tab"), "File"),
+        ("renameProject", Shortcut("p", modifiers: [.command, .shift], label: "Rename Project"), "File"),
         ("toggleSidebar", Shortcut("b", modifiers: .command, label: "Toggle Sidebar"), "View"),
         ("commandPalette", Shortcut("p", modifiers: .command, label: "Command Palette"), "View"),
         ("notifications", Shortcut("n", modifiers: [.command, .shift], label: "Notifications"), "View"),
@@ -54,6 +55,7 @@ enum KeyboardShortcuts {
         ("nextProject", Shortcut(.tab, modifiers: .control, label: "Next Project"), "Projects"),
         ("prevProject", Shortcut(.tab, modifiers: [.control, .shift], label: "Previous Project"), "Projects"),
         ("settings", Shortcut(",", modifiers: .command, label: "Settings"), "App"),
+        ("clearScrollback", Shortcut("k", modifiers: .command, label: "Clear Scrollback"), "App"),
     ]
 
     // MARK: - Resolution

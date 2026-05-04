@@ -54,6 +54,7 @@ protocol TmuxPort {
     func swapWindow(id: String, offset: Int) async
 
     func sourceConfig(path: String) async
+    func clearHistory(pane: String) async
 
     func startControlMode(onEvent: @escaping @Sendable (String) -> Void)
     func stopControlMode()

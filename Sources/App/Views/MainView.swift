@@ -97,30 +97,7 @@ struct MainView: View {
     private func configureWindow() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             guard let window = NSApp.windows.first(where: { $0.isVisible }) else { return }
-            Self.applyWindowStyle(window)
-            NotificationCenter.default.addObserver(
-                forName: NSWindow.didExitFullScreenNotification,
-                object: window,
-                queue: .main
-            ) { notification in
-                if let w = notification.object as? NSWindow {
-                    Self.applyWindowStyle(w)
-                }
-            }
-            NotificationCenter.default.addObserver(
-                forName: NSApplication.didBecomeActiveNotification,
-                object: nil,
-                queue: .main
-            ) { _ in
-                Self.applyWindowStyle(window)
-            }
+            window.isMovableByWindowBackground = false
         }
-    }
-
-    @MainActor private static func applyWindowStyle(_ window: NSWindow) {
-        window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
-        window.styleMask.insert(.fullSizeContentView)
-        window.isMovableByWindowBackground = false
     }
 }

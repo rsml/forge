@@ -15,6 +15,7 @@ struct ModalContainer<Content: View>: View {
             content()
                 .frame(width: width)
                 .frame(maxHeight: maxHeight)
+                .fixedSize(horizontal: false, vertical: true)
                 .background(.ultraThinMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .shadow(color: .black.opacity(0.25), radius: 30, y: 8)
@@ -23,6 +24,7 @@ struct ModalContainer<Content: View>: View {
                         .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
                 )
         }
+        .onKeyPress(.escape) { isPresented = false; return .handled }
         .transition(.opacity.combined(with: .scale(scale: 0.97)))
     }
 }

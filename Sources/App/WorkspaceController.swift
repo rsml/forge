@@ -195,6 +195,11 @@ final class WorkspaceController {
         }
     }
 
+    func clearScrollback() {
+        guard let paneId = workspace.activePaneId else { return }
+        Task { await tmux.clearHistory(pane: paneId) }
+    }
+
     func splitPane(direction: SplitDirection) {
         guard let windowId = workspace.activeWindowId else { return }
         Task { await tmux.splitWindow(id: windowId, direction: direction) }

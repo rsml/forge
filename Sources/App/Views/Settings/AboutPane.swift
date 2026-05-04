@@ -2,10 +2,10 @@ import SwiftUI
 
 struct AboutPane: View {
     private var version: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1"
     }
     private var build: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     }
 
     var body: some View {

@@ -16,7 +16,7 @@ struct ForgeApp: App {
                     debugServer.start(controller: controller)
                 }
         }
-        .windowStyle(.automatic)
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1200, height: 800)
         .commands {
             ForgeMenuCommands(controller: controller)
@@ -34,6 +34,9 @@ struct ForgeMenuCommands: Commands {
     let controller: WorkspaceController
 
     var body: some Commands {
+        // Remove Services menu
+        CommandGroup(replacing: .systemServices) { }
+
         // MARK: File
         CommandGroup(replacing: .newItem) {
             Button("New Project...") {
@@ -73,12 +76,12 @@ struct ForgeMenuCommands: Commands {
             Button("Rename Tab...") {
                 NotificationCenter.default.post(name: .forgeRenameTab, object: nil)
             }
-            .keyboardShortcut("r", modifiers: [.command, .shift])
+            .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
 
             Button("Rename Project...") {
                 NotificationCenter.default.post(name: .forgeRenameProject, object: nil)
             }
-            .keyboardShortcut("r", modifiers: [.command, .option])
+            .keyboardShortcut(KeyboardShortcuts.renameProject.key, modifiers: KeyboardShortcuts.renameProject.modifiers)
         }
 
         // MARK: Edit — pass standard editing commands through to the active responder (terminal)
@@ -126,6 +129,13 @@ struct ForgeMenuCommands: Commands {
                 controller.splitPane(direction: .vertical)
             }
             .keyboardShortcut(KeyboardShortcuts.splitVertical.key, modifiers: KeyboardShortcuts.splitVertical.modifiers)
+
+            Divider()
+
+            Button("Clear Scrollback") {
+                controller.clearScrollback()
+            }
+            .keyboardShortcut(KeyboardShortcuts.clearScrollback.key, modifiers: KeyboardShortcuts.clearScrollback.modifiers)
         }
 
         // MARK: Window — tab and project navigation
@@ -237,6 +247,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+
+        // Remove unwanted default menu items after SwiftUI builds the menu bar
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.cleanUpMenuBar()
+        }
+    }
+
+    private func cleanUpMenuBar() {
+        guard let mainMenu = NSApp.mainMenu else { return }
+        for menuItem in mainMenu.items {
+            guard let submenu = menuItem.submenu else { continue }
+            // Remove "Close" and "Close All" from File menu (SwiftUI defaults)
+            if menuItem.title == "File" {
+                submenu.items.removeAll { item in
+                    item.title == "Close" || item.title == "Close All"
+                }
+            }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
