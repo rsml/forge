@@ -7,8 +7,6 @@ struct ProjectPickerView: View {
     @State private var searchText = ""
     @State private var selectedPath: String?
     @State private var recentPaths: [String] = []
-    @State private var searchResults: [String] = []
-    @State private var searchTask: Task<Void, Never>?
     @State private var errorMessage: String?
 
     var body: some View {
@@ -16,32 +14,17 @@ struct ProjectPickerView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("Search for a project folder...", text: $searchText)
+                TextField("Filter recent projects...", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.title3)
                     .onSubmit { openProject() }
-                    .onChange(of: searchText) { _, newValue in
-                        scheduleSearch(newValue)
-                    }
             }
             .padding(16)
 
             Divider()
 
             List(selection: $selectedPath) {
-                // Currently open projects
-                let openPaths = controller.workspace.sessions.compactMap(\.path)
-                if !openPaths.isEmpty && searchText.isEmpty {
-                    Section("Open Projects") {
-                        ForEach(openPaths, id: \.self) { path in
-                            ProjectRow(path: path)
-                                .tag(path)
-                        }
-                    }
-                }
-
-                // Recent (not currently open)
-                let recentFiltered = displayRecent.filter { !openPaths.contains($0) }
+                let recentFiltered = displayRecent
                 if !recentFiltered.isEmpty {
                     Section("Recent") {
                         ForEach(recentFiltered, id: \.self) { path in
@@ -51,17 +34,7 @@ struct ProjectPickerView: View {
                     }
                 }
 
-                // Filesystem search results
-                if !searchResults.isEmpty {
-                    Section("Found on Disk") {
-                        ForEach(searchResults, id: \.self) { path in
-                            ProjectRow(path: path)
-                                .tag(path)
-                        }
-                    }
-                }
-
-                if !searchText.isEmpty && displayRecent.isEmpty && searchResults.isEmpty {
+                if !searchText.isEmpty && displayRecent.isEmpty {
                     VStack {
                         Spacer()
                         Text("No matches found")
@@ -102,6 +75,7 @@ struct ProjectPickerView: View {
             }
             .padding(16)
         }
+        .onKeyPress(.escape) { close(); return .handled }
         .onAppear {
             recentPaths = ForgeConfig.load().recentDirectories
         }
@@ -176,80 +150,22 @@ struct ProjectPickerView: View {
         panel.allowsMultipleSelection = false
         panel.message = "Choose a project directory"
         if panel.runModal() == .OK, let url = panel.url {
-            selectedPath = url.path
-            searchText = url.lastPathComponent
-        }
-    }
-
-    // MARK: - Filesystem Search
-
-    private func scheduleSearch(_ query: String) {
-        errorMessage = nil
-        searchTask?.cancel()
-        guard !query.isEmpty else {
-            searchResults = []
-            return
-        }
-        searchTask = Task {
-            try? await Task.sleep(for: .milliseconds(250))
-            guard !Task.isCancelled else { return }
-            let results = await findDirectories(matching: query)
-            guard !Task.isCancelled else { return }
-            await MainActor.run { searchResults = results }
-        }
-    }
-
-    private func findDirectories(matching query: String) async -> [String] {
-        let expanded = (query as NSString).expandingTildeInPath
-        // If user typed an absolute path, check if it exists directly
-        if expanded.hasPrefix("/") && isDirectory(expanded) {
-            return [expanded]
-        }
-
-        // Search common project roots
-        let searchRoots = projectSearchRoots()
-        let term = query.lowercased()
-        var found: [String] = []
-        let fm = FileManager.default
-
-        for root in searchRoots {
-            guard let entries = try? fm.contentsOfDirectory(atPath: root) else { continue }
-            for entry in entries where entry.lowercased().contains(term) {
-                let full = (root as NSString).appendingPathComponent(entry)
-                var isDir: ObjCBool = false
-                if fm.fileExists(atPath: full, isDirectory: &isDir), isDir.boolValue {
-                    // Prefer directories with .git (actual projects)
-                    found.append(full)
-                }
-                if found.count >= 20 { return found }
+            let path = url.path
+            if let existing = controller.workspace.sessions.first(where: { $0.path == path }) {
+                controller.selectSession(existing)
+                close()
+                return
             }
-            if Task.isCancelled { return [] }
+            guard isDirectory(path) else { return }
+            let baseName = URL(fileURLWithPath: path).lastPathComponent
+            let existingNames = Set(controller.workspace.sessions.map(\.name))
+            let sessionName = uniqueSessionName(baseName, existing: existingNames)
+            saveToRecent(path)
+            Task { @MainActor in
+                await controller.addSession(name: sessionName, path: path)
+                close()
+            }
         }
-
-        // Sort: git repos first, then alphabetical
-        let fm2 = FileManager.default
-        return found.sorted { a, b in
-            let aGit = fm2.fileExists(atPath: (a as NSString).appendingPathComponent(".git"))
-            let bGit = fm2.fileExists(atPath: (b as NSString).appendingPathComponent(".git"))
-            if aGit != bGit { return aGit }
-            return a.localizedCaseInsensitiveCompare(b) == .orderedAscending
-        }
-    }
-
-    private func projectSearchRoots() -> [String] {
-        let home = NSHomeDirectory()
-        let candidates = [
-            "\(home)/Projects",
-            "\(home)/Developer",
-            "\(home)/Code",
-            "\(home)/src",
-            "\(home)/repos",
-            "\(home)/Personal",
-            "\(home)/Work",
-            "\(home)/Documents",
-            "\(home)/Desktop",
-        ]
-        return candidates.filter { isDirectory($0) }
     }
 
     // MARK: - Helpers

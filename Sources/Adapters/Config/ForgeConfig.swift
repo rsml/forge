@@ -7,6 +7,7 @@ struct ForgeConfig: Codable {
     var uiState: UIState?
     var general: GeneralSettings?
     var appearance: AppearanceSettings?
+    var terminal: TerminalSettings?
     var shortcuts: [String: ShortcutConfig]?
 
     struct ProjectConfig: Codable {
@@ -26,6 +27,17 @@ struct ForgeConfig: Codable {
         var defaultProjectDir: String?
         var autoRestore: Bool?
         var confirmBeforeClose: Bool?
+        var warnOnCloseProject: Bool?
+        var warnOnCloseTab: Bool?
+    }
+
+    struct TerminalSettings: Codable {
+        var fontFamily: String?
+        var fontSize: Int?
+        var scrollbackLines: Int?
+        var tabBarPosition: String?
+        var useTmuxPersistence: Bool?
+        var tmuxConfigOverride: String?
     }
 
     struct AppearanceSettings: Codable {

@@ -53,6 +53,8 @@ protocol TmuxPort {
     func splitWindow(id: String, direction: SplitDirection) async
     func swapWindow(id: String, offset: Int) async
 
+    func sourceConfig(path: String) async
+
     func startControlMode(onEvent: @escaping @Sendable (String) -> Void)
     func stopControlMode()
 }

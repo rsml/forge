@@ -71,6 +71,7 @@ struct SidebarView: View {
                                 }
                                 renamingSessionId = nil
                             },
+                            onRenameCancel: { renamingSessionId = nil },
                             onSelect: {
                                 controller.selectSession(session)
                             },
@@ -92,6 +93,7 @@ struct SidebarView: View {
                                 }
                                 renamingWindowId = nil
                             },
+                            onRenameWindowCancel: { renamingWindowId = nil },
                             projectIndex: index + 1
                         )
                         .opacity(draggedSessionId == session.id ? 0.0 : 1.0)
@@ -137,6 +139,12 @@ struct SidebarView: View {
                     .filter { nameSet.contains($0.name) }
                     .map(\.id))
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .forgeRenameProject)) { _ in
+            guard let session = controller.workspace.activeSession else { return }
+            renamingWindowId = nil
+            renameText = session.name
+            renamingSessionId = session.id
         }
     }
 }

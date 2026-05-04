@@ -8,11 +8,13 @@ struct SessionRow: View {
     var isRenaming: Bool
     @Binding var renameText: String
     var onRenameCommit: () -> Void
+    var onRenameCancel: () -> Void = {}
     var onSelect: () -> Void
     var onSelectWindow: (Window) -> Void
     var renamingWindowId: String?
     var onStartWindowRename: (Window) -> Void = { _ in }
     var onRenameWindowCommit: () -> Void = {}
+    var onRenameWindowCancel: () -> Void = {}
     var projectIndex: Int = 0
 
     @State private var isHeaderHovered = false
@@ -56,7 +58,7 @@ struct SessionRow: View {
                 AttentionDot(needsAttention: session.needsAttention, size: 8)
 
                 if isRenaming {
-                    InlineRenameField(text: $renameText, font: .system(.body, weight: .medium), onCommit: onRenameCommit)
+                    InlineRenameField(text: $renameText, font: .system(.body, weight: .medium), onCancel: onRenameCancel, onCommit: onRenameCommit)
                 } else {
                     Text(session.name)
                         .font(.system(.body, weight: isActive ? .medium : .regular))
@@ -90,7 +92,8 @@ struct SessionRow: View {
                             isRenaming: renamingWindowId == window.id,
                             tabIndex: index + 1,
                             renameText: $renameText,
-                            onRenameCommit: onRenameWindowCommit
+                            onRenameCommit: onRenameWindowCommit,
+                            onRenameCancel: onRenameWindowCancel
                         )
                         .opacity(draggedWindowId == window.id ? 0.0 : 1.0)
                         .onDrag {
@@ -132,6 +135,7 @@ struct SessionRow: View {
 struct InlineRenameField: View {
     @Binding var text: String
     var font: Font = .caption
+    var onCancel: () -> Void = {}
     var onCommit: () -> Void
     @FocusState private var isFocused: Bool
 
@@ -157,6 +161,7 @@ struct InlineRenameField: View {
             }
             .frame(width: 20, height: 20)
         }
+        .onKeyPress(.escape) { onCancel(); return .handled }
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 isFocused = true
@@ -174,6 +179,7 @@ struct SidebarTabRow: View {
     var tabIndex: Int = 0
     @Binding var renameText: String
     var onRenameCommit: () -> Void = {}
+    var onRenameCancel: () -> Void = {}
 
     var body: some View {
         let modifiers = ModifierKeyMonitor.shared
@@ -195,7 +201,7 @@ struct SidebarTabRow: View {
             }
 
             if isRenaming {
-                InlineRenameField(text: $renameText, font: .caption, onCommit: onRenameCommit)
+                InlineRenameField(text: $renameText, font: .caption, onCancel: onRenameCancel, onCommit: onRenameCommit)
             } else {
                 Text(window.name)
                     .font(.caption)

@@ -12,7 +12,18 @@ struct CommandPalette: View {
         let registry = CommandRegistry.shared
         let sorted = registry.commands.sorted { $0.name < $1.name }
         if query.isEmpty {
-            return sorted.map { CommandItem(command: $0) }
+            var items: [CommandItem] = []
+            for session in controller.workspace.sessions {
+                items.append(CommandItem(title: session.name, subtitle: "Project", icon: "folder", action: { [weak controller] in
+                    controller?.selectSession(session)
+                }))
+            }
+            let commonCommands = ["go", "new-project", "new-tab", "theme", "toggle-sidebar"]
+            let common = sorted.filter { commonCommands.contains($0.name) }
+            for cmd in common {
+                items.append(CommandItem(command: cmd))
+            }
+            return items
         }
         if query.hasPrefix("/") {
             let afterSlash = String(query.dropFirst())
@@ -52,7 +63,7 @@ struct CommandPalette: View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("Search or type / for commands...", text: $query)
+                TextField("Type a command, project, or tab name...", text: $query)
                     .textFieldStyle(.plain)
                     .font(.system(size: 16))
                     .focused($isFieldFocused)

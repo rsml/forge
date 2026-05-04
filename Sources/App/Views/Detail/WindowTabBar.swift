@@ -43,7 +43,7 @@ struct WindowTabBar: View {
                     HStack(spacing: 1) {
                         ForEach(Array(session.windows.enumerated()), id: \.element.id) { index, window in
                             if renamingWindowId == window.id {
-                                InlineRenameField(text: $renameText, font: .system(.caption, weight: .regular)) {
+                                InlineRenameField(text: $renameText, font: .system(.caption, weight: .regular), onCancel: { renamingWindowId = nil }) {
                                     if !renameText.isEmpty {
                                         controller.renameWindow(window, to: renameText)
                                     }
@@ -123,6 +123,12 @@ struct WindowTabBar: View {
         .background(Color(nsColor: .controlBackgroundColor))
         .onAppear { fetchGitBranch() }
         .onChange(of: session.path) { fetchGitBranch() }
+        .onReceive(NotificationCenter.default.publisher(for: .forgeRenameTab)) { _ in
+            guard let windowId = controller.workspace.activeWindowId,
+                  let window = session.windows.first(where: { $0.id == windowId }) else { return }
+            renamingWindowId = window.id
+            renameText = window.name
+        }
     }
 
     private func fetchGitBranch() {

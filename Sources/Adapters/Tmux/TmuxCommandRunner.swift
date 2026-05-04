@@ -18,9 +18,12 @@ struct TmuxCommandRunner: Sendable {
                 .first { FileManager.default.fileExists(atPath: $0) } ?? "tmux"
         }
 
-        // Config: next to executable
-        let configCandidate = execURL?.appendingPathComponent("forge-tmux.conf").path
-        if let configCandidate, FileManager.default.fileExists(atPath: configCandidate) {
+        // Config: user override first, then bundled
+        let userConfigPath = (NSHomeDirectory() as NSString).appendingPathComponent(".config/forge/forge-tmux.conf")
+        if FileManager.default.fileExists(atPath: userConfigPath) {
+            self.configPath = userConfigPath
+        } else if let configCandidate = execURL?.appendingPathComponent("forge-tmux.conf").path,
+                  FileManager.default.fileExists(atPath: configCandidate) {
             self.configPath = configCandidate
         } else {
             self.configPath = nil

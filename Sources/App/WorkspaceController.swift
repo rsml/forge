@@ -143,7 +143,9 @@ final class WorkspaceController {
         let hasMultipleWindows = session.windows.count > 1
 
         // Check if a non-shell process is running
-        if let pane = activePane, pane.status == .running {
+        let isRunning = activePane?.status == .running
+
+        if isRunning {
             let processName = window.name
             let alert = NSAlert()
             if hasMultiplePanes {
@@ -162,6 +164,26 @@ final class WorkspaceController {
             alert.addButton(withTitle: "Cancel")
             alert.alertStyle = .warning
             guard alert.runModal() == .alertFirstButtonReturn else { return }
+        } else {
+            // Settings-based warnings when no process is running
+            let config = ForgeConfigStore.shared.config.general
+            if !hasMultiplePanes && !hasMultipleWindows && (config?.warnOnCloseProject ?? true) {
+                let alert = NSAlert()
+                alert.messageText = "Close project \"\(session.name)\"?"
+                alert.informativeText = "This will close all tabs and remove the project from Forge."
+                alert.addButton(withTitle: "Close Project")
+                alert.addButton(withTitle: "Cancel")
+                alert.alertStyle = .warning
+                guard alert.runModal() == .alertFirstButtonReturn else { return }
+            } else if !hasMultiplePanes && hasMultipleWindows && (config?.warnOnCloseTab ?? false) {
+                let alert = NSAlert()
+                alert.messageText = "Close tab \"\(window.name)\"?"
+                alert.informativeText = "This tab will be closed."
+                alert.addButton(withTitle: "Close Tab")
+                alert.addButton(withTitle: "Cancel")
+                alert.alertStyle = .warning
+                guard alert.runModal() == .alertFirstButtonReturn else { return }
+            }
         }
 
         if hasMultiplePanes, let pane = activePane {

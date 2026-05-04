@@ -19,7 +19,9 @@ struct ForgeTerminalView: NSViewRepresentable {
 
         terminal.nativeForegroundColor = NSColor(red: 0.77, green: 0.78, blue: 0.78, alpha: 1.0)
         terminal.nativeBackgroundColor = NSColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0)
-        terminal.font = resolveTerminalFont(size: 13)
+        let configFontFamily = ForgeConfigStore.shared.config.terminal?.fontFamily ?? ForgeConfigStore.shared.config.appearance?.fontFamily
+        let configFontSize = ForgeConfigStore.shared.config.terminal?.fontSize ?? ForgeConfigStore.shared.config.appearance?.fontSize ?? 13
+        terminal.font = resolveTerminalFont(family: configFontFamily, size: CGFloat(configFontSize))
 
         let tmuxPath = findTmux()
         let configArg: String
@@ -66,7 +68,10 @@ struct ForgeTerminalView: NSViewRepresentable {
     /// 1. Font declared in ~/.config/ghostty/config (`font-family = ...`)
     /// 2. Common Nerd Font families installed on the system
     /// 3. System monospaced font (final fallback, no Nerd Font glyphs)
-    private func resolveTerminalFont(size: CGFloat) -> NSFont {
+    private func resolveTerminalFont(family: String? = nil, size: CGFloat) -> NSFont {
+        if let family, let font = NSFont(name: family, size: size) {
+            return font
+        }
         let fallbacks = [
             "Dank Mono",
             "MesloLGS NF",

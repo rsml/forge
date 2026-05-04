@@ -80,6 +80,10 @@ final class TmuxAdapter: TmuxPort {
         controlMode.send("swap-window -s \(id) -t \(target)")
     }
 
+    func sourceConfig(path: String) async {
+        _ = await runner.run("source-file", path)
+    }
+
     func startControlMode(onEvent: @escaping @Sendable (String) -> Void) {
         controlMode.start(onEvent: onEvent)
     }

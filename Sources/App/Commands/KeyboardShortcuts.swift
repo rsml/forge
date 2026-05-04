@@ -1,35 +1,67 @@
 import SwiftUI
 
 /// Default keyboard shortcuts for all Forge actions.
-/// These serve as defaults and will be overridable via settings.
+/// Overrides are resolved from ForgeConfigStore at access time.
+@MainActor
 enum KeyboardShortcuts {
     // MARK: - File
-    static let newProject = Shortcut("n", modifiers: .command, label: "New Project")
-    static let newTab = Shortcut("t", modifiers: .command, label: "New Tab")
-    static let closePane = Shortcut("w", modifiers: .command, label: "Close Pane")
-    static let closeProject = Shortcut("w", modifiers: [.command, .shift], label: "Close Project")
+    static var newProject: Shortcut { resolve("newProject", default: Shortcut("n", modifiers: .command, label: "New Project")) }
+    static var newTab: Shortcut { resolve("newTab", default: Shortcut("t", modifiers: .command, label: "New Tab")) }
+    static var closePane: Shortcut { resolve("closePane", default: Shortcut("w", modifiers: .command, label: "Close Pane")) }
+    static var closeProject: Shortcut { resolve("closeProject", default: Shortcut("w", modifiers: [.command, .shift], label: "Close Project")) }
+    static var renameTab: Shortcut { resolve("renameTab", default: Shortcut("r", modifiers: [.command, .shift], label: "Rename Tab")) }
+    static var renameProject: Shortcut { resolve("renameProject", default: Shortcut("r", modifiers: [.command, .option], label: "Rename Project")) }
 
     // MARK: - View
-    static let toggleSidebar = Shortcut("b", modifiers: .command, label: "Toggle Sidebar")
-    static let commandPalette = Shortcut("p", modifiers: .command, label: "Command Palette")
-    static let notifications = Shortcut("n", modifiers: [.command, .shift], label: "Notifications")
+    static var toggleSidebar: Shortcut { resolve("toggleSidebar", default: Shortcut("b", modifiers: .command, label: "Toggle Sidebar")) }
+    static var commandPalette: Shortcut { resolve("commandPalette", default: Shortcut("p", modifiers: .command, label: "Command Palette")) }
+    static var notifications: Shortcut { resolve("notifications", default: Shortcut("n", modifiers: [.command, .shift], label: "Notifications")) }
 
     // MARK: - Splits
-    static let splitHorizontal = Shortcut("d", modifiers: .command, label: "Split Horizontally")
-    static let splitVertical = Shortcut("d", modifiers: [.command, .shift], label: "Split Vertically")
+    static var splitHorizontal: Shortcut { resolve("splitHorizontal", default: Shortcut("d", modifiers: .command, label: "Split Horizontally")) }
+    static var splitVertical: Shortcut { resolve("splitVertical", default: Shortcut("d", modifiers: [.command, .shift], label: "Split Vertically")) }
 
     // MARK: - Tabs
-    static let selectTabLeft = Shortcut("[", modifiers: [.command, .shift], label: "Select Tab Left")
-    static let selectTabRight = Shortcut("]", modifiers: [.command, .shift], label: "Select Tab Right")
-    static let moveTabLeft = Shortcut(.leftArrow, modifiers: [.command, .shift], label: "Move Tab Left")
-    static let moveTabRight = Shortcut(.rightArrow, modifiers: [.command, .shift], label: "Move Tab Right")
+    static var selectTabLeft: Shortcut { resolve("selectTabLeft", default: Shortcut("[", modifiers: [.command, .shift], label: "Select Tab Left")) }
+    static var selectTabRight: Shortcut { resolve("selectTabRight", default: Shortcut("]", modifiers: [.command, .shift], label: "Select Tab Right")) }
+    static var moveTabLeft: Shortcut { resolve("moveTabLeft", default: Shortcut(.leftArrow, modifiers: [.command, .shift], label: "Move Tab Left")) }
+    static var moveTabRight: Shortcut { resolve("moveTabRight", default: Shortcut(.rightArrow, modifiers: [.command, .shift], label: "Move Tab Right")) }
 
     // MARK: - Projects
-    static let nextProject = Shortcut(.tab, modifiers: .control, label: "Next Project")
-    static let prevProject = Shortcut(.tab, modifiers: [.control, .shift], label: "Previous Project")
+    static var nextProject: Shortcut { resolve("nextProject", default: Shortcut(.tab, modifiers: .control, label: "Next Project")) }
+    static var prevProject: Shortcut { resolve("prevProject", default: Shortcut(.tab, modifiers: [.control, .shift], label: "Previous Project")) }
 
     // MARK: - App
-    static let settings = Shortcut(",", modifiers: .command, label: "Settings")
+    static var settings: Shortcut { resolve("settings", default: Shortcut(",", modifiers: .command, label: "Settings")) }
+
+    // MARK: - All Defaults (for settings UI)
+    static let allDefaults: [(id: String, shortcut: Shortcut, category: String)] = [
+        ("newProject", Shortcut("n", modifiers: .command, label: "New Project"), "File"),
+        ("newTab", Shortcut("t", modifiers: .command, label: "New Tab"), "File"),
+        ("closePane", Shortcut("w", modifiers: .command, label: "Close Pane"), "File"),
+        ("closeProject", Shortcut("w", modifiers: [.command, .shift], label: "Close Project"), "File"),
+        ("renameTab", Shortcut("r", modifiers: [.command, .shift], label: "Rename Tab"), "File"),
+        ("renameProject", Shortcut("r", modifiers: [.command, .option], label: "Rename Project"), "File"),
+        ("toggleSidebar", Shortcut("b", modifiers: .command, label: "Toggle Sidebar"), "View"),
+        ("commandPalette", Shortcut("p", modifiers: .command, label: "Command Palette"), "View"),
+        ("notifications", Shortcut("n", modifiers: [.command, .shift], label: "Notifications"), "View"),
+        ("splitHorizontal", Shortcut("d", modifiers: .command, label: "Split Horizontally"), "Splits"),
+        ("splitVertical", Shortcut("d", modifiers: [.command, .shift], label: "Split Vertically"), "Splits"),
+        ("selectTabLeft", Shortcut("[", modifiers: [.command, .shift], label: "Select Tab Left"), "Tabs"),
+        ("selectTabRight", Shortcut("]", modifiers: [.command, .shift], label: "Select Tab Right"), "Tabs"),
+        ("moveTabLeft", Shortcut(.leftArrow, modifiers: [.command, .shift], label: "Move Tab Left"), "Tabs"),
+        ("moveTabRight", Shortcut(.rightArrow, modifiers: [.command, .shift], label: "Move Tab Right"), "Tabs"),
+        ("nextProject", Shortcut(.tab, modifiers: .control, label: "Next Project"), "Projects"),
+        ("prevProject", Shortcut(.tab, modifiers: [.control, .shift], label: "Previous Project"), "Projects"),
+        ("settings", Shortcut(",", modifiers: .command, label: "Settings"), "App"),
+    ]
+
+    // MARK: - Resolution
+
+    private static func resolve(_ id: String, default shortcut: Shortcut) -> Shortcut {
+        guard let override = ForgeConfigStore.shared.config.shortcuts?[id] else { return shortcut }
+        return Shortcut(from: override, label: shortcut.label)
+    }
 }
 
 /// A keyboard shortcut definition with a human-readable tooltip string.
@@ -53,6 +85,17 @@ struct Shortcut {
     init(_ string: String, modifiers: EventModifiers, label: String) {
         self.key = KeyEquivalent(string.first!)
         self.modifiers = modifiers
+        self.label = label
+    }
+
+    init(from config: ForgeConfig.ShortcutConfig, label: String) {
+        var mods: EventModifiers = []
+        if config.modifiers.contains("control") { mods.insert(.control) }
+        if config.modifiers.contains("option") { mods.insert(.option) }
+        if config.modifiers.contains("shift") { mods.insert(.shift) }
+        if config.modifiers.contains("command") { mods.insert(.command) }
+        self.key = KeyEquivalent(config.key.first ?? Character("?"))
+        self.modifiers = mods
         self.label = label
     }
 

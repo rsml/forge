@@ -6,10 +6,20 @@ struct SessionDetailView: View {
     var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller
 
+    private var tabBarPosition: String {
+        ForgeConfigStore.shared.config.terminal?.tabBarPosition ??
+        ForgeConfigStore.shared.config.appearance?.tabBarPosition ?? "top"
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            WindowTabBar(session: session, sidebarVisible: sidebarVisible, onToggleSidebar: onToggleSidebar)
-            TerminalArea(session: session)
+            if tabBarPosition == "bottom" {
+                TerminalArea(session: session)
+                WindowTabBar(session: session, sidebarVisible: sidebarVisible, onToggleSidebar: onToggleSidebar)
+            } else {
+                WindowTabBar(session: session, sidebarVisible: sidebarVisible, onToggleSidebar: onToggleSidebar)
+                TerminalArea(session: session)
+            }
         }
         .toolbar(.hidden, for: .automatic)
     }

@@ -34,14 +34,6 @@ struct ForgeMenuCommands: Commands {
     let controller: WorkspaceController
 
     var body: some Commands {
-        // MARK: Forge (app menu) — Settings lives here
-        CommandGroup(replacing: .appSettings) {
-            Button("Settings...") {
-                openSettings()
-            }
-            .keyboardShortcut(KeyboardShortcuts.settings.key, modifiers: KeyboardShortcuts.settings.modifiers)
-        }
-
         // MARK: File
         CommandGroup(replacing: .newItem) {
             Button("New Project...") {
@@ -75,6 +67,18 @@ struct ForgeMenuCommands: Commands {
                 controller.removeSession(session)
             }
             .keyboardShortcut(KeyboardShortcuts.closeProject.key, modifiers: KeyboardShortcuts.closeProject.modifiers)
+
+            Divider()
+
+            Button("Rename Tab...") {
+                NotificationCenter.default.post(name: .forgeRenameTab, object: nil)
+            }
+            .keyboardShortcut("r", modifiers: [.command, .shift])
+
+            Button("Rename Project...") {
+                NotificationCenter.default.post(name: .forgeRenameProject, object: nil)
+            }
+            .keyboardShortcut("r", modifiers: [.command, .option])
         }
 
         // MARK: Edit — pass standard editing commands through to the active responder (terminal)
@@ -126,6 +130,29 @@ struct ForgeMenuCommands: Commands {
 
         // MARK: Window — tab and project navigation
         CommandMenu("Window") {
+            Menu("Switch to Tab") {
+                ForEach(1...9, id: \.self) { n in
+                    Button("Tab \(n)") {
+                        guard let session = controller.workspace.activeSession,
+                              session.windows.count >= n
+                        else { return }
+                        controller.selectWindow(session.windows[n - 1])
+                    }
+                    .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command)
+                }
+            }
+
+            Menu("Switch to Project") {
+                ForEach(Array(controller.workspace.sessions.enumerated().prefix(9)), id: \.element.id) { index, session in
+                    Button(session.name) {
+                        controller.selectSession(session)
+                    }
+                    .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .option)
+                }
+            }
+
+            Divider()
+
             Button("Select Tab Left") {
                 guard let session = controller.workspace.activeSession,
                       let windowId = controller.workspace.activeWindowId,
@@ -155,18 +182,6 @@ struct ForgeMenuCommands: Commands {
                 NotificationCenter.default.post(name: .forgeMoveTabRight, object: nil)
             }
             .keyboardShortcut(KeyboardShortcuts.moveTabRight.key, modifiers: KeyboardShortcuts.moveTabRight.modifiers)
-
-            Divider()
-
-            ForEach(1...9, id: \.self) { n in
-                Button("Tab \(n)") {
-                    guard let session = controller.workspace.activeSession,
-                          session.windows.count >= n
-                    else { return }
-                    controller.selectWindow(session.windows[n - 1])
-                }
-                .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command)
-            }
 
             Divider()
 
@@ -201,9 +216,6 @@ struct ForgeMenuCommands: Commands {
         }
     }
 
-    private func openSettings() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-    }
 }
 
 extension Notification.Name {
@@ -215,6 +227,8 @@ extension Notification.Name {
     static let forgeNotifications = Notification.Name("forgeNotifications")
     static let forgeCollapseAll = Notification.Name("forgeCollapseAll")
     static let forgeExpandAll = Notification.Name("forgeExpandAll")
+    static let forgeRenameTab = Notification.Name("forgeRenameTab")
+    static let forgeRenameProject = Notification.Name("forgeRenameProject")
 }
 
 // MARK: - App Delegate
@@ -230,6 +244,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard ForgeConfigStore.shared.config.general?.confirmBeforeClose ?? true else {
+            return .terminateNow
+        }
         let alert = NSAlert()
         alert.messageText = "Quit Forge?"
         alert.informativeText = "Your tmux sessions will keep running in the background."
