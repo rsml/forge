@@ -14,73 +14,91 @@ struct ShortcutsSettingsPane: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                ForEach(categories, id: \.self) { category in
-                    let group = KeyboardShortcuts.allDefaults.filter { $0.category == category }
-                    if !group.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(category.uppercased())
-                                .font(.system(size: 11, weight: .semibold, design: .default))
-                                .tracking(1.2)
-                                .foregroundStyle(.secondary)
-                                .padding(.bottom, 2)
-
-                            ForEach(group, id: \.id) { entry in
-                                HStack(spacing: 0) {
-                                    Text(entry.shortcut.label)
-                                        .font(.system(size: 13))
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                                    HStack(spacing: 8) {
-                                        if conflicts.contains(entry.id) {
-                                            Image(systemName: "exclamationmark.triangle.fill")
-                                                .foregroundStyle(.yellow)
-                                                .font(.system(size: 12))
-                                                .help("Conflicts with another shortcut")
-                                        }
-
-                                        ShortcutRecorder(
-                                            current: resolveHint(id: entry.id, default: entry.shortcut),
-                                            isRecording: recordingId == entry.id,
-                                            onStartRecording: { startRecording(entry.id) },
-                                            onCancel: { stopRecording() }
-                                        )
-
-                                        Button {
-                                            store.update { $0.shortcuts?.removeValue(forKey: entry.id) }
-                                            detectConflicts()
-                                        } label: {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .foregroundStyle(.tertiary)
-                                                .font(.system(size: 14))
-                                        }
-                                        .buttonStyle(.plain)
-                                        .opacity(shortcuts[entry.id] != nil ? 1 : 0.3)
-                                        .disabled(shortcuts[entry.id] == nil)
-                                    }
-                                    .frame(width: 200, alignment: .trailing)
-                                }
-                                .padding(.vertical, 3)
-                            }
-                        }
+            HStack(alignment: .top, spacing: 32) {
+                // Left column
+                VStack(alignment: .leading, spacing: 24) {
+                    ForEach(["File", "View", "Splits"], id: \.self) { category in
+                        categorySection(category)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                Divider()
-
-                HStack {
-                    Spacer()
-                    Button("Reset All to Defaults") {
-                        store.update { $0.shortcuts = nil }
-                        detectConflicts()
+                // Right column
+                VStack(alignment: .leading, spacing: 24) {
+                    ForEach(["Tabs", "Projects", "App"], id: \.self) { category in
+                        categorySection(category)
                     }
-                    .foregroundStyle(.red)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(24)
+
+            Divider().padding(.horizontal, 24)
+
+            HStack {
+                Spacer()
+                Button("Reset All to Defaults") {
+                    store.update { $0.shortcuts = nil }
+                    detectConflicts()
+                }
+                .foregroundStyle(.red)
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { detectConflicts() }
+    }
+
+    @ViewBuilder
+    private func categorySection(_ category: String) -> some View {
+        let group = KeyboardShortcuts.allDefaults.filter { $0.category == category }
+        if !group.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(category.uppercased())
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(1.2)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 2)
+
+                ForEach(group, id: \.id) { entry in
+                    HStack(spacing: 0) {
+                        Text(entry.shortcut.label)
+                            .font(.system(size: 13))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        HStack(spacing: 8) {
+                            if conflicts.contains(entry.id) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.yellow)
+                                    .font(.system(size: 12))
+                                    .help("Conflicts with another shortcut")
+                            }
+
+                            ShortcutRecorder(
+                                current: resolveHint(id: entry.id, default: entry.shortcut),
+                                isRecording: recordingId == entry.id,
+                                onStartRecording: { startRecording(entry.id) },
+                                onCancel: { stopRecording() }
+                            )
+
+                            Button {
+                                store.update { $0.shortcuts?.removeValue(forKey: entry.id) }
+                                detectConflicts()
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.tertiary)
+                                    .font(.system(size: 14))
+                            }
+                            .buttonStyle(.plain)
+                            .opacity(shortcuts[entry.id] != nil ? 1 : 0.3)
+                            .disabled(shortcuts[entry.id] == nil)
+                        }
+                    }
+                    .padding(.vertical, 3)
+                }
+            }
+        }
     }
 
     private func resolveHint(id: String, default shortcut: Shortcut) -> String {

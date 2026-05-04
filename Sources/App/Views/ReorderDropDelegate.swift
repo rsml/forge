@@ -15,8 +15,13 @@ struct ReorderDropDelegate<Item: Identifiable>: DropDelegate where Item.ID == St
               from != to
         else { return }
         withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
-            onMove(IndexSet(integer: from), to)
+            let dest = from < to ? to + 1 : to
+            onMove(IndexSet(integer: from), dest)
         }
+    }
+
+    func dropExited(info: DropInfo) {
+        // Don't clear here — let performDrop handle cleanup
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {

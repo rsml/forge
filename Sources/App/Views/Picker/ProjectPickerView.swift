@@ -80,6 +80,12 @@ struct ProjectPickerView: View {
         .onKeyPress(.escape) { close(); return .handled }
         .onAppear {
             recentPaths = ForgeConfig.load().recentDirectories
+            if recentPaths.isEmpty {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    browseForFolder()
+                }
+                return  // Don't focus search since browse dialog will show
+            }
             // Auto-select first item
             if selectedPath == nil, let first = recentPaths.first {
                 selectedPath = first

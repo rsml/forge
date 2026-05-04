@@ -35,6 +35,8 @@ struct NotificationPanel: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
+                .frame(minHeight: 150)
+                .padding(.vertical, 16)
             } else {
                 List {
                     ForEach(attentionItems, id: \.window.id) { item in

@@ -16,7 +16,7 @@ struct ForgeApp: App {
                     debugServer.start(controller: controller)
                 }
         }
-        .windowStyle(.hiddenTitleBar)
+        .windowStyle(.automatic)
         .defaultSize(width: 1200, height: 800)
         .commands {
             ForgeMenuCommands(controller: controller)
@@ -34,6 +34,19 @@ struct ForgeMenuCommands: Commands {
     let controller: WorkspaceController
 
     var body: some Commands {
+        CommandGroup(replacing: .appInfo) {
+            Button("About Forge") {
+                let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1"
+                let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+                let alert = NSAlert()
+                alert.messageText = "Forge"
+                alert.informativeText = "Version \(version) (\(build))\nA native macOS frontend for tmux."
+                alert.alertStyle = .informational
+                alert.icon = NSImage(systemSymbolName: "terminal.fill", accessibilityDescription: "Forge")
+                alert.runModal()
+            }
+        }
+
         // Remove Services menu
         CommandGroup(replacing: .systemServices) { }
 
@@ -244,17 +257,54 @@ extension Notification.Name {
 // MARK: - App Delegate
 
 final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
+    private var windowObservers: [NSObjectProtocol] = []
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
 
-        // Remove unwanted default menu items after SwiftUI builds the menu bar
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            self.configureMainWindow()
             self.cleanUpMenuBar()
         }
     }
 
-    private func cleanUpMenuBar() {
+    @MainActor private func configureMainWindow() {
+        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.identifier?.rawValue != "com_apple_SwiftUI_Settings_window" }) else {
+            // Retry if window not ready
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.configureMainWindow() }
+            return
+        }
+        applyWindowStyle(window)
+
+        // Observe events that can reset title bar
+        let events: [Notification.Name] = [
+            NSWindow.didExitFullScreenNotification,
+            NSWindow.didBecomeKeyNotification,
+            NSWindow.didBecomeMainNotification,
+            NSWindow.didChangeScreenNotification,
+        ]
+        for event in events {
+            let observer = NotificationCenter.default.addObserver(forName: event, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.applyWindowStyle(window) }
+            }
+            windowObservers.append(observer)
+        }
+        // Also re-apply when app becomes active (catches all edge cases)
+        let activeObserver = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyWindowStyle(window) }
+        }
+        windowObservers.append(activeObserver)
+    }
+
+    @MainActor private func applyWindowStyle(_ window: NSWindow) {
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.styleMask.insert(.fullSizeContentView)
+        window.isMovableByWindowBackground = false
+    }
+
+    @MainActor private func cleanUpMenuBar() {
         guard let mainMenu = NSApp.mainMenu else { return }
         for menuItem in mainMenu.items {
             guard let submenu = menuItem.submenu else { continue }

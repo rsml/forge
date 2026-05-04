@@ -9,6 +9,12 @@ struct WindowTabBar: View {
     @State private var renamingWindowId: String?
     @State private var renameText = ""
 
+    private var tabBarOnBottom: Bool {
+        let pos = ForgeConfigStore.shared.config.terminal?.tabBarPosition ??
+                  ForgeConfigStore.shared.config.appearance?.tabBarPosition ?? "top"
+        return pos == "bottom"
+    }
+
     var body: some View {
         // Tab bar only (title bar is in SessionDetailView)
         HStack(spacing: 0) {
@@ -36,7 +42,8 @@ struct WindowTabBar: View {
                                 WindowTab(
                                     window: window,
                                     isActive: window.id == controller.workspace.activeWindowId,
-                                    tabIndex: index + 1
+                                    tabIndex: index + 1,
+                                    indicatorOnTop: tabBarOnBottom
                                 )
                                 .opacity(draggedTabId == window.id ? 0.0 : 1.0)
                                 .onDrag {
@@ -76,6 +83,19 @@ struct WindowTabBar: View {
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) {
                         controller.addWindow(in: session)
+                    }
+                    .onDrop(of: [.text], isTargeted: nil) { providers in
+                        guard let draggedId = draggedTabId,
+                              let from = session.windows.firstIndex(where: { $0.id == draggedId })
+                        else { return false }
+                        let to = session.windows.count
+                        if from != to - 1 {
+                            withAnimation {
+                                session.windows.move(fromOffsets: IndexSet(integer: from), toOffset: to)
+                            }
+                        }
+                        draggedTabId = nil
+                        return true
                     }
                     .contextMenu {
                         Button("New Tab") {
@@ -156,12 +176,21 @@ struct WindowTab: View {
     var window: Window
     let isActive: Bool
     var tabIndex: Int = 0
+    var indicatorOnTop: Bool = false
     @State private var isHovered = false
 
     var body: some View {
         let modifiers = ModifierKeyMonitor.shared
 
         VStack(spacing: 0) {
+            if indicatorOnTop {
+                // Active tab indicator — flush to top
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(isActive ? Color.accentColor.opacity(0.6) : Color.clear)
+                    .frame(height: 2)
+                    .padding(.horizontal, 6)
+            }
+
             HStack(spacing: 4) {
                 if modifiers.commandPressed && tabIndex >= 1 && tabIndex <= 9 {
                     Text("\(tabIndex)")
@@ -178,13 +207,15 @@ struct WindowTab: View {
             }
             .padding(.horizontal, 10)
             .frame(maxHeight: .infinity)
-            .offset(y: 1)
+            .offset(y: indicatorOnTop ? -1 : 1)
 
-            // Active tab indicator — flush to bottom
-            RoundedRectangle(cornerRadius: 1)
-                .fill(isActive ? Color.accentColor.opacity(0.6) : Color.clear)
-                .frame(height: 2)
-                .padding(.horizontal, 6)
+            if !indicatorOnTop {
+                // Active tab indicator — flush to bottom
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(isActive ? Color.accentColor.opacity(0.6) : Color.clear)
+                    .frame(height: 2)
+                    .padding(.horizontal, 6)
+            }
         }
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
