@@ -23,6 +23,10 @@ struct SessionDetailView: View {
         return URL(fileURLWithPath: path).lastPathComponent
     }
 
+    private var chromeBackground: Color {
+        ForgeConfigStore.shared.resolvedTheme?.background ?? Color(nsColor: .controlBackgroundColor)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Title bar always at top
@@ -30,6 +34,7 @@ struct SessionDetailView: View {
                 .frame(height: 28)
                 .padding(.trailing, 8)
                 .padding(.leading, sidebarVisible ? 8 : 78)
+                .background(chromeBackground)
 
             if tabBarPosition == "bottom" {
                 TerminalArea(session: session)

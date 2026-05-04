@@ -120,7 +120,7 @@ struct WindowTabBar: View {
                 .padding(.trailing, 8)
             }
         .frame(height: 28)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(ForgeConfigStore.shared.resolvedTheme?.background ?? Color(nsColor: .controlBackgroundColor))
         .onReceive(NotificationCenter.default.publisher(for: .forgeRenameTab)) { _ in
             guard let windowId = controller.workspace.activeWindowId,
                   let window = session.windows.first(where: { $0.id == windowId }) else { return }
