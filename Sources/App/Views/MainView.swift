@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Configures the host NSWindow from within the SwiftUI view hierarchy.
-/// updateNSView is called on every SwiftUI state change, so window properties
-/// stay in sync with theme changes reactively.
+/// Directly manipulates the NSWindow title bar view hierarchy to eliminate
+/// the native macOS title bar chrome (background material/vibrancy) while
+/// keeping traffic light buttons. This is how Chrome and iTerm2 do it.
 struct WindowConfigurator: NSViewRepresentable {
     let backgroundColor: NSColor
 
@@ -27,6 +28,36 @@ struct WindowConfigurator: NSViewRepresentable {
         window.titlebarSeparatorStyle = .none
         window.isMovableByWindowBackground = false
         window.backgroundColor = backgroundColor
+
+        // Nuclear option: walk the window's private view hierarchy and
+        // hide the visual effect view that renders the title bar material.
+        // The traffic light buttons are siblings, not children, so they survive.
+        guard let themeFrame = window.contentView?.superview else { return }
+        stripTitleBarBackground(themeFrame)
+    }
+
+    private func stripTitleBarBackground(_ view: NSView) {
+        let className = String(describing: type(of: view))
+
+        // NSTitlebarContainerView contains the title bar chrome
+        if className == "NSTitlebarContainerView" {
+            for child in view.subviews {
+                let childClass = String(describing: type(of: child))
+                if childClass == "NSTitlebarView" {
+                    for grandchild in child.subviews {
+                        // NSVisualEffectView is the material/vibrancy background
+                        if grandchild is NSVisualEffectView {
+                            grandchild.isHidden = true
+                        }
+                    }
+                }
+            }
+            return  // Don't recurse into title bar children
+        }
+
+        for subview in view.subviews {
+            stripTitleBarBackground(subview)
+        }
     }
 }
 
