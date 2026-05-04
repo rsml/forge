@@ -3,7 +3,8 @@ import SwiftUI
 struct MainView: View {
     @Environment(WorkspaceController.self) var controller
     @State private var sidebarWidth: CGFloat = 160
-    @State private var sidebarVisible = true
+    @State private var sidebarVisible = ForgeConfig.load().uiState?.sidebarVisible ?? true
+    @State private var showCommandPalette = false
 
     var body: some View {
         HStack(spacing: 0) {
@@ -11,6 +12,7 @@ struct MainView: View {
             if sidebarVisible {
                 SidebarView(onToggleSidebar: {
                     withAnimation(.easeInOut(duration: 0.2)) { sidebarVisible.toggle() }
+                    controller.saveUIState(sidebarVisible: sidebarVisible)
                 })
                     .frame(width: sidebarWidth)
                     .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
@@ -29,6 +31,7 @@ struct MainView: View {
                         sidebarVisible: sidebarVisible,
                         onToggleSidebar: {
                             withAnimation(.easeInOut(duration: 0.2)) { sidebarVisible.toggle() }
+                            controller.saveUIState(sidebarVisible: sidebarVisible)
                         }
                     )
                 } else {
@@ -43,19 +46,55 @@ struct MainView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .overlay {
+            if showCommandPalette {
+                ZStack {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                        .onTapGesture { showCommandPalette = false }
+
+                    VStack {
+                        CommandPalette(isPresented: $showCommandPalette)
+                            .padding(.top, 80)
+                        Spacer()
+                    }
+                }
+            }
+        }
         .ignoresSafeArea()
         .onAppear {
             configureWindow()
+            CommandRegistry.shared.setup(controller: controller)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .forgeCommandPalette)) { _ in
+            showCommandPalette.toggle()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .forgeToggleSidebar)) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) { sidebarVisible.toggle() }
+            controller.saveUIState(sidebarVisible: sidebarVisible)
         }
     }
 
     private func configureWindow() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             guard let window = NSApp.windows.first(where: { $0.isVisible }) else { return }
-            window.titlebarAppearsTransparent = true
-            window.titleVisibility = .hidden
-            window.styleMask.insert(.fullSizeContentView)
-            window.isMovableByWindowBackground = false
+            Self.applyWindowStyle(window)
+            NotificationCenter.default.addObserver(
+                forName: NSWindow.didExitFullScreenNotification,
+                object: window,
+                queue: .main
+            ) { notification in
+                if let w = notification.object as? NSWindow {
+                    Self.applyWindowStyle(w)
+                }
+            }
         }
+    }
+
+    @MainActor private static func applyWindowStyle(_ window: NSWindow) {
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.styleMask.insert(.fullSizeContentView)
+        window.isMovableByWindowBackground = false
     }
 }

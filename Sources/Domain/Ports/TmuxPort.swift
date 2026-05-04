@@ -29,6 +29,8 @@ struct PaneInfo {
     let pid: Int
 }
 
+enum SplitDirection { case horizontal, vertical }
+
 @MainActor
 protocol TmuxPort {
     func listSessions() async -> [SessionInfo]
@@ -46,6 +48,9 @@ protocol TmuxPort {
 
     func selectPane(id: String) async
     func switchClient(session: String) async
+
+    func splitWindow(id: String, direction: SplitDirection) async
+    func swapWindow(id: String, offset: Int) async
 
     func startControlMode(onEvent: @escaping @Sendable (String) -> Void)
     func stopControlMode()

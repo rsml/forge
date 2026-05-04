@@ -4,6 +4,7 @@ struct ForgeConfig: Codable {
     var projects: [ProjectConfig]
     var recentDirectories: [String]
     var theme: ThemeConfig?
+    var uiState: UIState?
 
     struct ProjectConfig: Codable {
         var name: String
@@ -15,6 +16,13 @@ struct ForgeConfig: Codable {
 
     struct ThemeConfig: Codable {
         var source: String?
+    }
+
+    struct UIState: Codable {
+        var activeSessionName: String?
+        var activeWindowIndex: Int?
+        var sidebarVisible: Bool?
+        var expandedSessionNames: [String]?
     }
 
     static let defaultConfig = ForgeConfig(

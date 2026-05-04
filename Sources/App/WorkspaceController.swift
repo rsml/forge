@@ -19,6 +19,7 @@ final class WorkspaceController {
             ForgeLog.log("[app] Connecting...")
             await ensureServer()
             await refresh()
+            restoreUIState()
 
             tmux.startControlMode { [weak self] event in
                 Task { @MainActor in
@@ -62,11 +63,13 @@ final class WorkspaceController {
             workspace.activeWindowId = window.id
         }
         Task { await tmux.switchClient(session: session.name) }
+        saveUIState()
     }
 
     func selectWindow(_ window: Window) {
         workspace.activeWindowId = window.id
         Task { await tmux.selectWindow(id: window.id) }
+        saveUIState()
     }
 
     func addSession(name: String, path: String) async {
@@ -89,12 +92,33 @@ final class WorkspaceController {
         Task { await tmux.killWindow(id: window.id) }
     }
 
+    /// Removes a window, selecting the tab to its left (or the next tab if it was first).
+    func removeWindow(_ window: Window, in session: Session) {
+        if let index = session.windows.firstIndex(where: { $0.id == window.id }) {
+            let nextIndex = index > 0 ? index - 1 : min(index + 1, session.windows.count - 1)
+            if nextIndex != index, nextIndex < session.windows.count {
+                selectWindow(session.windows[nextIndex])
+            }
+        }
+        Task { await tmux.killWindow(id: window.id) }
+    }
+
     func renameSession(_ session: Session, to name: String) {
         Task { await tmux.renameSession(target: session.name, newName: name) }
     }
 
     func renameWindow(_ window: Window, to name: String) {
         Task { await tmux.renameWindow(id: window.id, newName: name) }
+    }
+
+    func splitPane(direction: SplitDirection) {
+        guard let windowId = workspace.activeWindowId else { return }
+        Task { await tmux.splitWindow(id: windowId, direction: direction) }
+    }
+
+    func swapWindow(offset: Int) {
+        guard let windowId = workspace.activeWindowId else { return }
+        Task { await tmux.swapWindow(id: windowId, offset: offset) }
     }
 
     // MARK: - Private
@@ -108,6 +132,22 @@ final class WorkspaceController {
 
     private func handleEvent(_ event: String) {
         ForgeLog.log("[control] \(event)")
+
+        if event.hasPrefix("%bell") {
+            // %bell %<window_id> — mark panes in that window as having bell
+            let parts = event.split(separator: " ")
+            if parts.count >= 2 {
+                let windowId = String(parts[1])
+                for session in workspace.sessions {
+                    if let window = session.windows.first(where: { $0.id == windowId }) {
+                        for pane in window.panes {
+                            pane.hasBell = true
+                        }
+                    }
+                }
+            }
+        }
+
         Task { await refresh() }
     }
 
@@ -157,6 +197,42 @@ final class WorkspaceController {
         if let active = infos.first(where: { $0.active }) {
             if session.id == workspace.activeSessionId {
                 workspace.activeWindowId = active.id
+            }
+        }
+    }
+
+    // MARK: - UI State Persistence
+
+    func saveUIState(sidebarVisible: Bool? = nil, expandedSessionNames: [String]? = nil) {
+        let activeSession = workspace.sessions.first { $0.id == workspace.activeSessionId }
+        let activeWindow = activeSession?.windows.first { $0.id == workspace.activeWindowId }
+
+        var config = ForgeConfig.load()
+        var state = config.uiState ?? ForgeConfig.UIState()
+        state.activeSessionName = activeSession?.name
+        state.activeWindowIndex = activeWindow?.index
+        if let sidebarVisible { state.sidebarVisible = sidebarVisible }
+        if let expandedSessionNames { state.expandedSessionNames = expandedSessionNames }
+        config.uiState = state
+        config.save()
+    }
+
+    private func restoreUIState() {
+        guard let state = ForgeConfig.load().uiState else { return }
+
+        // Restore active session by name
+        if let name = state.activeSessionName,
+           let session = workspace.sessions.first(where: { $0.name == name }) {
+            workspace.activeSessionId = session.id
+            Task { await tmux.switchClient(session: session.name) }
+
+            // Restore active window by index within that session
+            if let index = state.activeWindowIndex,
+               let window = session.windows.first(where: { $0.index == index }) {
+                workspace.activeWindowId = window.id
+                Task { await tmux.selectWindow(id: window.id) }
+            } else if let first = session.windows.first {
+                workspace.activeWindowId = first.id
             }
         }
     }

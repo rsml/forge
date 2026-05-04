@@ -35,7 +35,7 @@ struct ForgeMenuCommands: Commands {
             Button("New Project...") {
                 NotificationCenter.default.post(name: .forgeNewProject, object: nil)
             }
-            .keyboardShortcut("o")
+            .keyboardShortcut("n")
 
             Button("New Tab") {
                 if let session = controller.workspace.activeSession {
@@ -50,7 +50,7 @@ struct ForgeMenuCommands: Commands {
                 if let session = controller.workspace.activeSession,
                    let windowId = controller.workspace.activeWindowId,
                    let window = session.windows.first(where: { $0.id == windowId }) {
-                    controller.removeWindow(window)
+                    controller.removeWindow(window, in: session)
                 }
             }
             .keyboardShortcut("w")
@@ -61,6 +61,86 @@ struct ForgeMenuCommands: Commands {
                 openSettings()
             }
             .keyboardShortcut(",")
+        }
+
+        CommandMenu("View") {
+            Button("Toggle Sidebar") {
+                NotificationCenter.default.post(name: .forgeToggleSidebar, object: nil)
+            }
+            .keyboardShortcut("b")
+
+            Button("Command Palette") {
+                NotificationCenter.default.post(name: .forgeCommandPalette, object: nil)
+            }
+            .keyboardShortcut("p")
+
+            Divider()
+
+            Button("Select Tab Left") {
+                guard let session = controller.workspace.activeSession,
+                      let windowId = controller.workspace.activeWindowId,
+                      let idx = session.windows.firstIndex(where: { $0.id == windowId }),
+                      idx > 0
+                else { return }
+                controller.selectWindow(session.windows[idx - 1])
+            }
+            .keyboardShortcut("[", modifiers: [.command, .shift])
+
+            Button("Select Tab Right") {
+                guard let session = controller.workspace.activeSession,
+                      let windowId = controller.workspace.activeWindowId,
+                      let idx = session.windows.firstIndex(where: { $0.id == windowId }),
+                      idx < session.windows.count - 1
+                else { return }
+                controller.selectWindow(session.windows[idx + 1])
+            }
+            .keyboardShortcut("]", modifiers: [.command, .shift])
+
+            Button("Move Tab Left") {
+                NotificationCenter.default.post(name: .forgeMoveTabLeft, object: nil)
+            }
+            .keyboardShortcut(.leftArrow, modifiers: [.command, .shift])
+
+            Button("Move Tab Right") {
+                NotificationCenter.default.post(name: .forgeMoveTabRight, object: nil)
+            }
+            .keyboardShortcut(.rightArrow, modifiers: [.command, .shift])
+
+            Divider()
+
+            ForEach(1...9, id: \.self) { n in
+                Button("Tab \(n)") {
+                    guard let session = controller.workspace.activeSession,
+                          session.windows.count >= n
+                    else { return }
+                    controller.selectWindow(session.windows[n - 1])
+                }
+                .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command)
+            }
+
+            Divider()
+
+            Button("Next Project") {
+                let sessions = controller.workspace.sessions
+                guard sessions.count > 1,
+                      let activeId = controller.workspace.activeSessionId,
+                      let idx = sessions.firstIndex(where: { $0.id == activeId })
+                else { return }
+                let next = sessions[(idx + 1) % sessions.count]
+                controller.selectSession(next)
+            }
+            .keyboardShortcut(KeyEquivalent("\t"), modifiers: .control)
+
+            Button("Previous Project") {
+                let sessions = controller.workspace.sessions
+                guard sessions.count > 1,
+                      let activeId = controller.workspace.activeSessionId,
+                      let idx = sessions.firstIndex(where: { $0.id == activeId })
+                else { return }
+                let prev = sessions[(idx - 1 + sessions.count) % sessions.count]
+                controller.selectSession(prev)
+            }
+            .keyboardShortcut(KeyEquivalent("\t"), modifiers: [.control, .shift])
         }
     }
 
@@ -76,6 +156,12 @@ struct ForgeMenuCommands: Commands {
 
 extension Notification.Name {
     static let forgeNewProject = Notification.Name("forgeNewProject")
+    static let forgeCommandPalette = Notification.Name("forgeCommandPalette")
+    static let forgeToggleSidebar = Notification.Name("forgeToggleSidebar")
+    static let forgeMoveTabLeft = Notification.Name("forgeMoveTabLeft")
+    static let forgeMoveTabRight = Notification.Name("forgeMoveTabRight")
+    static let forgeCollapseAll = Notification.Name("forgeCollapseAll")
+    static let forgeExpandAll = Notification.Name("forgeExpandAll")
 }
 
 // MARK: - App Delegate

@@ -3,13 +3,41 @@ import Foundation
 /// Runs tmux CLI commands off the main thread
 struct TmuxCommandRunner: Sendable {
     let tmuxPath: String
+    let socketName: String = "forge"
+    let configPath: String?
 
     init() {
-        self.tmuxPath = ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
-            .first { FileManager.default.fileExists(atPath: $0) } ?? "tmux"
+        // 1. Bundled: next to the executable
+        let execURL = Bundle.main.executableURL?.deletingLastPathComponent()
+        let bundledPath = execURL?.appendingPathComponent("tmux").path
+        if let bundledPath, FileManager.default.fileExists(atPath: bundledPath) {
+            self.tmuxPath = bundledPath
+        } else {
+            // 2. System installations (fallback)
+            self.tmuxPath = ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
+                .first { FileManager.default.fileExists(atPath: $0) } ?? "tmux"
+        }
+
+        // Config: next to executable
+        let configCandidate = execURL?.appendingPathComponent("forge-tmux.conf").path
+        if let configCandidate, FileManager.default.fileExists(atPath: configCandidate) {
+            self.configPath = configCandidate
+        } else {
+            self.configPath = nil
+        }
+    }
+
+    /// Builds the base arguments that should precede every tmux command
+    private var baseArgs: [String] {
+        var args = ["-L", socketName]
+        if let configPath {
+            args += ["-f", configPath]
+        }
+        return args
     }
 
     func run(_ args: [String]) async -> String? {
+        let fullArgs = baseArgs + args
         let path = tmuxPath
         return await withCheckedContinuation { continuation in
             DispatchQueue.global().async {
@@ -17,7 +45,7 @@ struct TmuxCommandRunner: Sendable {
                 let pipe = Pipe()
                 let errPipe = Pipe()
                 process.executableURL = URL(fileURLWithPath: path)
-                process.arguments = args
+                process.arguments = fullArgs
                 process.standardOutput = pipe
                 process.standardError = errPipe
 
@@ -31,7 +59,7 @@ struct TmuxCommandRunner: Sendable {
                     if process.terminationStatus != 0 {
                         let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
                         let errMsg = String(data: errData, encoding: .utf8) ?? ""
-                        ForgeLog.log("[tmux] \(args.joined(separator: " ")) failed: \(errMsg)")
+                        ForgeLog.log("[tmux] \(fullArgs.joined(separator: " ")) failed: \(errMsg)")
                     }
 
                     continuation.resume(returning: output)

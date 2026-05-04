@@ -10,7 +10,9 @@ struct SessionRow: View {
     var onRenameCommit: () -> Void
     var onSelect: () -> Void
     var onSelectWindow: (Window) -> Void
-    var onMoveWindow: (IndexSet, Int) -> Void
+    var renamingWindowId: String?
+    var onStartWindowRename: (Window) -> Void = { _ in }
+    var onRenameWindowCommit: () -> Void = {}
 
     @State private var isHeaderHovered = false
     @State private var isChevronHovered = false
@@ -36,12 +38,10 @@ struct SessionRow: View {
                 AttentionDot(needsAttention: session.needsAttention, size: 8)
 
                 if isRenaming {
-                    TextField("Project name", text: $renameText, onCommit: onRenameCommit)
-                        .textFieldStyle(.plain)
-                        .font(.system(.body, weight: .medium))
+                    InlineRenameField(text: $renameText, font: .system(.body, weight: .medium), onCommit: onRenameCommit)
                 } else {
                     Text(session.name)
-                        .font(.system(.body, weight: .medium))
+                        .font(.system(.body, weight: isActive ? .medium : .regular))
                         .foregroundStyle(isActive ? .primary : .secondary)
                         .lineLimit(1)
                 }
@@ -69,8 +69,24 @@ struct SessionRow: View {
                         SidebarTabRow(
                             window: window,
                             isActive: isActive && window.id == activeWindowId,
-                            isHovered: hoveredWindowId == window.id
+                            isHovered: hoveredWindowId == window.id,
+                            isRenaming: renamingWindowId == window.id,
+                            renameText: $renameText,
+                            onRenameCommit: onRenameWindowCommit
                         )
+                        .draggable(window.id)
+                        .dropDestination(for: String.self) { droppedIds, _ in
+                            guard let droppedId = droppedIds.first,
+                                  let from = session.windows.firstIndex(where: { $0.id == droppedId }),
+                                  let to = session.windows.firstIndex(where: { $0.id == window.id }),
+                                  from != to
+                            else { return false }
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                session.windows.move(fromOffsets: IndexSet(integer: from),
+                                                     toOffset: to > from ? to + 1 : to)
+                            }
+                            return true
+                        }
                         .contentShape(Rectangle())
                         .onHover { hovering in
                             hoveredWindowId = hovering ? window.id : nil
@@ -78,12 +94,48 @@ struct SessionRow: View {
                         .onTapGesture {
                             onSelectWindow(window)
                         }
+                        .contextMenu {
+                            Button("Rename...") { onStartWindowRename(window) }
+                            Divider()
+                            Button("Close Tab", role: .destructive) {
+                                onSelectWindow(window)
+                            }
+                        }
                     }
-                    .onMove(perform: onMoveWindow)
                 }
-                .padding(.leading, 10)
+                .padding(.leading, 0)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
+        }
+    }
+}
+
+/// Inline text field with a checkmark commit button.
+struct InlineRenameField: View {
+    @Binding var text: String
+    var font: Font = .caption
+    var onCommit: () -> Void
+
+    var body: some View {
+        HStack(spacing: 4) {
+            TextField("Name", text: $text, onCommit: onCommit)
+                .textFieldStyle(.plain)
+                .font(font)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.primary.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .strokeBorder(Color.accentColor.opacity(0.4), lineWidth: 1)
+                )
+
+            IconButton(systemName: "checkmark", font: .system(size: 10, weight: .semibold)) {
+                onCommit()
+            }
+            .frame(width: 20, height: 20)
         }
     }
 }
@@ -93,6 +145,9 @@ struct SidebarTabRow: View {
     var window: Window
     var isActive: Bool
     var isHovered: Bool
+    var isRenaming: Bool = false
+    @Binding var renameText: String
+    var onRenameCommit: () -> Void = {}
 
     var body: some View {
         HStack(spacing: 0) {
@@ -102,12 +157,16 @@ struct SidebarTabRow: View {
                 .frame(width: 2, height: 12)
                 .padding(.trailing, 4)
 
-            Text(displayName)
-                .font(.caption)
-                .foregroundStyle(isActive ? .primary : .secondary)
-                .lineLimit(1)
+            if isRenaming {
+                InlineRenameField(text: $renameText, font: .caption, onCommit: onRenameCommit)
+            } else {
+                Text(window.name)
+                    .font(.caption)
+                    .foregroundStyle(isActive ? .primary : .secondary)
+                    .lineLimit(1)
+            }
 
-            if window.needsAttention {
+            if !isRenaming && window.needsAttention {
                 AttentionDot(needsAttention: true, size: 5)
                     .padding(.leading, 4)
             }
@@ -120,14 +179,5 @@ struct SidebarTabRow: View {
             RoundedRectangle(cornerRadius: 4)
                 .fill(isHovered ? Color.primary.opacity(0.06) : Color.clear)
         )
-    }
-
-    private var displayName: String {
-        guard let pane = window.panes.first,
-              !pane.currentCommand.isEmpty,
-              pane.currentCommand != window.name else {
-            return window.name
-        }
-        return "\(window.name) — \(pane.currentCommand)"
     }
 }

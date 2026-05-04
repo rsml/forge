@@ -22,10 +22,19 @@ struct ForgeTerminalView: NSViewRepresentable {
         terminal.font = resolveTerminalFont(size: 13)
 
         let tmuxPath = findTmux()
+        let configArg: String
+        if let configPath = Bundle.main.executableURL?.deletingLastPathComponent()
+            .appendingPathComponent("forge-tmux.conf").path,
+            FileManager.default.fileExists(atPath: configPath) {
+            configArg = "-f \(configPath) "
+        } else {
+            configArg = ""
+        }
+        let socketArg = "-L forge"
 
         // Hide tmux status bar — Forge provides the tab UI
         let shell = "/bin/zsh"
-        let cmd = "\(tmuxPath) set-option -g status off 2>/dev/null; \(tmuxPath) attach-session -t \(sessionName)"
+        let cmd = "\(tmuxPath) \(socketArg) \(configArg)set-option -g status off 2>/dev/null; \(tmuxPath) \(socketArg) \(configArg)attach-session -t \(sessionName)"
         terminal.startProcess(
             executable: shell,
             args: ["-c", cmd],
@@ -59,6 +68,7 @@ struct ForgeTerminalView: NSViewRepresentable {
     /// 3. System monospaced font (final fallback, no Nerd Font glyphs)
     private func resolveTerminalFont(size: CGFloat) -> NSFont {
         let fallbacks = [
+            "Dank Mono",
             "MesloLGS NF",
             "MesloLGM Nerd Font",
             "JetBrainsMono Nerd Font",
@@ -98,7 +108,12 @@ struct ForgeTerminalView: NSViewRepresentable {
     }
 
     private func findTmux() -> String {
-        ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
+        if let bundledPath = Bundle.main.executableURL?.deletingLastPathComponent()
+            .appendingPathComponent("tmux").path,
+            FileManager.default.fileExists(atPath: bundledPath) {
+            return bundledPath
+        }
+        return ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
             .first { FileManager.default.fileExists(atPath: $0) }
             ?? "/opt/homebrew/bin/tmux"
     }

@@ -43,6 +43,19 @@ struct WindowTabBar: View {
                                 window: window,
                                 isActive: window.id == controller.workspace.activeWindowId
                             )
+                            .draggable(window.id)
+                            .dropDestination(for: String.self) { droppedIds, _ in
+                                guard let droppedId = droppedIds.first,
+                                      let from = session.windows.firstIndex(where: { $0.id == droppedId }),
+                                      let to = session.windows.firstIndex(where: { $0.id == window.id }),
+                                      from != to
+                                else { return false }
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    session.windows.move(fromOffsets: IndexSet(integer: from),
+                                                         toOffset: to > from ? to + 1 : to)
+                                }
+                                return true
+                            }
                             .onTapGesture {
                                 controller.selectWindow(window)
                             }
@@ -50,7 +63,7 @@ struct WindowTabBar: View {
                                 Button("Rename...") {}
                                 Divider()
                                 Button("Close Tab", role: .destructive) {
-                                    controller.removeWindow(window)
+                                    controller.removeWindow(window, in: session)
                                 }
                             }
                         }
@@ -59,13 +72,32 @@ struct WindowTabBar: View {
                 }
 
                 Spacer()
+                    .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2) {
+                        controller.addWindow(in: session)
+                    }
+                    .contextMenu {
+                        Button("New Tab") {
+                            controller.addWindow(in: session)
+                        }
+                        Button("New Browser Tab") {}
+                    }
 
-                IconButton(systemName: "plus", font: .caption) {
-                    controller.addWindow(in: session)
+                HStack(spacing: 0) {
+                    IconButton(systemName: "rectangle.split.2x1") {
+                        controller.splitPane(direction: .horizontal)
+                    }
+                    .frame(width: 28, height: 28)
+                    .help("Split Horizontally")
+
+                    IconButton(systemName: "rectangle.split.1x2") {
+                        controller.splitPane(direction: .vertical)
+                    }
+                    .frame(width: 28, height: 28)
+                    .help("Split Vertically")
                 }
-                .frame(width: 36, height: 28)
-                .padding(.horizontal, 8)
-                .help("New Tab")
+                .padding(.trailing, 8)
             }
             .frame(height: 28)
         }
@@ -153,11 +185,12 @@ struct WindowTab: View {
             }
             .padding(.horizontal, 10)
             .frame(maxHeight: .infinity)
+            .offset(y: 1)
 
-            // Subtle bottom indicator
-            RoundedRectangle(cornerRadius: 0.5)
-                .fill(isActive ? Color.accentColor.opacity(0.5) : Color.clear)
-                .frame(height: 1)
+            // Active tab indicator — flush to bottom
+            RoundedRectangle(cornerRadius: 1)
+                .fill(isActive ? Color.accentColor.opacity(0.6) : Color.clear)
+                .frame(height: 2)
                 .padding(.horizontal, 6)
         }
         .contentShape(Rectangle())

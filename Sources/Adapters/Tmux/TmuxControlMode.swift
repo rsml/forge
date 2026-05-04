@@ -6,10 +6,14 @@ final class TmuxControlMode: @unchecked Sendable {
     private var stdin: FileHandle?
     private var buffer = ""
     private let tmuxPath: String
+    private let socketName: String
+    private let configPath: String?
     private var onEvent: (@Sendable (String) -> Void)?
 
-    init(tmuxPath: String) {
+    init(tmuxPath: String, socketName: String = "forge", configPath: String? = nil) {
         self.tmuxPath = tmuxPath
+        self.socketName = socketName
+        self.configPath = configPath
     }
 
     func start(onEvent: @escaping @Sendable (String) -> Void) {
@@ -19,8 +23,14 @@ final class TmuxControlMode: @unchecked Sendable {
         let stdoutPipe = Pipe()
         let stdinPipe = Pipe()
 
+        var args = ["-C", "-L", socketName]
+        if let configPath {
+            args += ["-f", configPath]
+        }
+        args += ["attach"]
+
         process.executableURL = URL(fileURLWithPath: tmuxPath)
-        process.arguments = ["-C", "attach"]
+        process.arguments = args
         process.standardOutput = stdoutPipe
         process.standardInput = stdinPipe
         process.standardError = FileHandle.nullDevice
@@ -71,7 +81,7 @@ final class TmuxControlMode: @unchecked Sendable {
             let line = String(buffer[buffer.startIndex..<idx])
             buffer = String(buffer[buffer.index(after: idx)...])
             if line.hasPrefix("%") {
-                let event = line.split(separator: " ", maxSplits: 1).first.map(String.init) ?? line
+                let event = line
                 onEvent?(event)
             }
         }

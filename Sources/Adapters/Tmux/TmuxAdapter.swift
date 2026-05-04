@@ -4,7 +4,11 @@ import Foundation
 @MainActor
 final class TmuxAdapter: TmuxPort {
     private let runner = TmuxCommandRunner()
-    private lazy var controlMode = TmuxControlMode(tmuxPath: runner.tmuxPath)
+    private lazy var controlMode = TmuxControlMode(
+        tmuxPath: runner.tmuxPath,
+        socketName: runner.socketName,
+        configPath: runner.configPath
+    )
 
     func listSessions() async -> [SessionInfo] {
         guard let output = await runner.run("list-sessions", "-F", TmuxStateParser.sessionFormat),
@@ -60,6 +64,16 @@ final class TmuxAdapter: TmuxPort {
 
     func switchClient(session: String) async {
         controlMode.send("switch-client -t \(session)")
+    }
+
+    func splitWindow(id: String, direction: SplitDirection) async {
+        let flag = direction == .horizontal ? "-h" : "-v"
+        controlMode.send("split-window \(flag) -t \(id)")
+    }
+
+    func swapWindow(id: String, offset: Int) async {
+        let target = offset > 0 ? "+\(offset)" : "\(offset)"
+        controlMode.send("swap-window -s \(id) -t \(target)")
     }
 
     func startControlMode(onEvent: @escaping @Sendable (String) -> Void) {

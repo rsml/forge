@@ -1,0 +1,164 @@
+import SwiftUI
+
+struct CommandPalette: View {
+    @Environment(WorkspaceController.self) var controller
+    @Binding var isPresented: Bool
+    @State private var query = ""
+    @State private var selectedIndex = 0
+    @FocusState private var isFieldFocused: Bool
+
+    private var results: [CommandItem] {
+        let registry = CommandRegistry.shared
+        if query.isEmpty {
+            return registry.commands.map { CommandItem(command: $0) }
+        }
+        if query.hasPrefix("/") {
+            let searchTerm = String(query.dropFirst()).lowercased()
+            return registry.commands
+                .filter { $0.name.lowercased().contains(searchTerm) || $0.description.lowercased().contains(searchTerm) }
+                .map { CommandItem(command: $0) }
+        }
+        // Plain text: fuzzy search sessions + windows
+        let term = query.lowercased()
+        var items: [CommandItem] = []
+        for session in controller.workspace.sessions {
+            if session.name.lowercased().contains(term) {
+                items.append(CommandItem(title: session.name, subtitle: "Project", icon: "folder", action: { [weak controller] in
+                    controller?.selectSession(session)
+                }))
+            }
+            for window in session.windows {
+                if window.name.lowercased().contains(term) {
+                    items.append(CommandItem(title: window.name, subtitle: session.name, icon: "rectangle.topthird.inset.filled", action: { [weak controller] in
+                        controller?.selectSession(session)
+                        controller?.selectWindow(window)
+                    }))
+                }
+            }
+        }
+        return items
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Search field
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Search or type / for commands...", text: $query)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 16))
+                    .focused($isFieldFocused)
+                    .onSubmit { executeSelected() }
+                    .onChange(of: query) { selectedIndex = 0 }
+            }
+            .padding(12)
+
+            if !results.isEmpty {
+                Divider()
+
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(Array(results.enumerated().prefix(20)), id: \.offset) { index, item in
+                                CommandRow(item: item, isSelected: index == selectedIndex)
+                                    .id(index)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        selectedIndex = index
+                                        executeSelected()
+                                    }
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 300)
+                    .onChange(of: selectedIndex) { _, newValue in
+                        proxy.scrollTo(newValue, anchor: .center)
+                    }
+                }
+            }
+        }
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+        .frame(width: 500)
+        .onAppear { isFieldFocused = true }
+        .onKeyPress(.escape) { dismiss(); return .handled }
+        .onKeyPress(.upArrow) {
+            selectedIndex = max(0, selectedIndex - 1)
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            selectedIndex = min(results.count - 1, selectedIndex + 1)
+            return .handled
+        }
+    }
+
+    private func executeSelected() {
+        guard selectedIndex < results.count else { return }
+        let item = results[selectedIndex]
+        item.execute(argumentFrom(query))
+        dismiss()
+    }
+
+    private func dismiss() {
+        isPresented = false
+        query = ""
+        selectedIndex = 0
+    }
+
+    private func argumentFrom(_ query: String) -> String {
+        if query.hasPrefix("/") {
+            let parts = query.dropFirst().split(separator: " ", maxSplits: 1)
+            return parts.count > 1 ? String(parts[1]) : ""
+        }
+        return query
+    }
+}
+
+struct CommandRow: View {
+    let item: CommandItem
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: item.icon)
+                .frame(width: 20)
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.title)
+                    .font(.system(size: 13))
+                if !item.subtitle.isEmpty {
+                    Text(item.subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
+    }
+}
+
+struct CommandItem {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let execute: (String) -> Void
+
+    init(title: String, subtitle: String, icon: String, action: @escaping () -> Void) {
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.execute = { _ in action() }
+    }
+
+    init(command: Command) {
+        self.title = "/\(command.name)"
+        self.subtitle = command.description
+        self.icon = command.icon
+        self.execute = command.execute
+    }
+}
