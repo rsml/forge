@@ -5,6 +5,9 @@ struct ForgeConfig: Codable {
     var recentDirectories: [String]
     var theme: ThemeConfig?
     var uiState: UIState?
+    var general: GeneralSettings?
+    var appearance: AppearanceSettings?
+    var shortcuts: [String: ShortcutConfig]?
 
     struct ProjectConfig: Codable {
         var name: String
@@ -16,6 +19,24 @@ struct ForgeConfig: Codable {
 
     struct ThemeConfig: Codable {
         var source: String?
+    }
+
+    struct GeneralSettings: Codable {
+        var defaultShell: String?
+        var defaultProjectDir: String?
+        var autoRestore: Bool?
+        var confirmBeforeClose: Bool?
+    }
+
+    struct AppearanceSettings: Codable {
+        var fontFamily: String?
+        var fontSize: Int?
+        var tabBarPosition: String?
+    }
+
+    struct ShortcutConfig: Codable, Equatable {
+        var key: String
+        var modifiers: [String]
     }
 
     struct UIState: Codable {

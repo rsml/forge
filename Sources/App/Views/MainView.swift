@@ -50,35 +50,21 @@ struct MainView: View {
         }
         .overlay {
             if showCommandPalette {
-                ZStack {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                        .onTapGesture { showCommandPalette = false }
-
-                    VStack {
-                        CommandPalette(isPresented: $showCommandPalette)
-                            .padding(.top, 80)
-                        Spacer()
-                    }
+                ModalContainer(isPresented: $showCommandPalette, width: 500, maxHeight: 400) {
+                    CommandPalette(isPresented: $showCommandPalette)
                 }
             }
         }
         .overlay {
             if showNewProject {
-                ZStack {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                        .onTapGesture { showNewProject = false }
+                ModalContainer(isPresented: $showNewProject, width: 520, maxHeight: 480) {
                     ProjectPickerView(onDismiss: { showNewProject = false })
                 }
             }
         }
         .overlay {
             if showNotifications {
-                ZStack {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                        .onTapGesture { showNotifications = false }
+                ModalContainer(isPresented: $showNotifications, width: 380, maxHeight: 440) {
                     NotificationPanel(onDismiss: { showNotifications = false })
                 }
             }

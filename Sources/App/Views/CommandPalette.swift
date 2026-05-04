@@ -5,6 +5,7 @@ struct CommandPalette: View {
     @Binding var isPresented: Bool
     @State private var query = ""
     @State private var selectedIndex = 0
+    @State private var useMouseSelection = true
     @FocusState private var isFieldFocused: Bool
 
     private var results: [CommandItem] {
@@ -14,7 +15,9 @@ struct CommandPalette: View {
             return sorted.map { CommandItem(command: $0) }
         }
         if query.hasPrefix("/") {
-            let searchTerm = String(query.dropFirst()).trimmingCharacters(in: .whitespaces).lowercased()
+            let afterSlash = String(query.dropFirst())
+            let commandPart = afterSlash.split(separator: " ", maxSplits: 1).first.map(String.init) ?? afterSlash
+            let searchTerm = commandPart.trimmingCharacters(in: .whitespaces).lowercased()
             if searchTerm.isEmpty {
                 return sorted.map { CommandItem(command: $0) }
             }
@@ -54,7 +57,10 @@ struct CommandPalette: View {
                     .font(.system(size: 16))
                     .focused($isFieldFocused)
                     .onSubmit { executeSelected() }
-                    .onChange(of: query) { selectedIndex = 0 }
+                    .onChange(of: query) {
+                        selectedIndex = 0
+                        useMouseSelection = false
+                    }
             }
             .padding(12)
 
@@ -68,6 +74,12 @@ struct CommandPalette: View {
                                 CommandRow(item: item, isSelected: index == selectedIndex)
                                     .id(index)
                                     .contentShape(Rectangle())
+                                    .onHover { hovering in
+                                        if hovering {
+                                            useMouseSelection = true
+                                            selectedIndex = index
+                                        }
+                                    }
                                     .onTapGesture {
                                         selectedIndex = index
                                         executeSelected()
@@ -82,10 +94,6 @@ struct CommandPalette: View {
                 }
             }
         }
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
-        .frame(width: 500)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 isFieldFocused = true
@@ -93,10 +101,12 @@ struct CommandPalette: View {
         }
         .onKeyPress(.escape) { dismiss(); return .handled }
         .onKeyPress(.upArrow) {
+            useMouseSelection = false
             selectedIndex = max(0, selectedIndex - 1)
             return .handled
         }
         .onKeyPress(.downArrow) {
+            useMouseSelection = false
             selectedIndex = min(results.count - 1, selectedIndex + 1)
             return .handled
         }

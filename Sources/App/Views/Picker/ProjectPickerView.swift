@@ -102,7 +102,6 @@ struct ProjectPickerView: View {
             }
             .padding(16)
         }
-        .frame(width: 520, height: 440)
         .onAppear {
             recentPaths = ForgeConfig.load().recentDirectories
         }
@@ -117,9 +116,10 @@ struct ProjectPickerView: View {
     private var displayRecent: [String] {
         if searchText.isEmpty { return recentPaths }
         let term = searchText.lowercased()
-        return recentPaths.filter {
-            $0.lowercased().contains(term) ||
-            URL(fileURLWithPath: $0).lastPathComponent.lowercased().contains(term)
+        return recentPaths.filter { path in
+            guard !path.isEmpty else { return false }
+            return path.lowercased().contains(term) ||
+                URL(fileURLWithPath: path).lastPathComponent.lowercased().contains(term)
         }
     }
 
@@ -145,16 +145,26 @@ struct ProjectPickerView: View {
             }
             return
         }
-        // Validate path still exists
+        // Guard against re-opening an already open project — just switch to it
+        if let existing = controller.workspace.sessions.first(where: { $0.path == path }) {
+            controller.selectSession(existing)
+            close()
+            return
+        }
+        // Validate path still exists (may have been deleted between selection and click)
         guard isDirectory(path) else {
             errorMessage = "Directory no longer exists: \(path)"
             selectedPath = nil
             return
         }
+        // Derive a unique session name to avoid tmux session name conflicts
+        let baseName = path.isEmpty ? "project" : URL(fileURLWithPath: path).lastPathComponent
+        let existingNames = Set(controller.workspace.sessions.map(\.name))
+        let sessionName = uniqueSessionName(baseName, existing: existingNames)
         errorMessage = nil
         saveToRecent(path)
-        Task {
-            await controller.addSession(name: URL(fileURLWithPath: path).lastPathComponent, path: path)
+        Task { @MainActor in
+            await controller.addSession(name: sessionName, path: path)
             close()
         }
     }
@@ -185,7 +195,7 @@ struct ProjectPickerView: View {
             guard !Task.isCancelled else { return }
             let results = await findDirectories(matching: query)
             guard !Task.isCancelled else { return }
-            searchResults = results
+            await MainActor.run { searchResults = results }
         }
     }
 
@@ -245,8 +255,17 @@ struct ProjectPickerView: View {
     // MARK: - Helpers
 
     private func isDirectory(_ path: String) -> Bool {
+        guard !path.isEmpty else { return false }
         var isDir: ObjCBool = false
         return FileManager.default.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue
+    }
+
+    /// Returns `base` if not in `existing`, otherwise appends a numeric suffix (base-2, base-3, …).
+    private func uniqueSessionName(_ base: String, existing: Set<String>) -> String {
+        guard existing.contains(base) else { return base }
+        var counter = 2
+        while existing.contains("\(base)-\(counter)") { counter += 1 }
+        return "\(base)-\(counter)"
     }
 
     private func saveToRecent(_ path: String) {
@@ -263,9 +282,15 @@ struct ProjectPickerView: View {
 struct ProjectRow: View {
     let path: String
 
-    private var name: String { URL(fileURLWithPath: path).lastPathComponent }
+    private var name: String {
+        guard !path.isEmpty else { return "(unknown)" }
+        return URL(fileURLWithPath: path).lastPathComponent
+    }
     private var displayPath: String { path.replacingOccurrences(of: NSHomeDirectory(), with: "~") }
-    private var isGitRepo: Bool { FileManager.default.fileExists(atPath: (path as NSString).appendingPathComponent(".git")) }
+    private var isGitRepo: Bool {
+        guard !path.isEmpty else { return false }
+        return FileManager.default.fileExists(atPath: (path as NSString).appendingPathComponent(".git"))
+    }
 
     var body: some View {
         HStack(spacing: 8) {

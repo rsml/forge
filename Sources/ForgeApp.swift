@@ -21,6 +21,10 @@ struct ForgeApp: App {
         .commands {
             ForgeMenuCommands(controller: controller)
         }
+
+        Settings {
+            SettingsView()
+        }
     }
 }
 
@@ -30,7 +34,15 @@ struct ForgeMenuCommands: Commands {
     let controller: WorkspaceController
 
     var body: some Commands {
-        // Replace "New Window" in File menu
+        // MARK: Forge (app menu) — Settings lives here
+        CommandGroup(replacing: .appSettings) {
+            Button("Settings...") {
+                openSettings()
+            }
+            .keyboardShortcut(KeyboardShortcuts.settings.key, modifiers: KeyboardShortcuts.settings.modifiers)
+        }
+
+        // MARK: File
         CommandGroup(replacing: .newItem) {
             Button("New Project...") {
                 NotificationCenter.default.post(name: .forgeNewProject, object: nil)
@@ -65,23 +77,39 @@ struct ForgeMenuCommands: Commands {
             .keyboardShortcut(KeyboardShortcuts.closeProject.key, modifiers: KeyboardShortcuts.closeProject.modifiers)
         }
 
-        CommandGroup(after: .appSettings) {
-            Button("Settings...") {
-                openSettings()
-            }
-            .keyboardShortcut(KeyboardShortcuts.settings.key, modifiers: KeyboardShortcuts.settings.modifiers)
+        // MARK: Edit — pass standard editing commands through to the active responder (terminal)
+        CommandGroup(replacing: .pasteboard) {
+            Button("Undo") { NSApp.sendAction(Selector(("undo:")), to: nil, from: nil) }
+                .keyboardShortcut("z", modifiers: .command)
+            Button("Redo") { NSApp.sendAction(Selector(("redo:")), to: nil, from: nil) }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+            Divider()
+            Button("Cut") { NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil) }
+                .keyboardShortcut("x", modifiers: .command)
+            Button("Copy") { NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil) }
+                .keyboardShortcut("c", modifiers: .command)
+            Button("Paste") { NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil) }
+                .keyboardShortcut("v", modifiers: .command)
+            Button("Select All") { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) }
+                .keyboardShortcut("a", modifiers: .command)
         }
 
+        // MARK: View
         CommandMenu("View") {
+            Button("Command Palette") {
+                NotificationCenter.default.post(name: .forgeCommandPalette, object: nil)
+            }
+            .keyboardShortcut(KeyboardShortcuts.commandPalette.key, modifiers: KeyboardShortcuts.commandPalette.modifiers)
+
             Button("Toggle Sidebar") {
                 NotificationCenter.default.post(name: .forgeToggleSidebar, object: nil)
             }
             .keyboardShortcut(KeyboardShortcuts.toggleSidebar.key, modifiers: KeyboardShortcuts.toggleSidebar.modifiers)
 
-            Button("Command Palette") {
-                NotificationCenter.default.post(name: .forgeCommandPalette, object: nil)
+            Button("Notifications") {
+                NotificationCenter.default.post(name: .forgeNotifications, object: nil)
             }
-            .keyboardShortcut(KeyboardShortcuts.commandPalette.key, modifiers: KeyboardShortcuts.commandPalette.modifiers)
+            .keyboardShortcut(KeyboardShortcuts.notifications.key, modifiers: KeyboardShortcuts.notifications.modifiers)
 
             Divider()
 
@@ -94,14 +122,10 @@ struct ForgeMenuCommands: Commands {
                 controller.splitPane(direction: .vertical)
             }
             .keyboardShortcut(KeyboardShortcuts.splitVertical.key, modifiers: KeyboardShortcuts.splitVertical.modifiers)
+        }
 
-            Button("Notifications") {
-                NotificationCenter.default.post(name: .forgeNotifications, object: nil)
-            }
-            .keyboardShortcut(KeyboardShortcuts.notifications.key, modifiers: KeyboardShortcuts.notifications.modifiers)
-
-            Divider()
-
+        // MARK: Window — tab and project navigation
+        CommandMenu("Window") {
             Button("Select Tab Left") {
                 guard let session = controller.workspace.activeSession,
                       let windowId = controller.workspace.activeWindowId,
@@ -167,17 +191,18 @@ struct ForgeMenuCommands: Commands {
                 controller.selectSession(prev)
             }
             .keyboardShortcut(KeyboardShortcuts.prevProject.key, modifiers: KeyboardShortcuts.prevProject.modifiers)
+        }
 
+        // MARK: Help
+        CommandMenu("Help") {
+            Button("Forge Help") {
+                NSApp.showHelp(nil)
+            }
         }
     }
 
     private func openSettings() {
-        let configURL = ForgeConfig.configURL
-        // Ensure file exists
-        if !FileManager.default.fileExists(atPath: configURL.path) {
-            ForgeConfig.defaultConfig.save()
-        }
-        NSWorkspace.shared.open(configURL)
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 }
 
