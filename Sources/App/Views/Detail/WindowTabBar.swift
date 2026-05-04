@@ -2,6 +2,8 @@ import SwiftUI
 
 struct WindowTabBar: View {
     var session: Session
+    var sidebarVisible: Bool = true
+    var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller
     @State private var gitBranch: String?
 
@@ -20,10 +22,20 @@ struct WindowTabBar: View {
             // Title bar area — path + git branch
             TitleBarRow(fullPath: fullPath, shortPath: shortPath, gitBranch: gitBranch)
                 .frame(height: 28)
-                .padding(.horizontal, 8)
+                .padding(.trailing, 8)
+                // When sidebar is hidden, avoid overlapping traffic light buttons
+                .padding(.leading, sidebarVisible ? 8 : 78)
 
             // Tab bar
             HStack(spacing: 0) {
+                // Show sidebar toggle when sidebar is hidden
+                if !sidebarVisible {
+                    IconButton(systemName: "sidebar.left") { onToggleSidebar() }
+                        .frame(width: 36, height: 28)
+                        .padding(.leading, 8)
+                        .help("Show Sidebar")
+                }
+
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 1) {
                         ForEach(session.windows) { window in
@@ -48,14 +60,10 @@ struct WindowTabBar: View {
 
                 Spacer()
 
-                Button {
+                IconButton(systemName: "plus", font: .caption) {
                     controller.addWindow(in: session)
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
+                .frame(width: 36, height: 28)
                 .padding(.horizontal, 8)
                 .help("New Tab")
             }
@@ -131,13 +139,14 @@ struct TitleBarRow: View {
 struct WindowTab: View {
     var window: Window
     let isActive: Bool
+    @State private var isHovered = false
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 4) {
                 Text("\(window.index): \(window.name)")
                     .font(.system(.caption, weight: .regular))
-                    .foregroundStyle(isActive ? .primary : .secondary)
+                    .foregroundStyle((isActive || isHovered) ? .primary : .secondary)
                     .lineLimit(1)
 
                 AttentionDot(needsAttention: window.needsAttention, size: 6)
@@ -152,5 +161,6 @@ struct WindowTab: View {
                 .padding(.horizontal, 6)
         }
         .contentShape(Rectangle())
+        .onHover { isHovered = $0 }
     }
 }

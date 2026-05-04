@@ -7,7 +7,7 @@ struct ForgeApp: App {
     @State private var debugServer = DebugServer()
 
     var body: some Scene {
-        SwiftUI.Window("Forge", id: "main") {
+        SwiftUI.Window("", id: "main") {
             MainView()
                 .environment(controller)
                 .frame(minWidth: 800, minHeight: 500)
@@ -81,6 +81,11 @@ extension Notification.Name {
 // MARK: - App Delegate
 
 final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }

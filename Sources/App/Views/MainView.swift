@@ -3,23 +3,34 @@ import SwiftUI
 struct MainView: View {
     @Environment(WorkspaceController.self) var controller
     @State private var sidebarWidth: CGFloat = 160
+    @State private var sidebarVisible = true
 
     var body: some View {
         HStack(spacing: 0) {
             // Sidebar
-            SidebarView()
-                .frame(width: sidebarWidth)
-                .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
+            if sidebarVisible {
+                SidebarView(onToggleSidebar: {
+                    withAnimation(.easeInOut(duration: 0.2)) { sidebarVisible.toggle() }
+                })
+                    .frame(width: sidebarWidth)
+                    .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
 
-            // Divider
-            Rectangle()
-                .fill(Color(nsColor: .separatorColor))
-                .frame(width: 1)
+                // Divider
+                Rectangle()
+                    .fill(Color(nsColor: .separatorColor))
+                    .frame(width: 1)
+            }
 
             // Detail
             VStack(spacing: 0) {
                 if let session = controller.workspace.activeSession {
-                    SessionDetailView(session: session)
+                    SessionDetailView(
+                        session: session,
+                        sidebarVisible: sidebarVisible,
+                        onToggleSidebar: {
+                            withAnimation(.easeInOut(duration: 0.2)) { sidebarVisible.toggle() }
+                        }
+                    )
                 } else {
                     VStack {
                         Spacer()
@@ -44,7 +55,7 @@ struct MainView: View {
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.styleMask.insert(.fullSizeContentView)
-            window.isMovableByWindowBackground = true
+            window.isMovableByWindowBackground = false
         }
     }
 }

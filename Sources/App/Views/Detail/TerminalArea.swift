@@ -9,8 +9,7 @@ struct TerminalArea: View {
         // when switching tabs — tmux handles window switching internally via select-window,
         // so there's no need to recreate the terminal view (which causes a blank flash).
         ForgeTerminalView(sessionName: session.name)
-            // Extend into safe-area insets so the scrollbar reaches the window edge
-            // without being clipped at the bottom-right corner.
+            .padding(.trailing, -15) // Compensate for SwiftTerm's reserved legacy scroller width
             .ignoresSafeArea(edges: [.bottom, .trailing])
             .id(session.id)
             .background(Color(red: 0.1, green: 0.1, blue: 0.1))

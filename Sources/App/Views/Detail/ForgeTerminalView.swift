@@ -8,12 +8,12 @@ struct ForgeTerminalView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> LocalProcessTerminalView {
         let terminal = LocalProcessTerminalView(frame: .zero)
+        terminal.autoresizingMask = [.width, .height]
 
         // Hide the legacy scroller — tmux manages scrollback
         for subview in terminal.subviews {
             if let scroller = subview as? NSScroller {
-                scroller.scrollerStyle = .overlay
-                scroller.alphaValue = 0
+                scroller.isHidden = true
             }
         }
 
@@ -33,10 +33,23 @@ struct ForgeTerminalView: NSViewRepresentable {
             execName: "zsh"
         )
 
+        // Grab focus so the terminal receives keyboard input
+        DispatchQueue.main.async {
+            terminal.window?.makeFirstResponder(terminal)
+        }
+
         return terminal
     }
 
-    func updateNSView(_ nsView: LocalProcessTerminalView, context: Context) {}
+    func updateNSView(_ nsView: LocalProcessTerminalView, context: Context) {
+        // Scrollers may not exist during makeNSView; hide them here where the
+        // view hierarchy is guaranteed to be fully assembled.
+        for subview in nsView.subviews {
+            if let scroller = subview as? NSScroller {
+                scroller.isHidden = true
+            }
+        }
+    }
 
     /// Resolves the best available monospaced font with Nerd Font glyph coverage.
     ///

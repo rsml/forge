@@ -2,27 +2,36 @@ import SwiftUI
 
 struct SessionRow: View {
     var session: Session
+    var isActive: Bool
+    var activeWindowId: String?
     @Binding var isExpanded: Bool
     var isRenaming: Bool
     @Binding var renameText: String
     var onRenameCommit: () -> Void
+    var onSelect: () -> Void
     var onSelectWindow: (Window) -> Void
+    var onMoveWindow: (IndexSet, Int) -> Void
+
+    @State private var isHeaderHovered = false
+    @State private var isChevronHovered = false
+    @State private var hoveredWindowId: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 0) {
+            // Project header — fixed height, vertically centered
             HStack(spacing: 6) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isExpanded.toggle()
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(isChevronHovered ? .primary : .tertiary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .frame(width: 16, height: 28)
+                    .contentShape(Rectangle())
+                    .onHover { isChevronHovered = $0 }
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isExpanded.toggle()
+                        }
                     }
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                }
-                .buttonStyle(.plain)
-                .frame(width: 12, height: 12)
 
                 AttentionDot(needsAttention: session.needsAttention, size: 8)
 
@@ -33,70 +42,92 @@ struct SessionRow: View {
                 } else {
                     Text(session.name)
                         .font(.system(.body, weight: .medium))
+                        .foregroundStyle(isActive ? .primary : .secondary)
                         .lineLimit(1)
                 }
 
                 Spacer()
             }
+            .frame(height: 28)
+            .padding(.horizontal, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(isHeaderHovered ? Color.primary.opacity(0.06) : Color.clear)
+            )
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                isHeaderHovered = hovering
+            }
+            .onTapGesture {
+                onSelect()
+            }
 
+            // Expanded window list
             if isExpanded {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 0) {
                     ForEach(session.windows) { window in
-                        TabRow(window: window)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                onSelectWindow(window)
-                            }
+                        SidebarTabRow(
+                            window: window,
+                            isActive: isActive && window.id == activeWindowId,
+                            isHovered: hoveredWindowId == window.id
+                        )
+                        .contentShape(Rectangle())
+                        .onHover { hovering in
+                            hoveredWindowId = hovering ? window.id : nil
+                        }
+                        .onTapGesture {
+                            onSelectWindow(window)
+                        }
                     }
+                    .onMove(perform: onMoveWindow)
                 }
-                .padding(.leading, 24)
+                .padding(.leading, 10)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding(.vertical, 2)
     }
 }
 
-/// A tab row inside a project's expanded sidebar view
-struct TabRow: View {
+/// A tab row inside a project's expanded sidebar view.
+struct SidebarTabRow: View {
     var window: Window
+    var isActive: Bool
+    var isHovered: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            HStack(spacing: 5) {
-                Image(systemName: "terminal")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+        HStack(spacing: 0) {
+            // Subtle active indicator — thin left bar
+            RoundedRectangle(cornerRadius: 1)
+                .fill(isActive ? Color.accentColor.opacity(0.6) : Color.clear)
+                .frame(width: 2, height: 12)
+                .padding(.trailing, 4)
 
-                Text(window.name)
-                    .font(.caption)
-                    .lineLimit(1)
-
-                if window.needsAttention {
-                    AttentionDot(needsAttention: true, size: 5)
-                }
-            }
-            .padding(.vertical, 2)
-
-            ForEach(window.panes) { pane in
-                PaneRow(pane: pane)
-            }
-        }
-    }
-}
-
-struct PaneRow: View {
-    var pane: Pane
-
-    var body: some View {
-        HStack(spacing: 5) {
-            AttentionDot(needsAttention: pane.needsAttention, size: 5)
-
-            Text(pane.currentCommand)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            Text(displayName)
+                .font(.caption)
+                .foregroundStyle(isActive ? .primary : .secondary)
                 .lineLimit(1)
+
+            if window.needsAttention {
+                AttentionDot(needsAttention: true, size: 5)
+                    .padding(.leading, 4)
+            }
+
+            Spacer()
         }
-        .padding(.leading, 14)
+        .padding(.horizontal, 4)
+        .frame(height: 22)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(isHovered ? Color.primary.opacity(0.06) : Color.clear)
+        )
+    }
+
+    private var displayName: String {
+        guard let pane = window.panes.first,
+              !pane.currentCommand.isEmpty,
+              pane.currentCommand != window.name else {
+            return window.name
+        }
+        return "\(window.name) — \(pane.currentCommand)"
     }
 }
