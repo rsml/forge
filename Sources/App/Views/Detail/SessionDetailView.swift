@@ -8,6 +8,7 @@ struct SessionDetailView: View {
     @State private var gitBranch: String?
 
     private var tabBarPosition: String {
+        ForgeConfigStore.shared.config.general?.tabBarPosition ??
         ForgeConfigStore.shared.config.terminal?.tabBarPosition ??
         ForgeConfigStore.shared.config.appearance?.tabBarPosition ?? "top"
     }

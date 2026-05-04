@@ -8,45 +8,31 @@ struct MainView: View {
     @State private var showNewProject = false
     @State private var showNotifications = false
 
+    private var sidebarPosition: String {
+        ForgeConfigStore.shared.config.general?.sidebarPosition ?? "left"
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            // Sidebar
-            if sidebarVisible {
-                SidebarView(onToggleSidebar: {
-                    withAnimation(.easeInOut(duration: 0.2)) { sidebarVisible.toggle() }
-                    controller.saveUIState(sidebarVisible: sidebarVisible)
-                })
-                    .frame(width: sidebarWidth)
-                    .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
+            if sidebarPosition == "right" {
+                detailContent
 
-                // Divider
-                Rectangle()
-                    .fill(Color(nsColor: .separatorColor))
-                    .frame(width: 1)
-            }
-
-            // Detail
-            VStack(spacing: 0) {
-                if let session = controller.workspace.activeSession {
-                    SessionDetailView(
-                        session: session,
-                        sidebarVisible: sidebarVisible,
-                        onToggleSidebar: {
-                            withAnimation(.easeInOut(duration: 0.2)) { sidebarVisible.toggle() }
-                            controller.saveUIState(sidebarVisible: sidebarVisible)
-                        }
-                    )
-                } else {
-                    VStack {
-                        Spacer()
-                        Text("Click + to open a project")
-                            .foregroundStyle(.secondary)
-                            .font(.body)
-                        Spacer()
-                    }
+                if sidebarVisible {
+                    Rectangle().fill(Color(nsColor: .separatorColor)).frame(width: 1)
+                    sidebarContent
+                        .frame(width: sidebarWidth)
+                        .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
                 }
+            } else {
+                if sidebarVisible {
+                    sidebarContent
+                        .frame(width: sidebarWidth)
+                        .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
+                    Rectangle().fill(Color(nsColor: .separatorColor)).frame(width: 1)
+                }
+
+                detailContent
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .overlay {
             if showCommandPalette {
@@ -71,7 +57,6 @@ struct MainView: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            configureWindow()
             CommandRegistry.shared.setup(controller: controller)
             ModifierKeyMonitor.shared.onOptionNumber = { n in
                 let sessions = controller.workspace.sessions
@@ -94,10 +79,39 @@ struct MainView: View {
         }
     }
 
-    private func configureWindow() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            guard let window = NSApp.windows.first(where: { $0.isVisible }) else { return }
-            window.isMovableByWindowBackground = false
+    @ViewBuilder
+    private var sidebarContent: some View {
+        SidebarView(
+            position: sidebarPosition,
+            onToggleSidebar: {
+                withAnimation(.easeInOut(duration: 0.2)) { sidebarVisible.toggle() }
+                controller.saveUIState(sidebarVisible: sidebarVisible)
+            }
+        )
+    }
+
+    @ViewBuilder
+    private var detailContent: some View {
+        VStack(spacing: 0) {
+            if let session = controller.workspace.activeSession {
+                SessionDetailView(
+                    session: session,
+                    sidebarVisible: sidebarVisible,
+                    onToggleSidebar: {
+                        withAnimation(.easeInOut(duration: 0.2)) { sidebarVisible.toggle() }
+                        controller.saveUIState(sidebarVisible: sidebarVisible)
+                    }
+                )
+            } else {
+                VStack {
+                    Spacer()
+                    Text("Click + to open a project")
+                        .foregroundStyle(.secondary)
+                        .font(.body)
+                    Spacer()
+                }
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

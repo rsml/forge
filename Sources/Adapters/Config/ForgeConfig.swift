@@ -9,6 +9,16 @@ struct ForgeConfig: Codable {
     var appearance: AppearanceSettings?
     var terminal: TerminalSettings?
     var shortcuts: [String: ShortcutConfig]?
+    var primaryFont: FontConfig?
+    var secondaryFont: FontConfig?
+    var terminalFont: FontConfig?
+
+    struct FontConfig: Codable {
+        var family: String?
+        var size: Int?
+        var useLigatures: Bool?
+        var lineHeight: Double?
+    }
 
     struct ProjectConfig: Codable {
         var name: String
@@ -29,6 +39,8 @@ struct ForgeConfig: Codable {
         var confirmBeforeClose: Bool?
         var warnOnCloseProject: Bool?
         var warnOnCloseTab: Bool?
+        var sidebarPosition: String?    // "left" or "right"
+        var tabBarPosition: String?     // "top" or "bottom"
     }
 
     struct TerminalSettings: Codable {

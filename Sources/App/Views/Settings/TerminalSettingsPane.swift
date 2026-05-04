@@ -115,20 +115,6 @@ struct TerminalSettingsPane: View {
                     .labelsHidden()
                 }
 
-                Picker("Tab bar position", selection: Binding(
-                    get: { store.config.terminal?.tabBarPosition ?? store.config.appearance?.tabBarPosition ?? "top" },
-                    set: { newValue in
-                        store.update {
-                            if $0.terminal == nil { $0.terminal = ForgeConfig.TerminalSettings() }
-                            $0.terminal!.tabBarPosition = newValue
-                        }
-                    }
-                )) {
-                    Text("Top").tag("top")
-                    Text("Bottom").tag("bottom")
-                }
-                .pickerStyle(.segmented)
-
                 Toggle("Use tmux for session persistence", isOn: Binding(
                     get: { store.config.terminal?.useTmuxPersistence ?? true },
                     set: { newValue in

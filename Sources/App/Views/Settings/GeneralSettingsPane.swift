@@ -29,6 +29,20 @@ struct GeneralSettingsPane: View {
                 Toggle("Warn before closing a project", isOn: generalBinding(\.warnOnCloseProject, default: true))
                 Toggle("Warn before closing a tab", isOn: generalBinding(\.warnOnCloseTab, default: false))
             }
+
+            Section("Layout") {
+                Picker("Sidebar position", selection: generalBinding(\.sidebarPosition, default: "left")) {
+                    Text("Left").tag("left")
+                    Text("Right").tag("right")
+                }
+                .pickerStyle(.segmented)
+
+                Picker("Tab bar position", selection: generalBinding(\.tabBarPosition, default: "top")) {
+                    Text("Top").tag("top")
+                    Text("Bottom").tag("bottom")
+                }
+                .pickerStyle(.segmented)
+            }
         }
         .formStyle(.grouped)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -52,6 +66,9 @@ struct GeneralSettingsPane: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.prompt = "Choose"
+        if let currentDir = store.config.general?.defaultProjectDir {
+            panel.directoryURL = URL(fileURLWithPath: currentDir)
+        }
         if panel.runModal() == .OK, let url = panel.url {
             store.update {
                 if $0.general == nil { $0.general = ForgeConfig.GeneralSettings() }
