@@ -9,13 +9,17 @@ struct CommandPalette: View {
 
     private var results: [CommandItem] {
         let registry = CommandRegistry.shared
+        let sorted = registry.commands.sorted { $0.name < $1.name }
         if query.isEmpty {
-            return registry.commands.map { CommandItem(command: $0) }
+            return sorted.map { CommandItem(command: $0) }
         }
         if query.hasPrefix("/") {
-            let searchTerm = String(query.dropFirst()).lowercased()
-            return registry.commands
-                .filter { $0.name.lowercased().contains(searchTerm) || $0.description.lowercased().contains(searchTerm) }
+            let searchTerm = String(query.dropFirst()).trimmingCharacters(in: .whitespaces).lowercased()
+            if searchTerm.isEmpty {
+                return sorted.map { CommandItem(command: $0) }
+            }
+            return sorted
+                .filter { $0.name.lowercased().contains(searchTerm) }
                 .map { CommandItem(command: $0) }
         }
         // Plain text: fuzzy search sessions + windows
@@ -82,7 +86,11 @@ struct CommandPalette: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
         .frame(width: 500)
-        .onAppear { isFieldFocused = true }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                isFieldFocused = true
+            }
+        }
         .onKeyPress(.escape) { dismiss(); return .handled }
         .onKeyPress(.upArrow) {
             selectedIndex = max(0, selectedIndex - 1)

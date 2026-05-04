@@ -47,9 +47,20 @@ struct ForgeMenuCommands: Commands {
             Divider()
 
             Button("Close Tab") {
-                if let session = controller.workspace.activeSession,
-                   let windowId = controller.workspace.activeWindowId,
-                   let window = session.windows.first(where: { $0.id == windowId }) {
+                guard let session = controller.workspace.activeSession,
+                      let windowId = controller.workspace.activeWindowId,
+                      let window = session.windows.first(where: { $0.id == windowId })
+                else { return }
+                if session.windows.count <= 1 {
+                    let alert = NSAlert()
+                    alert.messageText = "Close project \"\(session.name)\"?"
+                    alert.informativeText = "This will close the last tab and remove the project from Forge."
+                    alert.addButton(withTitle: "Close Project")
+                    alert.addButton(withTitle: "Cancel")
+                    alert.alertStyle = .warning
+                    guard alert.runModal() == .alertFirstButtonReturn else { return }
+                    controller.removeSession(session)
+                } else {
                     controller.removeWindow(window, in: session)
                 }
             }

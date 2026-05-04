@@ -72,7 +72,7 @@ struct WindowTabBar: View {
                 }
 
                 Spacer()
-                    .frame(maxHeight: .infinity)
+                    .frame(minWidth: 40, maxHeight: .infinity)
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) {
                         controller.addWindow(in: session)

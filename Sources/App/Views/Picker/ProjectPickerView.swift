@@ -61,13 +61,15 @@ struct ProjectPickerView: View {
                 }
 
                 if !searchText.isEmpty && displayRecent.isEmpty && searchResults.isEmpty {
-                    HStack {
+                    VStack {
                         Spacer()
                         Text("No matches found")
                             .foregroundStyle(.secondary)
                             .font(.callout)
+                            .frame(maxWidth: .infinity)
                         Spacer()
                     }
+                    .frame(height: 200)
                     .listRowSeparator(.hidden)
                 }
             }
@@ -136,6 +138,12 @@ struct ProjectPickerView: View {
                     errorMessage = "Directory not found: \(expanded)"
                 }
             }
+            return
+        }
+        // Validate path still exists
+        guard isDirectory(path) else {
+            errorMessage = "Directory no longer exists: \(path)"
+            selectedPath = nil
             return
         }
         errorMessage = nil
