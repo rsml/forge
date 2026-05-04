@@ -29,34 +29,29 @@ struct WindowConfigurator: NSViewRepresentable {
         window.isMovableByWindowBackground = false
         window.backgroundColor = backgroundColor
 
-        // Nuclear option: walk the window's private view hierarchy and
-        // hide the visual effect view that renders the title bar material.
-        // The traffic light buttons are siblings, not children, so they survive.
+        // Walk the window's view hierarchy and neutralize title bar background
         guard let themeFrame = window.contentView?.superview else { return }
-        stripTitleBarBackground(themeFrame)
+        stripTitleBarBackground(themeFrame, bgColor: backgroundColor)
     }
 
-    private func stripTitleBarBackground(_ view: NSView) {
+    /// Find the NSTitlebarContainerView and hide its _NSTitlebarDecorationView.
+    /// The decoration view renders the dark background behind traffic lights.
+    /// NSTitlebarView (sibling) contains the traffic light buttons and is kept visible.
+    private func stripTitleBarBackground(_ view: NSView, bgColor: NSColor, depth: Int = 0) {
         let className = String(describing: type(of: view))
 
-        // NSTitlebarContainerView contains the title bar chrome
         if className == "NSTitlebarContainerView" {
             for child in view.subviews {
                 let childClass = String(describing: type(of: child))
-                if childClass == "NSTitlebarView" {
-                    for grandchild in child.subviews {
-                        // NSVisualEffectView is the material/vibrancy background
-                        if grandchild is NSVisualEffectView {
-                            grandchild.isHidden = true
-                        }
-                    }
+                if childClass == "_NSTitlebarDecorationView" {
+                    child.isHidden = true
                 }
             }
-            return  // Don't recurse into title bar children
+            return
         }
 
         for subview in view.subviews {
-            stripTitleBarBackground(subview)
+            stripTitleBarBackground(subview, bgColor: bgColor, depth: depth + 1)
         }
     }
 }
