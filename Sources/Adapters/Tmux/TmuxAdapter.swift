@@ -58,6 +58,10 @@ final class TmuxAdapter: TmuxPort {
         controlMode.send("rename-window -t \(id) \(newName)")
     }
 
+    func killPane(id: String) async {
+        controlMode.send("kill-pane -t \(id)")
+    }
+
     func selectPane(id: String) async {
         controlMode.send("select-pane -t \(id)")
     }

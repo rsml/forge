@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct NotificationPanel: View {
+    var onDismiss: (() -> Void)? = nil
     @Environment(WorkspaceController.self) var controller
     @Environment(\.dismiss) var dismiss
 
@@ -40,7 +41,7 @@ struct NotificationPanel: View {
                         Button {
                             controller.selectSession(item.session)
                             controller.selectWindow(item.window)
-                            dismiss()
+                            close()
                         } label: {
                             HStack {
                                 AttentionDot(needsAttention: true, size: 6)
@@ -68,16 +69,20 @@ struct NotificationPanel: View {
                     Button("Jump to Latest") {
                         controller.selectSession(latest.session)
                         controller.selectWindow(latest.window)
-                        dismiss()
+                        close()
                     }
                 }
                 Spacer()
-                Button("Done") { dismiss() }
+                Button("Done") { close() }
                     .keyboardShortcut(.cancelAction)
             }
             .padding(16)
         }
         .frame(width: 350, height: 400)
+    }
+
+    private func close() {
+        if let onDismiss { onDismiss() } else { dismiss() }
     }
 
     private func clearAll() {

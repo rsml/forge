@@ -6,6 +6,9 @@ struct WindowTabBar: View {
     var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller
     @State private var gitBranch: String?
+    @State private var draggedTabId: String?
+    @State private var renamingWindowId: String?
+    @State private var renameText = ""
 
     private var fullPath: String {
         guard let path = session.path else { return session.name }
@@ -33,46 +36,62 @@ struct WindowTabBar: View {
                     IconButton(systemName: "sidebar.left") { onToggleSidebar() }
                         .frame(width: 36, height: 28)
                         .padding(.leading, 8)
-                        .help("Show Sidebar")
+                        .help(KeyboardShortcuts.toggleSidebar.tooltip)
                 }
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 1) {
-                        ForEach(session.windows) { window in
-                            WindowTab(
-                                window: window,
-                                isActive: window.id == controller.workspace.activeWindowId
-                            )
-                            .draggable(window.id)
-                            .dropDestination(for: String.self) { droppedIds, _ in
-                                guard let droppedId = droppedIds.first,
-                                      let from = session.windows.firstIndex(where: { $0.id == droppedId }),
-                                      let to = session.windows.firstIndex(where: { $0.id == window.id }),
-                                      from != to
-                                else { return false }
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    session.windows.move(fromOffsets: IndexSet(integer: from),
-                                                         toOffset: to > from ? to + 1 : to)
+                        ForEach(Array(session.windows.enumerated()), id: \.element.id) { index, window in
+                            if renamingWindowId == window.id {
+                                InlineRenameField(text: $renameText, font: .system(.caption, weight: .regular)) {
+                                    if !renameText.isEmpty {
+                                        controller.renameWindow(window, to: renameText)
+                                    }
+                                    renamingWindowId = nil
                                 }
-                                return true
-                            }
-                            .onTapGesture {
-                                controller.selectWindow(window)
-                            }
-                            .contextMenu {
-                                Button("Rename...") {}
-                                Divider()
-                                Button("Close Tab", role: .destructive) {
-                                    controller.removeWindow(window, in: session)
+                                .fixedSize()
+                                .frame(height: 28)
+                            } else {
+                                WindowTab(
+                                    window: window,
+                                    isActive: window.id == controller.workspace.activeWindowId,
+                                    tabIndex: index + 1
+                                )
+                                .opacity(draggedTabId == window.id ? 0.0 : 1.0)
+                                .onDrag {
+                                    draggedTabId = window.id
+                                    return NSItemProvider(object: window.id as NSString)
+                                }
+                                .onDrop(of: [.text], delegate: ReorderDropDelegate(
+                                    item: window,
+                                    items: session.windows,
+                                    draggedItemId: $draggedTabId,
+                                    onMove: { from, to in
+                                        session.windows.move(fromOffsets: from, toOffset: to)
+                                    }
+                                ))
+                                .onTapGesture {
+                                    controller.selectWindow(window)
+                                }
+                                .contextMenu {
+                                    Button("Rename...") {
+                                        renamingWindowId = window.id
+                                        renameText = window.name
+                                    }
+                                    Divider()
+                                    Button("Close Tab", role: .destructive) {
+                                        controller.removeWindow(window, in: session)
+                                    }
                                 }
                             }
                         }
                     }
                     .padding(.horizontal, 4)
                 }
+                .fixedSize(horizontal: true, vertical: false)
 
-                Spacer()
-                    .frame(minWidth: 40, maxHeight: .infinity)
+                Color.clear
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) {
                         controller.addWindow(in: session)
@@ -89,13 +108,13 @@ struct WindowTabBar: View {
                         controller.splitPane(direction: .horizontal)
                     }
                     .frame(width: 28, height: 28)
-                    .help("Split Horizontally")
+                    .help(KeyboardShortcuts.splitHorizontal.tooltip)
 
                     IconButton(systemName: "rectangle.split.1x2") {
                         controller.splitPane(direction: .vertical)
                     }
                     .frame(width: 28, height: 28)
-                    .help("Split Vertically")
+                    .help(KeyboardShortcuts.splitVertical.tooltip)
                 }
                 .padding(.trailing, 8)
             }
@@ -171,12 +190,21 @@ struct TitleBarRow: View {
 struct WindowTab: View {
     var window: Window
     let isActive: Bool
+    var tabIndex: Int = 0
     @State private var isHovered = false
 
     var body: some View {
+        let modifiers = ModifierKeyMonitor.shared
+
         VStack(spacing: 0) {
             HStack(spacing: 4) {
-                Text("\(window.index): \(window.name)")
+                if modifiers.commandPressed && tabIndex >= 1 && tabIndex <= 9 {
+                    Text("\(tabIndex)")
+                        .font(.system(.caption, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 14)
+                }
+                Text(window.name)
                     .font(.system(.caption, weight: .regular))
                     .foregroundStyle((isActive || isHovered) ? .primary : .secondary)
                     .lineLimit(1)

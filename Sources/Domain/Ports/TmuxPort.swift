@@ -46,6 +46,7 @@ protocol TmuxPort {
     func selectWindow(id: String) async
     func renameWindow(id: String, newName: String) async
 
+    func killPane(id: String) async
     func selectPane(id: String) async
     func switchClient(session: String) async
 

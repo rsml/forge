@@ -4,11 +4,10 @@ struct SidebarView: View {
     var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller
     @State private var expandedSessions: Set<String> = []
-    @State private var showNewProject = false
     @State private var renamingSessionId: String?
     @State private var renamingWindowId: String?
     @State private var renameText = ""
-    @State private var showNotifications = false
+    @State private var draggedSessionId: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -17,11 +16,15 @@ struct SidebarView: View {
 
             // Sidebar toolbar — each button fills half the row for maximum tap area
             HStack(spacing: 0) {
-                IconButton(systemName: "plus") { showNewProject = true }
-                    .help("New Project")
+                IconButton(systemName: "plus") {
+                    NotificationCenter.default.post(name: .forgeNewProject, object: nil)
+                }
+                    .help(KeyboardShortcuts.newProject.tooltip)
 
-                IconButton(systemName: "bell") { showNotifications = true }
-                    .help("Notifications")
+                IconButton(systemName: "bell") {
+                    NotificationCenter.default.post(name: .forgeNotifications, object: nil)
+                }
+                    .help(KeyboardShortcuts.notifications.tooltip)
                     .overlay(alignment: .topTrailing) {
                         if controller.workspace.sessions.contains(where: { $0.needsAttention }) {
                             Circle()
@@ -34,17 +37,17 @@ struct SidebarView: View {
                 IconButton(systemName: "command") {
                     NotificationCenter.default.post(name: .forgeCommandPalette, object: nil)
                 }
-                .help("Command Palette")
+                .help(KeyboardShortcuts.commandPalette.tooltip)
 
                 IconButton(systemName: "sidebar.left") { onToggleSidebar() }
-                    .help("Toggle Sidebar")
+                    .help(KeyboardShortcuts.toggleSidebar.tooltip)
             }
             .frame(height: 28)
 
             // Project list
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(controller.workspace.sessions) { session in
+                    ForEach(Array(controller.workspace.sessions.enumerated()), id: \.element.id) { index, session in
                         SessionRow(
                             session: session,
                             isActive: session.id == controller.workspace.activeSessionId,
@@ -88,21 +91,22 @@ struct SidebarView: View {
                                     controller.renameWindow(window, to: renameText)
                                 }
                                 renamingWindowId = nil
-                            }
+                            },
+                            projectIndex: index + 1
                         )
-                        .draggable(session.id)
-                        .dropDestination(for: String.self) { droppedIds, _ in
-                            guard let droppedId = droppedIds.first,
-                                  let from = controller.workspace.sessions.firstIndex(where: { $0.id == droppedId }),
-                                  let to = controller.workspace.sessions.firstIndex(where: { $0.id == session.id }),
-                                  from != to
-                            else { return false }
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                controller.workspace.sessions.move(fromOffsets: IndexSet(integer: from),
-                                                                   toOffset: to > from ? to + 1 : to)
-                            }
-                            return true
+                        .opacity(draggedSessionId == session.id ? 0.0 : 1.0)
+                        .onDrag {
+                            draggedSessionId = session.id
+                            return NSItemProvider(object: session.id as NSString)
                         }
+                        .onDrop(of: [.text], delegate: ReorderDropDelegate(
+                            item: session,
+                            items: controller.workspace.sessions,
+                            draggedItemId: $draggedSessionId,
+                            onMove: { from, to in
+                                controller.workspace.sessions.move(fromOffsets: from, toOffset: to)
+                            }
+                        ))
                         .contextMenu {
                             Button("Rename...") {
                                 renamingWindowId = nil
@@ -119,15 +123,11 @@ struct SidebarView: View {
                 .padding(.horizontal, 6)
                 .padding(.top, 4)
             }
-        }
-        .sheet(isPresented: $showNewProject) {
-            ProjectPickerView()
-        }
-        .sheet(isPresented: $showNotifications) {
-            NotificationPanel()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .forgeNewProject)) { _ in
-            showNewProject = true
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2) {
+                NotificationCenter.default.post(name: .forgeNewProject, object: nil)
+            }
         }
         .onAppear {
             // Restore expanded sessions from saved state
@@ -137,13 +137,6 @@ struct SidebarView: View {
                     .filter { nameSet.contains($0.name) }
                     .map(\.id))
             }
-        }
-        .background {
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture(count: 2) {
-                    showNewProject = true
-                }
         }
     }
 }

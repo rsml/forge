@@ -35,55 +35,70 @@ struct ForgeMenuCommands: Commands {
             Button("New Project...") {
                 NotificationCenter.default.post(name: .forgeNewProject, object: nil)
             }
-            .keyboardShortcut("n")
+            .keyboardShortcut(KeyboardShortcuts.newProject.key, modifiers: KeyboardShortcuts.newProject.modifiers)
 
             Button("New Tab") {
                 if let session = controller.workspace.activeSession {
                     controller.addWindow(in: session)
                 }
             }
-            .keyboardShortcut("t")
+            .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
 
             Divider()
 
-            Button("Close Tab") {
-                guard let session = controller.workspace.activeSession,
-                      let windowId = controller.workspace.activeWindowId,
-                      let window = session.windows.first(where: { $0.id == windowId })
-                else { return }
-                if session.windows.count <= 1 {
-                    let alert = NSAlert()
-                    alert.messageText = "Close project \"\(session.name)\"?"
-                    alert.informativeText = "This will close the last tab and remove the project from Forge."
-                    alert.addButton(withTitle: "Close Project")
-                    alert.addButton(withTitle: "Cancel")
-                    alert.alertStyle = .warning
-                    guard alert.runModal() == .alertFirstButtonReturn else { return }
-                    controller.removeSession(session)
-                } else {
-                    controller.removeWindow(window, in: session)
-                }
+            Button("Close Pane") {
+                controller.closeCurrentPane()
             }
-            .keyboardShortcut("w")
+            .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)
+
+            Button("Close Project") {
+                guard let session = controller.workspace.activeSession else { return }
+                let alert = NSAlert()
+                alert.messageText = "Close project \"\(session.name)\"?"
+                alert.informativeText = "This will close all tabs and remove the project from Forge."
+                alert.addButton(withTitle: "Close Project")
+                alert.addButton(withTitle: "Cancel")
+                alert.alertStyle = .warning
+                guard alert.runModal() == .alertFirstButtonReturn else { return }
+                controller.removeSession(session)
+            }
+            .keyboardShortcut(KeyboardShortcuts.closeProject.key, modifiers: KeyboardShortcuts.closeProject.modifiers)
         }
 
         CommandGroup(after: .appSettings) {
             Button("Settings...") {
                 openSettings()
             }
-            .keyboardShortcut(",")
+            .keyboardShortcut(KeyboardShortcuts.settings.key, modifiers: KeyboardShortcuts.settings.modifiers)
         }
 
         CommandMenu("View") {
             Button("Toggle Sidebar") {
                 NotificationCenter.default.post(name: .forgeToggleSidebar, object: nil)
             }
-            .keyboardShortcut("b")
+            .keyboardShortcut(KeyboardShortcuts.toggleSidebar.key, modifiers: KeyboardShortcuts.toggleSidebar.modifiers)
 
             Button("Command Palette") {
                 NotificationCenter.default.post(name: .forgeCommandPalette, object: nil)
             }
-            .keyboardShortcut("p")
+            .keyboardShortcut(KeyboardShortcuts.commandPalette.key, modifiers: KeyboardShortcuts.commandPalette.modifiers)
+
+            Divider()
+
+            Button("Split Horizontally") {
+                controller.splitPane(direction: .horizontal)
+            }
+            .keyboardShortcut(KeyboardShortcuts.splitHorizontal.key, modifiers: KeyboardShortcuts.splitHorizontal.modifiers)
+
+            Button("Split Vertically") {
+                controller.splitPane(direction: .vertical)
+            }
+            .keyboardShortcut(KeyboardShortcuts.splitVertical.key, modifiers: KeyboardShortcuts.splitVertical.modifiers)
+
+            Button("Notifications") {
+                NotificationCenter.default.post(name: .forgeNotifications, object: nil)
+            }
+            .keyboardShortcut(KeyboardShortcuts.notifications.key, modifiers: KeyboardShortcuts.notifications.modifiers)
 
             Divider()
 
@@ -95,7 +110,7 @@ struct ForgeMenuCommands: Commands {
                 else { return }
                 controller.selectWindow(session.windows[idx - 1])
             }
-            .keyboardShortcut("[", modifiers: [.command, .shift])
+            .keyboardShortcut(KeyboardShortcuts.selectTabLeft.key, modifiers: KeyboardShortcuts.selectTabLeft.modifiers)
 
             Button("Select Tab Right") {
                 guard let session = controller.workspace.activeSession,
@@ -105,17 +120,17 @@ struct ForgeMenuCommands: Commands {
                 else { return }
                 controller.selectWindow(session.windows[idx + 1])
             }
-            .keyboardShortcut("]", modifiers: [.command, .shift])
+            .keyboardShortcut(KeyboardShortcuts.selectTabRight.key, modifiers: KeyboardShortcuts.selectTabRight.modifiers)
 
             Button("Move Tab Left") {
                 NotificationCenter.default.post(name: .forgeMoveTabLeft, object: nil)
             }
-            .keyboardShortcut(.leftArrow, modifiers: [.command, .shift])
+            .keyboardShortcut(KeyboardShortcuts.moveTabLeft.key, modifiers: KeyboardShortcuts.moveTabLeft.modifiers)
 
             Button("Move Tab Right") {
                 NotificationCenter.default.post(name: .forgeMoveTabRight, object: nil)
             }
-            .keyboardShortcut(.rightArrow, modifiers: [.command, .shift])
+            .keyboardShortcut(KeyboardShortcuts.moveTabRight.key, modifiers: KeyboardShortcuts.moveTabRight.modifiers)
 
             Divider()
 
@@ -140,7 +155,7 @@ struct ForgeMenuCommands: Commands {
                 let next = sessions[(idx + 1) % sessions.count]
                 controller.selectSession(next)
             }
-            .keyboardShortcut(KeyEquivalent("\t"), modifiers: .control)
+            .keyboardShortcut(KeyboardShortcuts.nextProject.key, modifiers: KeyboardShortcuts.nextProject.modifiers)
 
             Button("Previous Project") {
                 let sessions = controller.workspace.sessions
@@ -151,7 +166,8 @@ struct ForgeMenuCommands: Commands {
                 let prev = sessions[(idx - 1 + sessions.count) % sessions.count]
                 controller.selectSession(prev)
             }
-            .keyboardShortcut(KeyEquivalent("\t"), modifiers: [.control, .shift])
+            .keyboardShortcut(KeyboardShortcuts.prevProject.key, modifiers: KeyboardShortcuts.prevProject.modifiers)
+
         }
     }
 
@@ -171,6 +187,7 @@ extension Notification.Name {
     static let forgeToggleSidebar = Notification.Name("forgeToggleSidebar")
     static let forgeMoveTabLeft = Notification.Name("forgeMoveTabLeft")
     static let forgeMoveTabRight = Notification.Name("forgeMoveTabRight")
+    static let forgeNotifications = Notification.Name("forgeNotifications")
     static let forgeCollapseAll = Notification.Name("forgeCollapseAll")
     static let forgeExpandAll = Notification.Name("forgeExpandAll")
 }

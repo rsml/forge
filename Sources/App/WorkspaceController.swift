@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -9,6 +10,7 @@ final class WorkspaceController {
     let workspace = Workspace()
     private let tmux: any TmuxPort
     private var refreshTask: Task<Void, Never>?
+    private var perSessionActiveWindowId: [String: String] = [:]  // sessionId -> windowId
 
     init(tmux: any TmuxPort) {
         self.tmux = tmux
@@ -58,10 +60,22 @@ final class WorkspaceController {
     // MARK: - Actions
 
     func selectSession(_ session: Session) {
+        // Save current window for the session we're leaving
+        if let currentSessionId = workspace.activeSessionId {
+            perSessionActiveWindowId[currentSessionId] = workspace.activeWindowId
+        }
+
         workspace.activeSessionId = session.id
-        if let window = session.windows.first(where: { $0.active }) ?? session.windows.first {
+
+        // Restore saved window for the session we're entering
+        if let savedWindowId = perSessionActiveWindowId[session.id],
+           session.windows.contains(where: { $0.id == savedWindowId }) {
+            workspace.activeWindowId = savedWindowId
+            Task { await tmux.selectWindow(id: savedWindowId) }
+        } else if let window = session.windows.first(where: { $0.active }) ?? session.windows.first {
             workspace.activeWindowId = window.id
         }
+
         Task { await tmux.switchClient(session: session.name) }
         saveUIState()
     }
@@ -109,6 +123,50 @@ final class WorkspaceController {
 
     func renameWindow(_ window: Window, to name: String) {
         Task { await tmux.renameWindow(id: window.id, newName: name) }
+    }
+
+    /// Closes the current pane (like tmux prefix+x). Cascades:
+    /// multiple panes → kill pane; one pane + multiple tabs → kill window; last tab → close project.
+    /// Confirms if a process is running.
+    func closeCurrentPane() {
+        guard let session = workspace.activeSession,
+              let windowId = workspace.activeWindowId,
+              let window = session.windows.first(where: { $0.id == windowId })
+        else { return }
+
+        let activePane = window.panes.first(where: { $0.active }) ?? window.panes.first
+        let hasMultiplePanes = window.panes.count > 1
+        let hasMultipleWindows = session.windows.count > 1
+
+        // Check if a non-shell process is running
+        if let pane = activePane, pane.status == .running {
+            let processName = window.name
+            let alert = NSAlert()
+            if hasMultiplePanes {
+                alert.messageText = "Close this pane?"
+                alert.informativeText = "\"\(processName)\" is running in this pane."
+                alert.addButton(withTitle: "Close Pane")
+            } else if hasMultipleWindows {
+                alert.messageText = "Close this tab?"
+                alert.informativeText = "\"\(processName)\" is running in this tab."
+                alert.addButton(withTitle: "Close Tab")
+            } else {
+                alert.messageText = "Close project \"\(session.name)\"?"
+                alert.informativeText = "\"\(processName)\" is running."
+                alert.addButton(withTitle: "Close Project")
+            }
+            alert.addButton(withTitle: "Cancel")
+            alert.alertStyle = .warning
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+
+        if hasMultiplePanes, let pane = activePane {
+            Task { await tmux.killPane(id: pane.id) }
+        } else if hasMultipleWindows {
+            removeWindow(window, in: session)
+        } else {
+            removeSession(session)
+        }
     }
 
     func splitPane(direction: SplitDirection) {

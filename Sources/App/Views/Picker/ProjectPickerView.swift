@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProjectPickerView: View {
+    var onDismiss: (() -> Void)? = nil
     @Environment(WorkspaceController.self) var controller
     @Environment(\.dismiss) var dismiss
     @State private var searchText = ""
@@ -94,7 +95,7 @@ struct ProjectPickerView: View {
             HStack {
                 Button("Browse...") { browseForFolder() }
                 Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Cancel") { close() }.keyboardShortcut(.cancelAction)
                 Button("Open") { openProject() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(resolvedPath == nil)
@@ -105,6 +106,10 @@ struct ProjectPickerView: View {
         .onAppear {
             recentPaths = ForgeConfig.load().recentDirectories
         }
+    }
+
+    private func close() {
+        if let onDismiss { onDismiss() } else { dismiss() }
     }
 
     // MARK: - Display
@@ -150,7 +155,7 @@ struct ProjectPickerView: View {
         saveToRecent(path)
         Task {
             await controller.addSession(name: URL(fileURLWithPath: path).lastPathComponent, path: path)
-            dismiss()
+            close()
         }
     }
 
