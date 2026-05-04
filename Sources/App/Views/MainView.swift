@@ -20,6 +20,9 @@ struct WindowConfigurator: NSViewRepresentable {
 
     private func configure(_ window: NSWindow?) {
         guard let window else { return }
+        // Proven combination (verified with self-screenshot test):
+        // .automatic window style + these properties + decoration removal = fully themed title bar
+        window.backgroundColor = backgroundColor
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         if !window.styleMask.contains(.fullSizeContentView) {
@@ -27,53 +30,26 @@ struct WindowConfigurator: NSViewRepresentable {
         }
         window.titlebarSeparatorStyle = .none
         window.isMovableByWindowBackground = false
-        window.backgroundColor = backgroundColor
 
-        // Force the themeFrame (window's root view) to use our background color.
-        // This ensures the title bar area matches our theme since the title bar
-        // sits inside the themeFrame.
-        guard let themeFrame = window.contentView?.superview else { return }
-        themeFrame.wantsLayer = true
-        themeFrame.layer?.backgroundColor = backgroundColor.cgColor
-
-        // Also aggressively clear all title bar related views
-        clearTitleBarChrome(themeFrame)
+        // Remove _NSTitlebarDecorationView — the view that renders the title bar background.
+        // Must be done every update because macOS may re-add it.
+        if let themeFrame = window.contentView?.superview {
+            removeDecorationView(themeFrame)
+        }
     }
 
-    private func clearTitleBarChrome(_ view: NSView) {
+    private func removeDecorationView(_ view: NSView) {
         let cls = String(describing: type(of: view))
-
-        if cls.contains("TitlebarContainer") || cls.contains("NSTitlebar") {
-            view.wantsLayer = true
-            view.layer?.backgroundColor = CGColor.clear
-            view.layer?.isOpaque = false
-
+        if cls == "NSTitlebarContainerView" {
             for child in view.subviews {
-                let childCls = String(describing: type(of: child))
-                // Hide the decoration view (background)
-                if childCls.contains("Decoration") {
-                    child.isHidden = true
-                    child.alphaValue = 0
-                }
-                // Clear all backgrounds in title bar children
-                child.wantsLayer = true
-                child.layer?.backgroundColor = CGColor.clear
-                child.layer?.isOpaque = false
-
-                for grandchild in child.subviews {
-                    if grandchild is NSVisualEffectView {
-                        grandchild.isHidden = true
-                    }
-                    grandchild.wantsLayer = true
-                    grandchild.layer?.backgroundColor = CGColor.clear
-                    grandchild.layer?.isOpaque = false
+                if String(describing: type(of: child)) == "_NSTitlebarDecorationView" {
+                    child.removeFromSuperview()
                 }
             }
             return
         }
-
         for sub in view.subviews {
-            clearTitleBarChrome(sub)
+            removeDecorationView(sub)
         }
     }
 }
