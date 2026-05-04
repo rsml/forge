@@ -16,7 +16,7 @@ struct ForgeApp: App {
                     debugServer.start(controller: controller)
                 }
         }
-        .windowStyle(.automatic)
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1200, height: 800)
         .commands {
             ForgeMenuCommands(controller: controller)
@@ -276,40 +276,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
     @MainActor private func configureMainWindow() {
         guard let window = NSApp.windows.first(where: { $0.isVisible && $0.identifier?.rawValue != "com_apple_SwiftUI_Settings_window" }) else {
-            // Retry if window not ready
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.configureMainWindow() }
             return
         }
-        applyWindowStyle(window)
+        applyThemeToWindow(window)
+        window.isMovableByWindowBackground = false
 
-        // Observe events that can reset title bar
+        // Re-apply theme color when window state changes (theme may have changed)
         let events: [Notification.Name] = [
-            NSWindow.didExitFullScreenNotification,
             NSWindow.didBecomeKeyNotification,
             NSWindow.didBecomeMainNotification,
-            NSWindow.didChangeScreenNotification,
         ]
         for event in events {
             let observer = NotificationCenter.default.addObserver(forName: event, object: window, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.applyWindowStyle(window) }
+                MainActor.assumeIsolated { self?.applyThemeToWindow(window) }
             }
             windowObservers.append(observer)
         }
-        // Also re-apply when app becomes active (catches all edge cases)
         let activeObserver = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.applyWindowStyle(window) }
+            MainActor.assumeIsolated { self?.applyThemeToWindow(window) }
         }
         windowObservers.append(activeObserver)
     }
 
-    @MainActor private func applyWindowStyle(_ window: NSWindow) {
-        window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
-        window.styleMask.insert(.fullSizeContentView)
-        window.isMovableByWindowBackground = false
-        // Set window background to match theme so traffic light area is themed
+    @MainActor private func applyThemeToWindow(_ window: NSWindow) {
+        // .hiddenTitleBar removes the native title bar chrome.
+        // We only need to set backgroundColor so the window frame matches the theme.
         if let theme = ForgeConfigStore.shared.resolvedTheme {
             window.backgroundColor = NSColor(theme.background)
+        } else {
+            window.backgroundColor = .windowBackgroundColor
         }
     }
 
