@@ -1,59 +1,5 @@
 import SwiftUI
 
-/// Configures the host NSWindow from within the SwiftUI view hierarchy.
-/// Directly manipulates the NSWindow title bar view hierarchy to eliminate
-/// the native macOS title bar chrome (background material/vibrancy) while
-/// keeping traffic light buttons. This is how Chrome and iTerm2 do it.
-struct WindowConfigurator: NSViewRepresentable {
-    let backgroundColor: NSColor
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        view.setFrameSize(.zero)
-        DispatchQueue.main.async { self.configure(view.window) }
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        configure(nsView.window)
-    }
-
-    private func configure(_ window: NSWindow?) {
-        guard let window else { return }
-        // Proven combination (verified with self-screenshot test):
-        // .automatic window style + these properties + decoration removal = fully themed title bar
-        window.backgroundColor = backgroundColor
-        window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
-        if !window.styleMask.contains(.fullSizeContentView) {
-            window.styleMask.insert(.fullSizeContentView)
-        }
-        window.titlebarSeparatorStyle = .none
-        window.isMovableByWindowBackground = false
-
-        // Remove _NSTitlebarDecorationView — the view that renders the title bar background.
-        // Must be done every update because macOS may re-add it.
-        if let themeFrame = window.contentView?.superview {
-            removeDecorationView(themeFrame)
-        }
-    }
-
-    private func removeDecorationView(_ view: NSView) {
-        let cls = String(describing: type(of: view))
-        if cls == "NSTitlebarContainerView" {
-            for child in view.subviews {
-                if String(describing: type(of: child)) == "_NSTitlebarDecorationView" {
-                    child.removeFromSuperview()
-                }
-            }
-            return
-        }
-        for sub in view.subviews {
-            removeDecorationView(sub)
-        }
-    }
-}
-
 struct MainView: View {
     @Environment(WorkspaceController.self) var controller
     @State private var sidebarWidth: CGFloat = 160
@@ -81,19 +27,23 @@ struct MainView: View {
         ForgeConfigStore.shared.resolvedTheme?.foreground
     }
 
+    private var showSidebar: Bool {
+        sidebarVisible && !controller.workspace.sessions.isEmpty
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             if sidebarPosition == "right" {
                 detailContent
 
-                if sidebarVisible {
+                if showSidebar {
                     Rectangle().fill(Color(nsColor: .separatorColor)).frame(width: 1)
                     sidebarContent
                         .frame(width: sidebarWidth)
                         .background(sidebarBackground)
                 }
             } else {
-                if sidebarVisible {
+                if showSidebar {
                     sidebarContent
                         .frame(width: sidebarWidth)
                         .background(sidebarBackground)
@@ -124,14 +74,6 @@ struct MainView: View {
                 }
             }
         }
-        .background(
-            WindowConfigurator(backgroundColor: {
-                if let theme = ForgeConfigStore.shared.resolvedTheme {
-                    return NSColor(theme.background)
-                }
-                return .windowBackgroundColor
-            }())
-        )
         .foregroundStyle(themeForeground ?? Color.primary)
         .ignoresSafeArea()
         .onAppear {
@@ -181,11 +123,19 @@ struct MainView: View {
                     }
                 )
             } else {
-                VStack {
+                VStack(spacing: 8) {
                     Spacer()
-                    Text("Click + to open a project")
-                        .foregroundStyle(.secondary)
-                        .font(.body)
+                    Button {
+                        NotificationCenter.default.post(name: .forgeNewProject, object: nil)
+                    } label: {
+                        VStack(spacing: 2) {
+                            Text("Open a New Project")
+                            Text(KeyboardShortcuts.newProject.hint)
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .buttonStyle(.bordered)
                     Spacer()
                 }
             }

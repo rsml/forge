@@ -23,6 +23,10 @@ struct SessionDetailView: View {
         return URL(fileURLWithPath: path).lastPathComponent
     }
 
+    private var sidebarPosition: String {
+        ForgeConfigStore.shared.config.general?.sidebarPosition ?? "left"
+    }
+
     private var chromeBackground: Color {
         ForgeConfigStore.shared.resolvedTheme?.background ?? Color(nsColor: .controlBackgroundColor)
     }
@@ -32,15 +36,15 @@ struct SessionDetailView: View {
             // Title bar always at top
             TitleBarRow(fullPath: fullPath, shortPath: shortPath, gitBranch: gitBranch)
                 .frame(height: 28)
-                .padding(.trailing, 8)
+                .padding(.trailing, (!sidebarVisible && sidebarPosition == "right") ? 52 : 8)
                 .padding(.leading, sidebarVisible ? 8 : 78)
                 .background(chromeBackground)
 
             if tabBarPosition == "bottom" {
                 TerminalArea(session: session)
-                WindowTabBar(session: session, sidebarVisible: sidebarVisible, onToggleSidebar: onToggleSidebar)
+                WindowTabBar(session: session, sidebarVisible: sidebarVisible, sidebarPosition: sidebarPosition, onToggleSidebar: onToggleSidebar)
             } else {
-                WindowTabBar(session: session, sidebarVisible: sidebarVisible, onToggleSidebar: onToggleSidebar)
+                WindowTabBar(session: session, sidebarVisible: sidebarVisible, sidebarPosition: sidebarPosition, onToggleSidebar: onToggleSidebar)
                 TerminalArea(session: session)
             }
         }

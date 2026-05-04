@@ -3,6 +3,7 @@ import SwiftUI
 struct WindowTabBar: View {
     var session: Session
     var sidebarVisible: Bool = true
+    var sidebarPosition: String = "left"
     var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller
     @State private var draggedTabId: String?
@@ -19,8 +20,8 @@ struct WindowTabBar: View {
     var body: some View {
         // Tab bar only (title bar is in SessionDetailView)
         HStack(spacing: 0) {
-                // Show sidebar toggle when sidebar is hidden
-                if !sidebarVisible {
+                // Show sidebar toggle when sidebar is hidden (left position)
+                if !sidebarVisible && sidebarPosition != "right" {
                     IconButton(systemName: "sidebar.left") { onToggleSidebar() }
                         .frame(width: 36, height: 28)
                         .padding(.leading, 8)
@@ -119,6 +120,14 @@ struct WindowTabBar: View {
                     .help(KeyboardShortcuts.splitVertical.tooltip)
                 }
                 .padding(.trailing, 8)
+
+                // Show sidebar toggle when sidebar is hidden (right position)
+                if !sidebarVisible && sidebarPosition == "right" {
+                    IconButton(systemName: "sidebar.right") { onToggleSidebar() }
+                        .frame(width: 36, height: 28)
+                        .padding(.trailing, 8)
+                        .help(KeyboardShortcuts.toggleSidebar.tooltip)
+                }
             }
         .frame(height: 28)
         .background(ForgeConfigStore.shared.resolvedTheme?.background ?? Color(nsColor: .controlBackgroundColor))
