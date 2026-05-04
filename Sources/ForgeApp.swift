@@ -39,8 +39,8 @@ struct ForgeMenuCommands: Commands {
                 let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1"
                 let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
                 let alert = NSAlert()
-                alert.messageText = "Forge"
-                alert.informativeText = "Version \(version) (\(build))\nA native macOS frontend for tmux."
+                alert.messageText = "Forge \(version) (\(build))"
+                alert.informativeText = "A native macOS frontend for tmux.\n\nhttps://github.com/anthropics/forge"
                 alert.alertStyle = .informational
                 alert.icon = NSImage(systemSymbolName: "terminal.fill", accessibilityDescription: "Forge")
                 alert.runModal()
@@ -67,6 +67,11 @@ struct ForgeMenuCommands: Commands {
             Divider()
 
             Button("Close Pane") {
+                if let keyWindow = NSApp.keyWindow,
+                   keyWindow.identifier?.rawValue == "com_apple_SwiftUI_Settings_window" {
+                    keyWindow.close()
+                    return
+                }
                 controller.closeCurrentPane()
             }
             .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)

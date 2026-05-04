@@ -179,6 +179,13 @@ struct WindowTab: View {
     var indicatorOnTop: Bool = false
     @State private var isHovered = false
 
+    private var secondaryFont: Font {
+        let config = ForgeConfigStore.shared.config.secondaryFont
+        let family = config?.family ?? ".AppleSystemUIFont"
+        let size = CGFloat(config?.size ?? 11)
+        return .custom(family, size: size)
+    }
+
     var body: some View {
         let modifiers = ModifierKeyMonitor.shared
 
@@ -199,7 +206,7 @@ struct WindowTab: View {
                         .frame(width: 14)
                 }
                 Text(window.name)
-                    .font(.system(.caption, weight: .regular))
+                    .font(secondaryFont)
                     .foregroundStyle((isActive || isHovered) ? .primary : .secondary)
                     .lineLimit(1)
 

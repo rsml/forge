@@ -6,34 +6,34 @@ struct ShortcutsSettingsPane: View {
     @State private var captureSession = KeyCaptureSession()
     @State private var conflicts: Set<String> = []
 
-    private let categories = ["File", "View", "Splits", "Tabs", "Projects", "App"]
-
     private var shortcuts: [String: ForgeConfig.ShortcutConfig] {
         store.config.shortcuts ?? [:]
     }
 
     var body: some View {
         ScrollView {
-            HStack(alignment: .top, spacing: 32) {
-                // Left column
+            HStack(alignment: .top, spacing: 24) {
                 VStack(alignment: .leading, spacing: 24) {
-                    ForEach(["File", "View", "Splits"], id: \.self) { category in
-                        categorySection(category)
-                    }
+                    categorySection("App")
+                    categorySection("File")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                // Right column
                 VStack(alignment: .leading, spacing: 24) {
-                    ForEach(["Tabs", "Projects", "App"], id: \.self) { category in
-                        categorySection(category)
-                    }
+                    categorySection("View")
+                    categorySection("Splits")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 24) {
+                    categorySection("Tabs")
+                    categorySection("Projects")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(24)
+            .padding(20)
 
-            Divider().padding(.horizontal, 24)
+            Divider().padding(.horizontal, 20)
 
             HStack {
                 Spacer()
@@ -43,8 +43,8 @@ struct ShortcutsSettingsPane: View {
                 }
                 .foregroundStyle(.red)
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 16)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { detectConflicts() }

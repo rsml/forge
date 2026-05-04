@@ -40,8 +40,7 @@ struct FontSettingsPane: View {
                 defaultFamily: ".AppleSystemUIFont",
                 defaultSize: 13,
                 keyPath: \ForgeConfig.primaryFont,
-                fontList: Self.allFonts,
-                showLineHeight: false
+                fontList: Self.allFonts
             )
 
             fontSection(
@@ -51,8 +50,7 @@ struct FontSettingsPane: View {
                 defaultFamily: ".AppleSystemUIFont",
                 defaultSize: 11,
                 keyPath: \ForgeConfig.secondaryFont,
-                fontList: Self.allFonts,
-                showLineHeight: false
+                fontList: Self.allFonts
             )
 
             fontSection(
@@ -62,8 +60,7 @@ struct FontSettingsPane: View {
                 defaultFamily: "Menlo",
                 defaultSize: 13,
                 keyPath: \ForgeConfig.terminalFont,
-                fontList: Self.monoFonts,
-                showLineHeight: true
+                fontList: Self.monoFonts
             )
         }
         .formStyle(.grouped)
@@ -78,8 +75,7 @@ struct FontSettingsPane: View {
         defaultFamily: String,
         defaultSize: Int,
         keyPath: WritableKeyPath<ForgeConfig, ForgeConfig.FontConfig?>,
-        fontList: [String],
-        showLineHeight: Bool
+        fontList: [String]
     ) -> some View {
         Section {
             Picker("Family", selection: Binding(
@@ -121,36 +117,6 @@ struct FontSettingsPane: View {
                     }
                 ), in: 8...36)
                 .labelsHidden()
-            }
-
-            Toggle("Use ligatures", isOn: Binding(
-                get: { config?.useLigatures ?? true },
-                set: { v in
-                    store.update {
-                        if $0[keyPath: keyPath] == nil { $0[keyPath: keyPath] = ForgeConfig.FontConfig() }
-                        $0[keyPath: keyPath]!.useLigatures = v
-                    }
-                }
-            ))
-
-            if showLineHeight {
-                HStack {
-                    Text("Line height")
-                    Spacer()
-                    Text(String(format: "%.1f", config?.lineHeight ?? 1.2))
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                    Slider(value: Binding(
-                        get: { config?.lineHeight ?? 1.2 },
-                        set: { v in
-                            store.update {
-                                if $0[keyPath: keyPath] == nil { $0[keyPath: keyPath] = ForgeConfig.FontConfig() }
-                                $0[keyPath: keyPath]!.lineHeight = v
-                            }
-                        }
-                    ), in: 1.0...2.0, step: 0.1)
-                    .frame(width: 120)
-                }
             }
 
             // Live preview

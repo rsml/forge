@@ -12,6 +12,22 @@ struct MainView: View {
         ForgeConfigStore.shared.config.general?.sidebarPosition ?? "left"
     }
 
+    private var sidebarBackground: Color {
+        if let themeId = ForgeConfigStore.shared.config.theme?.source {
+            let searchPaths = [
+                "/Applications/Ghostty.app/Contents/Resources/ghostty/themes",
+                (NSHomeDirectory() as NSString).appendingPathComponent(".config/ghostty/themes"),
+            ]
+            for searchPath in searchPaths {
+                let path = (searchPath as NSString).appendingPathComponent(themeId)
+                if let theme = ThemeParser.parseThemeFile(path: path, id: themeId) {
+                    return theme.background.opacity(0.85)
+                }
+            }
+        }
+        return Color(nsColor: .windowBackgroundColor)
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             if sidebarPosition == "right" {
@@ -21,13 +37,13 @@ struct MainView: View {
                     Rectangle().fill(Color(nsColor: .separatorColor)).frame(width: 1)
                     sidebarContent
                         .frame(width: sidebarWidth)
-                        .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
+                        .background(sidebarBackground)
                 }
             } else {
                 if sidebarVisible {
                     sidebarContent
                         .frame(width: sidebarWidth)
-                        .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
+                        .background(sidebarBackground)
                     Rectangle().fill(Color(nsColor: .separatorColor)).frame(width: 1)
                 }
 

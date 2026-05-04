@@ -68,6 +68,8 @@ struct GeneralSettingsPane: View {
         panel.prompt = "Choose"
         if let currentDir = store.config.general?.defaultProjectDir {
             panel.directoryURL = URL(fileURLWithPath: currentDir)
+        } else {
+            panel.directoryURL = URL(fileURLWithPath: NSHomeDirectory())
         }
         if panel.runModal() == .OK, let url = panel.url {
             store.update {

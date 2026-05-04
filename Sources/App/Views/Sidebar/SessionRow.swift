@@ -3,6 +3,13 @@ import SwiftUI
 struct SessionRow: View {
     var session: Session
     var isActive: Bool
+
+    private var primaryFont: Font {
+        let config = ForgeConfigStore.shared.config.primaryFont
+        let family = config?.family ?? ".AppleSystemUIFont"
+        let size = CGFloat(config?.size ?? 13)
+        return .custom(family, size: size)
+    }
     var activeWindowId: String?
     @Binding var isExpanded: Bool
     var isRenaming: Bool
@@ -61,7 +68,7 @@ struct SessionRow: View {
                     InlineRenameField(text: $renameText, font: .system(.body, weight: .medium), onCancel: onRenameCancel, onCommit: onRenameCommit)
                 } else {
                     Text(session.name)
-                        .font(.system(.body, weight: isActive ? .medium : .regular))
+                        .font(primaryFont.weight(isActive ? .medium : .regular))
                         .foregroundStyle(isActive ? .primary : .secondary)
                         .lineLimit(1)
                     Spacer()
@@ -181,6 +188,13 @@ struct SidebarTabRow: View {
     var onRenameCommit: () -> Void = {}
     var onRenameCancel: () -> Void = {}
 
+    private var secondaryFont: Font {
+        let config = ForgeConfigStore.shared.config.secondaryFont
+        let family = config?.family ?? ".AppleSystemUIFont"
+        let size = CGFloat(config?.size ?? 11)
+        return .custom(family, size: size)
+    }
+
     var body: some View {
         let modifiers = ModifierKeyMonitor.shared
 
@@ -204,7 +218,7 @@ struct SidebarTabRow: View {
                 InlineRenameField(text: $renameText, font: .caption, onCancel: onRenameCancel, onCommit: onRenameCommit)
             } else {
                 Text(window.name)
-                    .font(.caption)
+                    .font(secondaryFont)
                     .foregroundStyle(isActive ? .primary : .secondary)
                     .lineLimit(1)
 
