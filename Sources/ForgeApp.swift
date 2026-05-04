@@ -3,27 +3,13 @@ import SwiftUI
 @main
 struct ForgeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @State private var controller = WorkspaceController(tmux: TmuxAdapter())
-    @State private var debugServer = DebugServer()
 
     var body: some Scene {
-        SwiftUI.Window("", id: "main") {
-            MainView()
-                .environment(controller)
-                .frame(minWidth: 800, minHeight: 500)
-                .onAppear {
-                    controller.connect()
-                    debugServer.start(controller: controller)
-                }
-        }
-        .windowStyle(.automatic)
-        .defaultSize(width: 1200, height: 800)
-        .commands {
-            ForgeMenuCommands(controller: controller)
-        }
-
         Settings {
             SettingsView()
+        }
+        .commands {
+            ForgeMenuCommands(controller: appDelegate.controller)
         }
     }
 }
@@ -247,6 +233,7 @@ struct ForgeMenuCommands: Commands {
 }
 
 extension Notification.Name {
+    static let forgeConfigChanged = Notification.Name("forgeConfigChanged")
     static let forgeNewProject = Notification.Name("forgeNewProject")
     static let forgeCommandPalette = Notification.Name("forgeCommandPalette")
     static let forgeToggleSidebar = Notification.Name("forgeToggleSidebar")
@@ -261,21 +248,115 @@ extension Notification.Name {
 
 // MARK: - App Delegate
 
-final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    let controller = WorkspaceController(tmux: TmuxAdapter())
+    private let debugServer = DebugServer()
+    private var mainWindow: NSWindow?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
 
+        createMainWindow()
+        controller.connect()
+        debugServer.start(controller: controller)
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.cleanUpMenuBar()
         }
+
+        NotificationCenter.default.addObserver(
+            forName: .forgeConfigChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateWindowBackground() }
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didExitFullScreenNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.reapplyTitleBarStyle() }
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.stripTitleBarChrome() }
+        }
     }
 
-    @MainActor private func cleanUpMenuBar() {
+    private func createMainWindow() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.titlebarSeparatorStyle = .none
+        window.minSize = NSSize(width: 800, height: 500)
+        window.center()
+        window.setFrameAutosaveName("ForgeMainWindow")
+
+        if let theme = ForgeConfigStore.shared.resolvedTheme {
+            window.backgroundColor = NSColor(theme.background)
+        }
+
+        let rootView = MainView()
+            .environment(controller)
+        window.contentView = NSHostingView(rootView: rootView)
+        window.makeKeyAndOrderFront(nil)
+        self.mainWindow = window
+
+        // SwiftUI re-adds title bar chrome during layout passes.
+        // In release builds, decoration views appear at unpredictable times,
+        // so poll every 100ms for 3 seconds to catch them all.
+        let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.stripTitleBarChrome() }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { timer.invalidate() }
+    }
+
+    private func updateWindowBackground() {
+        guard let window = mainWindow else { return }
+        if let theme = ForgeConfigStore.shared.resolvedTheme {
+            window.backgroundColor = NSColor(theme.background)
+        } else {
+            window.backgroundColor = .windowBackgroundColor
+        }
+        stripTitleBarChrome()
+    }
+
+    private func reapplyTitleBarStyle() {
+        guard let window = mainWindow else { return }
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.titlebarSeparatorStyle = .none
+        updateWindowBackground()
+        stripTitleBarChrome()
+    }
+
+    private func stripTitleBarChrome() {
+        guard let themeFrame = mainWindow?.contentView?.superview else { return }
+        Self.removeDecorationViews(in: themeFrame)
+    }
+
+    private static func removeDecorationViews(in view: NSView) {
+        let name = String(describing: type(of: view))
+        if name == "NSTitlebarContainerView" {
+            for child in view.subviews where String(describing: type(of: child)) == "_NSTitlebarDecorationView" {
+                child.removeFromSuperview()
+            }
+            return
+        }
+        for sub in view.subviews {
+            removeDecorationViews(in: sub)
+        }
+    }
+
+    private func cleanUpMenuBar() {
         guard let mainMenu = NSApp.mainMenu else { return }
         for menuItem in mainMenu.items {
             guard let submenu = menuItem.submenu else { continue }
-            // Remove "Close" and "Close All" from File menu (SwiftUI defaults)
             if menuItem.title == "File" {
                 submenu.items.removeAll { item in
                     item.title == "Close" || item.title == "Close All"
