@@ -133,16 +133,24 @@ struct WindowTab: View {
     let isActive: Bool
 
     var body: some View {
-        HStack(spacing: 4) {
-            Text("\(window.index): \(window.name)")
-                .font(.system(.caption, weight: isActive ? .semibold : .regular))
-                .lineLimit(1)
+        VStack(spacing: 0) {
+            HStack(spacing: 4) {
+                Text("\(window.index): \(window.name)")
+                    .font(.system(.caption, weight: .regular))
+                    .foregroundStyle(isActive ? .primary : .secondary)
+                    .lineLimit(1)
 
-            AttentionDot(needsAttention: window.needsAttention, size: 6)
+                AttentionDot(needsAttention: window.needsAttention, size: 6)
+            }
+            .padding(.horizontal, 10)
+            .frame(maxHeight: .infinity)
+
+            // Subtle bottom indicator
+            RoundedRectangle(cornerRadius: 0.5)
+                .fill(isActive ? Color.accentColor.opacity(0.5) : Color.clear)
+                .frame(height: 1)
+                .padding(.horizontal, 6)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .background(isActive ? Color.accentColor.opacity(0.15) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .contentShape(Rectangle())
     }
 }

@@ -9,6 +9,14 @@ struct ForgeTerminalView: NSViewRepresentable {
     func makeNSView(context: Context) -> LocalProcessTerminalView {
         let terminal = LocalProcessTerminalView(frame: .zero)
 
+        // Hide the legacy scroller — tmux manages scrollback
+        for subview in terminal.subviews {
+            if let scroller = subview as? NSScroller {
+                scroller.scrollerStyle = .overlay
+                scroller.alphaValue = 0
+            }
+        }
+
         terminal.nativeForegroundColor = NSColor(red: 0.77, green: 0.78, blue: 0.78, alpha: 1.0)
         terminal.nativeBackgroundColor = NSColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0)
         terminal.font = resolveTerminalFont(size: 13)
