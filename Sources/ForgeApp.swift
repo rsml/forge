@@ -262,50 +262,12 @@ extension Notification.Name {
 // MARK: - App Delegate
 
 final class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
-    private var windowObservers: [NSObjectProtocol] = []
-
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            self.configureMainWindow()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.cleanUpMenuBar()
-        }
-    }
-
-    @MainActor private func configureMainWindow() {
-        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.identifier?.rawValue != "com_apple_SwiftUI_Settings_window" }) else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.configureMainWindow() }
-            return
-        }
-        applyThemeToWindow(window)
-        window.isMovableByWindowBackground = false
-
-        // Re-apply theme color when window state changes (theme may have changed)
-        let events: [Notification.Name] = [
-            NSWindow.didBecomeKeyNotification,
-            NSWindow.didBecomeMainNotification,
-        ]
-        for event in events {
-            let observer = NotificationCenter.default.addObserver(forName: event, object: window, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.applyThemeToWindow(window) }
-            }
-            windowObservers.append(observer)
-        }
-        let activeObserver = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.applyThemeToWindow(window) }
-        }
-        windowObservers.append(activeObserver)
-    }
-
-    @MainActor private func applyThemeToWindow(_ window: NSWindow) {
-        // .hiddenTitleBar removes the native title bar chrome.
-        // We only need to set backgroundColor so the window frame matches the theme.
-        if let theme = ForgeConfigStore.shared.resolvedTheme {
-            window.backgroundColor = NSColor(theme.background)
-        } else {
-            window.backgroundColor = .windowBackgroundColor
         }
     }
 

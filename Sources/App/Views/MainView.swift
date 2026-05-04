@@ -1,5 +1,35 @@
 import SwiftUI
 
+/// Configures the host NSWindow from within the SwiftUI view hierarchy.
+/// updateNSView is called on every SwiftUI state change, so window properties
+/// stay in sync with theme changes reactively.
+struct WindowConfigurator: NSViewRepresentable {
+    let backgroundColor: NSColor
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        view.setFrameSize(.zero)
+        DispatchQueue.main.async { self.configure(view.window) }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        configure(nsView.window)
+    }
+
+    private func configure(_ window: NSWindow?) {
+        guard let window else { return }
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        if !window.styleMask.contains(.fullSizeContentView) {
+            window.styleMask.insert(.fullSizeContentView)
+        }
+        window.titlebarSeparatorStyle = .none
+        window.isMovableByWindowBackground = false
+        window.backgroundColor = backgroundColor
+    }
+}
+
 struct MainView: View {
     @Environment(WorkspaceController.self) var controller
     @State private var sidebarWidth: CGFloat = 160
@@ -70,6 +100,14 @@ struct MainView: View {
                 }
             }
         }
+        .background(
+            WindowConfigurator(backgroundColor: {
+                if let theme = ForgeConfigStore.shared.resolvedTheme {
+                    return NSColor(theme.background)
+                }
+                return .windowBackgroundColor
+            }())
+        )
         .foregroundStyle(themeForeground ?? Color.primary)
         .ignoresSafeArea()
         .onAppear {
