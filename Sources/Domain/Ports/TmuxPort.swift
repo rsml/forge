@@ -35,7 +35,9 @@ enum SplitDirection { case horizontal, vertical }
 protocol TmuxPort {
     func listSessions() async -> [SessionInfo]
     func listWindows(session: String) async -> [WindowInfo]
+    func listAllWindows() async -> [WindowInfo]
     func listPanes(window: String) async -> [PaneInfo]
+    func listAllPanes() async -> [PaneInfo]
 
     func newSession(name: String, path: String) async
     func killSession(name: String) async

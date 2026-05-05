@@ -2,7 +2,6 @@ import SwiftUI
 
 struct TerminalArea: View {
     var session: Session
-    @Environment(WorkspaceController.self) var controller
 
     var body: some View {
         // Key only on session so terminal recreates when switching projects, but NOT

@@ -11,6 +11,10 @@ final class WorkspaceController {
     private(set) var gitBranch: String?
     private let tmux: any TmuxPort
     private var refreshTask: Task<Void, Never>?
+    private var refreshDebounceTask: Task<Void, Never>?
+    private var isRefreshing = false
+    private var needsRefreshAfterCurrent = false
+    private var lastGitBranchSessionId: String?
     private var perSessionActiveWindowId: [String: String] = [:]  // sessionId -> windowId
 
     init(tmux: any TmuxPort) {
@@ -46,19 +50,25 @@ final class WorkspaceController {
 
     func refresh() async {
         let sessionInfos = await tmux.listSessions()
+        let allWindows = await tmux.listAllWindows()
+        let allPanes = await tmux.listAllPanes()
+
         mergeSessionState(sessionInfos)
+        let windowsBySession = Dictionary(grouping: allWindows, by: \.sessionId)
+        let panesByWindow = Dictionary(grouping: allPanes, by: \.windowId)
 
         for session in workspace.sessions {
-            let windowInfos = await tmux.listWindows(session: session.name)
-            mergeWindowState(session: session, windowInfos)
-
+            mergeWindowState(session: session, windowsBySession[session.id] ?? [])
             for window in session.windows {
-                let paneInfos = await tmux.listPanes(window: window.id)
-                mergePaneState(window: window, paneInfos)
+                mergePaneState(window: window, panesByWindow[window.id] ?? [])
             }
         }
 
-        await fetchGitBranch()
+        let activeSessionId = workspace.activeSessionId
+        if activeSessionId != lastGitBranchSessionId {
+            lastGitBranchSessionId = activeSessionId
+            await fetchGitBranch()
+        }
         NotificationCenter.default.post(name: .forgeWindowTitleChanged, object: nil)
     }
 
@@ -260,7 +270,7 @@ final class WorkspaceController {
         ForgeLog.log("[control] \(event)")
 
         if event.hasPrefix("%bell") {
-            // %bell <window_id> — mark panes in that window as having bell
+            // %bell <window_id> — mark panes in that window as having bell, no refresh needed
             let parts = event.split(separator: " ")
             if parts.count >= 2 {
                 let windowId = String(parts[1])
@@ -278,15 +288,47 @@ final class WorkspaceController {
                     ForgeLog.log("[control] Bell event for unknown window: \(windowId)")
                 }
             }
+            return
         }
 
-        Task { await refresh() }
+        // Structural events that require a state refresh
+        let structuralPrefixes = [
+            "%window-add", "%window-close", "%unlinked-window-close",
+            "%layout-change",
+            "%session-changed", "%session-renamed",
+            "%window-renamed",
+        ]
+        let isStructural = structuralPrefixes.contains { event.hasPrefix($0) }
+
+        if isStructural {
+            scheduleRefresh()
+        }
+        // Informational events (%begin, %end, %error, %pane-mode-changed, etc.) — no action needed
+    }
+
+    private func scheduleRefresh() {
+        if isRefreshing {
+            needsRefreshAfterCurrent = true
+            return
+        }
+        refreshDebounceTask?.cancel()
+        refreshDebounceTask = Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else { return }
+            isRefreshing = true
+            await refresh()
+            isRefreshing = false
+            if needsRefreshAfterCurrent {
+                needsRefreshAfterCurrent = false
+                scheduleRefresh()
+            }
+        }
     }
 
     private func startPeriodicRefresh() {
         refreshTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
+                try? await Task.sleep(for: .seconds(5))
                 await refresh()
             }
         }

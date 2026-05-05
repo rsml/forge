@@ -22,8 +22,20 @@ final class TmuxAdapter: TmuxPort {
         return TmuxStateParser.parseWindows(output)
     }
 
+    func listAllWindows() async -> [WindowInfo] {
+        guard let output = await runner.run("list-windows", "-a", "-F", TmuxStateParser.windowFormat),
+              !output.isEmpty else { return [] }
+        return TmuxStateParser.parseWindows(output)
+    }
+
     func listPanes(window: String) async -> [PaneInfo] {
         guard let output = await runner.run("list-panes", "-t", window, "-F", TmuxStateParser.paneFormat),
+              !output.isEmpty else { return [] }
+        return TmuxStateParser.parsePanes(output)
+    }
+
+    func listAllPanes() async -> [PaneInfo] {
+        guard let output = await runner.run("list-panes", "-a", "-F", TmuxStateParser.paneFormat),
               !output.isEmpty else { return [] }
         return TmuxStateParser.parsePanes(output)
     }
