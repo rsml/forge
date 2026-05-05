@@ -38,27 +38,33 @@ struct MainView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            if sidebarPosition == "right" {
-                detailContent
-
-                if showSidebar {
-                    sidebarDivider
-                    sidebarContent
-                        .frame(width: sidebarWidth)
-                        .background(sidebarBackground)
-                        .zIndex(2)
-                }
+        Group {
+            if ForgeConfigStore.shared.isStackMode {
+                StackView()
             } else {
-                if showSidebar {
-                    sidebarContent
-                        .frame(width: sidebarWidth)
-                        .background(sidebarBackground)
-                        .zIndex(2)
-                    sidebarDivider
-                }
+                HStack(spacing: 0) {
+                    if sidebarPosition == "right" {
+                        detailContent
 
-                detailContent
+                        if showSidebar {
+                            sidebarDivider
+                            sidebarContent
+                                .frame(width: sidebarWidth)
+                                .background(sidebarBackground)
+                                .zIndex(2)
+                        }
+                    } else {
+                        if showSidebar {
+                            sidebarContent
+                                .frame(width: sidebarWidth)
+                                .background(sidebarBackground)
+                                .zIndex(2)
+                            sidebarDivider
+                        }
+
+                        detailContent
+                    }
+                }
             }
         }
         .overlay {
