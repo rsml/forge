@@ -5,6 +5,10 @@ struct SettingsView: View {
         TabView {
             GeneralSettingsPane()
                 .tabItem { Label("General", systemImage: "gearshape") }
+            ListModeSettingsPane()
+                .tabItem { Label("List Mode", systemImage: "sidebar.left") }
+            StackModeSettingsPane()
+                .tabItem { Label("Stack Mode", systemImage: "rectangle.stack") }
             ThemeSettingsPane()
                 .tabItem { Label("Theme", systemImage: "paintbrush.fill") }
             FontSettingsPane()

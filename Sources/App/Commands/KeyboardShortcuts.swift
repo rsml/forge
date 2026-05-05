@@ -16,6 +16,7 @@ enum KeyboardShortcuts {
     static var toggleSidebar: Shortcut { resolve("toggleSidebar", default: Shortcut("b", modifiers: .command, label: "Toggle Sidebar")) }
     static var commandPalette: Shortcut { resolve("commandPalette", default: Shortcut("p", modifiers: .command, label: "Command Palette")) }
     static var notifications: Shortcut { resolve("notifications", default: Shortcut("n", modifiers: [.command, .shift], label: "Notifications")) }
+    static var toggleMode: Shortcut { resolve("toggleMode", default: Shortcut("m", modifiers: [.command, .shift], label: "Toggle Mode")) }
 
     // MARK: - Splits
     static var splitHorizontal: Shortcut { resolve("splitHorizontal", default: Shortcut("d", modifiers: .command, label: "Split Horizontally")) }
@@ -46,6 +47,7 @@ enum KeyboardShortcuts {
         ("toggleSidebar", Shortcut("b", modifiers: .command, label: "Toggle Sidebar"), "View"),
         ("commandPalette", Shortcut("p", modifiers: .command, label: "Command Palette"), "View"),
         ("notifications", Shortcut("n", modifiers: [.command, .shift], label: "Notifications"), "View"),
+        ("toggleMode", Shortcut("m", modifiers: [.command, .shift], label: "Toggle Mode"), "View"),
         ("splitHorizontal", Shortcut("d", modifiers: .command, label: "Split Horizontally"), "Splits"),
         ("splitVertical", Shortcut("d", modifiers: [.command, .shift], label: "Split Vertically"), "Splits"),
         ("selectTabLeft", Shortcut("[", modifiers: [.command, .shift], label: "Select Tab Left"), "Tabs"),

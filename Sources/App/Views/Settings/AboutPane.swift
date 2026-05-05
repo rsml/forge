@@ -12,9 +12,19 @@ struct AboutPane: View {
         VStack(spacing: 20) {
             Spacer()
 
-            Image(systemName: "terminal.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(Color.accentColor)
+            Group {
+                if let iconPath = Bundle.main.executableURL?.deletingLastPathComponent()
+                    .appendingPathComponent("appicon-transparent.png"),
+                   let nsImage = NSImage(contentsOf: iconPath) {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .frame(width: 192, height: 192)
+                } else {
+                    Image(systemName: "terminal.fill")
+                        .font(.system(size: 56))
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
 
             VStack(spacing: 4) {
                 Text("Forge")

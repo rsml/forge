@@ -4,6 +4,7 @@ struct WindowTabBar: View {
     var session: Session
     var sidebarVisible: Bool = true
     var sidebarPosition: String = "left"
+    var isFullScreen: Bool = false
     var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller
     @State private var draggedTabId: String?
@@ -105,17 +106,21 @@ struct WindowTabBar: View {
                         Button("New Browser Tab") {}
                     }
 
-                IconButton(systemName: "rectangle.split.2x1") {
-                    controller.splitPane(direction: .horizontal)
-                }
-                .frame(width: 40, height: 28)
-                .help(KeyboardShortcuts.splitHorizontal.tooltip)
+                // Only show split icons in tab bar when tabs are on bottom OR fullscreen
+                // (when tabs on top + windowed, they appear in the titlebar instead)
+                if tabBarOnBottom || isFullScreen {
+                    IconButton(systemName: "rectangle.split.2x1") {
+                        controller.splitPane(direction: .horizontal)
+                    }
+                    .frame(width: 40, height: 28)
+                    .help(KeyboardShortcuts.splitHorizontal.tooltip)
 
-                IconButton(systemName: "rectangle.split.1x2") {
-                    controller.splitPane(direction: .vertical)
+                    IconButton(systemName: "rectangle.split.1x2") {
+                        controller.splitPane(direction: .vertical)
+                    }
+                    .frame(width: 40, height: 28)
+                    .help(KeyboardShortcuts.splitVertical.tooltip)
                 }
-                .frame(width: 40, height: 28)
-                .help(KeyboardShortcuts.splitVertical.tooltip)
 
                 // Show sidebar toggle when sidebar is hidden (right position)
                 if !sidebarVisible && sidebarPosition == "right" {

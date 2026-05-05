@@ -26,10 +26,19 @@ struct ForgeMenuCommands: Commands {
                 let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
                 let alert = NSAlert()
                 alert.messageText = "Forge \(version) (\(build))"
-                alert.informativeText = "A native macOS frontend for tmux.\n\nhttps://github.com/anthropics/forge"
+                alert.informativeText = "A native macOS frontend for tmux."
                 alert.alertStyle = .informational
-                alert.icon = NSImage(systemSymbolName: "terminal.fill", accessibilityDescription: "Forge")
-                alert.runModal()
+                if let iconPath = Bundle.main.executableURL?.deletingLastPathComponent()
+                    .appendingPathComponent("appicon-transparent.png"),
+                   let icon = NSImage(contentsOf: iconPath) {
+                    icon.size = NSSize(width: 128, height: 128)
+                    alert.icon = icon
+                }
+                alert.addButton(withTitle: "OK")
+                alert.addButton(withTitle: "View on GitHub")
+                if alert.runModal() == .alertSecondButtonReturn {
+                    NSWorkspace.shared.open(URL(string: "https://github.com/anthropics/forge")!)
+                }
             }
         }
 
@@ -291,6 +300,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+
+        if let iconPath = Bundle.main.executableURL?.deletingLastPathComponent()
+            .appendingPathComponent("AppIcon.icns"),
+           let icon = NSImage(contentsOf: iconPath) {
+            NSApp.applicationIconImage = icon
+        }
 
         createMainWindow()
         controller.connect()
@@ -578,7 +593,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let position = ForgeConfigStore.shared.config.general?.sidebarPosition ?? "left"
         let effectivelyVisible = sidebarVisible && !controller.workspace.sessions.isEmpty
-        let sidebarTotal: CGFloat = effectivelyVisible ? 161 : 0 // 160 sidebar + 1 separator
+        let sidebarTotal: CGFloat = effectivelyVisible ? ForgeConfigStore.shared.sidebarWidth + 1 : 0
 
         if position == "right" {
             overlayLeadingConstraint?.constant = 0

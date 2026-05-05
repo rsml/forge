@@ -30,19 +30,6 @@ struct GeneralSettingsPane: View {
                 Toggle("Warn before closing a tab", isOn: generalBinding(\.warnOnCloseTab, default: false))
             }
 
-            Section("Layout") {
-                Picker("Sidebar position", selection: generalBinding(\.sidebarPosition, default: "left")) {
-                    Text("Left").tag("left")
-                    Text("Right").tag("right")
-                }
-                .pickerStyle(.segmented)
-
-                Picker("Tab bar position", selection: generalBinding(\.tabBarPosition, default: "top")) {
-                    Text("Top").tag("top")
-                    Text("Bottom").tag("bottom")
-                }
-                .pickerStyle(.segmented)
-            }
         }
         .formStyle(.grouped)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

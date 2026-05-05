@@ -20,7 +20,7 @@ struct SessionDetailView: View {
                     ForgeConfigStore.shared.resolvedTheme?.background ?? Color(nsColor: .windowBackgroundColor)
                     Color.white.opacity(0.06)
                 }
-                .frame(height: 28)
+                .frame(height: ForgeConfigStore.shared.titlebarHeight)
             }
             if tabBarPosition == "bottom" {
                 TerminalArea(session: session)

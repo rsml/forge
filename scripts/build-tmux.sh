@@ -3,7 +3,8 @@ set -euo pipefail
 
 # Versions
 LIBEVENT_VERSION="2.1.12-stable"
-NCURSES_VERSION="6.4"
+NCURSES_VERSION="6.5"
+UTF8PROC_VERSION="2.9.0"
 TMUX_VERSION="3.5"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -43,17 +44,44 @@ make -j"$(sysctl -n hw.ncpu)"
 make install
 cd "$BUILD_DIR"
 
+echo "==> Building utf8proc $UTF8PROC_VERSION"
+if [[ ! -d "utf8proc-${UTF8PROC_VERSION}" ]]; then
+    curl -LO "https://github.com/JuliaStrings/utf8proc/archive/refs/tags/v${UTF8PROC_VERSION}.tar.gz"
+    tar xzf "v${UTF8PROC_VERSION}.tar.gz"
+fi
+cd "utf8proc-${UTF8PROC_VERSION}"
+make clean 2>/dev/null || true
+make -j"$(sysctl -n hw.ncpu)" libutf8proc.a
+mkdir -p "$PREFIX/lib" "$PREFIX/include"
+cp libutf8proc.a "$PREFIX/lib/"
+cp utf8proc.h "$PREFIX/include/"
+# Create pkg-config file so tmux's configure can find it
+mkdir -p "$PREFIX/lib/pkgconfig"
+cat > "$PREFIX/lib/pkgconfig/libutf8proc.pc" <<PKGEOF
+prefix=$PREFIX
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: libutf8proc
+Description: UTF-8 processing library
+Version: $UTF8PROC_VERSION
+Libs: -L\${libdir} -lutf8proc
+Cflags: -I\${includedir}
+PKGEOF
+cd "$BUILD_DIR"
+
 echo "==> Building tmux $TMUX_VERSION"
 if [[ ! -d "tmux-${TMUX_VERSION}" ]]; then
     curl -LO "https://github.com/tmux/tmux/releases/download/${TMUX_VERSION}/tmux-${TMUX_VERSION}.tar.gz"
     tar xzf "tmux-${TMUX_VERSION}.tar.gz"
 fi
 cd "tmux-${TMUX_VERSION}"
+# Force static linking by passing .a files directly via LIBS
 PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" \
 CFLAGS="-I$PREFIX/include -I$PREFIX/include/ncursesw" \
 LDFLAGS="-L$PREFIX/lib" \
-LIBS="-lncursesw" \
-./configure --prefix="$PREFIX" --enable-static
+LIBS="$PREFIX/lib/libncursesw.a $PREFIX/lib/libevent.a $PREFIX/lib/libevent_pthreads.a $PREFIX/lib/libutf8proc.a" \
+./configure --prefix="$PREFIX" --enable-utf8proc
 make -j"$(sysctl -n hw.ncpu)"
 
 cp tmux "$OUTPUT"

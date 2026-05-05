@@ -46,12 +46,14 @@ struct MainView: View {
                     sidebarContent
                         .frame(width: sidebarWidth)
                         .background(sidebarBackground)
+                        .zIndex(2)
                 }
             } else {
                 if showSidebar {
                     sidebarContent
                         .frame(width: sidebarWidth)
                         .background(sidebarBackground)
+                        .zIndex(2)
                     sidebarDivider
                 }
 
@@ -160,7 +162,7 @@ struct MainView: View {
             .frame(width: 1)
             .overlay {
                 Color.clear
-                    .frame(width: 30)
+                    .frame(width: 16)
                     .contentShape(Rectangle())
                     .gesture(
                         DragGesture(minimumDistance: 1, coordinateSpace: .global)
@@ -178,9 +180,9 @@ struct MainView: View {
                     )
                     .onHover { hovering in
                         if hovering {
-                            NSCursor.resizeLeftRight.push()
+                            NSCursor.resizeLeftRight.set()
                         } else {
-                            NSCursor.pop()
+                            NSCursor.arrow.set()
                         }
                     }
             }
