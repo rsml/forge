@@ -122,6 +122,11 @@ struct ForgeMenuCommands: Commands {
             }
             .keyboardShortcut(KeyboardShortcuts.notifications.key, modifiers: KeyboardShortcuts.notifications.modifiers)
 
+            Button("Toggle Mode") {
+                NotificationCenter.default.post(name: .forgeToggleMode, object: nil)
+            }
+            .keyboardShortcut(KeyboardShortcuts.toggleMode.key, modifiers: KeyboardShortcuts.toggleMode.modifiers)
+
             Divider()
 
             Button("Split Horizontally") {
@@ -244,6 +249,7 @@ extension Notification.Name {
     static let forgeExpandAll = Notification.Name("forgeExpandAll")
     static let forgeRenameTab = Notification.Name("forgeRenameTab")
     static let forgeRenameProject = Notification.Name("forgeRenameProject")
+    static let forgeToggleMode = Notification.Name("forgeToggleMode")
     static let forgeWindowTitleChanged = Notification.Name("forgeWindowTitleChanged")
 }
 
@@ -318,6 +324,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.isFullScreen = false
+                self?.measureTitlebarHeight()
                 self?.updateSplitIconVisibility()
                 self?.reapplyTitleBarStyle()
             }
@@ -382,6 +389,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.contentView = NSHostingView(rootView: rootView)
         window.makeKeyAndOrderFront(nil)
         self.mainWindow = window
+        measureTitlebarHeight()
         syncAppearance()
 
         // SwiftUI re-adds title bar chrome during layout passes.
@@ -397,6 +405,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { timer.invalidate() }
+    }
+
+    private func measureTitlebarHeight() {
+        guard let window = mainWindow else { return }
+        let height = window.frame.height - window.contentLayoutRect.height
+        if height > 0 {
+            ForgeConfigStore.shared.titlebarHeight = height
+        }
     }
 
     private func updateWindowBackground() {
@@ -556,7 +572,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if isFullScreen {
             overlayLeadingConstraint?.constant = 0
             overlayTrailingConstraint?.constant = 0
-            pathLabelLeadingConstraint?.constant = 12
+            pathLabelLeadingConstraint?.constant = 78
             return
         }
 
