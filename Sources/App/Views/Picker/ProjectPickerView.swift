@@ -32,21 +32,15 @@ struct ProjectPickerView: View {
 
             Divider()
 
-            List(selection: $selectedPath) {
+            ScrollView {
                 let sorted = sortedPaths
                 if !sorted.isEmpty {
-                    Section {
-                        ForEach(sorted, id: \.self) { path in
-                            ProjectRow(path: path, openCount: openCount(for: path))
-                                .tag(path)
-                                .onTapGesture(count: 2) {
-                                    selectedPath = path
-                                    openProject()
-                                }
-                        }
-                    } header: {
+                    VStack(spacing: 0) {
                         HStack {
                             Text(sortMode.rawValue)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
                             Spacer()
                             Menu {
                                 ForEach(ProjectSortMode.allCases, id: \.self) { mode in
@@ -68,10 +62,33 @@ struct ProjectPickerView: View {
                             .menuStyle(.borderlessButton)
                             .fixedSize()
                         }
-                    }
-                }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
 
-                if !searchText.isEmpty && sorted.isEmpty {
+                        ForEach(sorted, id: \.self) { path in
+                            ProjectRow(path: path, openCount: openCount(for: path))
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 16)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(selectedPath == path ? Color.accentColor.opacity(0.3) : Color.clear)
+                                        .padding(.horizontal, 8)
+                                )
+                                .contentShape(Rectangle())
+                                .onTapGesture(count: 2) {
+                                    selectedPath = path
+                                    openProject()
+                                }
+                                .onTapGesture(count: 1) {
+                                    selectedPath = path
+                                }
+                                .onHover { hovering in
+                                    if hovering { NSCursor.arrow.push() } else { NSCursor.pop() }
+                                }
+                        }
+                    }
+                } else if !searchText.isEmpty {
                     VStack {
                         Spacer()
                         Text("No matches found")
@@ -81,11 +98,9 @@ struct ProjectPickerView: View {
                         Spacer()
                     }
                     .frame(height: 200)
-                    .listRowSeparator(.hidden)
                 }
             }
-            .listStyle(.plain)
-            .frame(idealHeight: 300)
+            .frame(idealHeight: 500)
 
             Divider()
 
@@ -306,5 +321,6 @@ struct ProjectRow: View {
                     .monospacedDigit()
             }
         }
+        .textSelection(.disabled)
     }
 }
