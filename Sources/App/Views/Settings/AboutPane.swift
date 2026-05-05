@@ -38,8 +38,13 @@ struct AboutPane: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Link("View on GitHub", destination: URL(string: "https://github.com/anthropics/forge")!)
-                .font(.callout)
+            Button {
+                NSWorkspace.shared.open(URL(string: "https://github.com/rsml/forge")!)
+            } label: {
+                Text("View on GitHub")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
 
             Spacer()
         }

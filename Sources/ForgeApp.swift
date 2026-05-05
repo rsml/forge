@@ -37,7 +37,7 @@ struct ForgeMenuCommands: Commands {
                 alert.addButton(withTitle: "OK")
                 alert.addButton(withTitle: "View on GitHub")
                 if alert.runModal() == .alertSecondButtonReturn {
-                    NSWorkspace.shared.open(URL(string: "https://github.com/anthropics/forge")!)
+                    NSWorkspace.shared.open(URL(string: "https://github.com/rsml/forge")!)
                 }
             }
         }
