@@ -9,6 +9,7 @@ public struct AttentionQueue {
 
     /// Adds `id` to the back of the queue. No-op if already present.
     public mutating func enqueue(_ id: UUID) {
+        // O(n) membership check — acceptable for expected queue sizes (tens of items)
         guard !items.contains(id) else { return }
         items.append(id)
     }
@@ -21,6 +22,7 @@ public struct AttentionQueue {
 
     /// Inserts `id` at the front of the queue. No-op if already present.
     public mutating func insertAtFront(_ id: UUID) {
+        // O(n) membership check — acceptable for expected queue sizes (tens of items)
         guard !items.contains(id) else { return }
         items.insert(id, at: 0)
     }

@@ -7,27 +7,6 @@ import Testing
 @MainActor
 struct BellEventHandlingTests {
 
-    @Test("Bell event parser handles valid format")
-    func testBellEventParsing() {
-        let event = "%bell %1"
-        let parts = event.split(separator: " ")
-
-        #expect(parts.count >= 2)
-        #expect(String(parts[0]) == "%bell")
-        #expect(String(parts[1]) == "%1")
-    }
-
-    @Test("Bell event parser handles window ID extraction")
-    func testWindowIdExtraction() {
-        let event = "%bell %42"
-        let parts = event.split(separator: " ")
-
-        if parts.count >= 2 {
-            let windowId = String(parts[1])
-            #expect(windowId == "%42")
-        }
-    }
-
     @Test("Bell state propagation through window hierarchy")
     func testBellStatePropagation() {
         // Create test data structure

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Events that can place a window into the attention queue.
-public enum AttentionEvent {
+public enum AttentionEvent: Sendable, Equatable {
     case bell(windowUUID: UUID)
     case commandCompleted(windowUUID: UUID)
 
