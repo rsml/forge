@@ -8,6 +8,7 @@ import Observation
 @MainActor
 final class WorkspaceController {
     let workspace = Workspace()
+    private(set) var gitBranch: String?
     private let tmux: any TmuxPort
     private var refreshTask: Task<Void, Never>?
     private var perSessionActiveWindowId: [String: String] = [:]  // sessionId -> windowId
@@ -55,6 +56,9 @@ final class WorkspaceController {
                 mergePaneState(window: window, paneInfos)
             }
         }
+
+        await fetchGitBranch()
+        NotificationCenter.default.post(name: .forgeWindowTitleChanged, object: nil)
     }
 
     // MARK: - Actions
@@ -212,9 +216,41 @@ final class WorkspaceController {
 
     // MARK: - Private
 
+    private func fetchGitBranch() async {
+        guard let path = workspace.activeSession?.path else {
+            gitBranch = nil
+            return
+        }
+        let result: String? = await withCheckedContinuation { cont in
+            let process = Process()
+            let pipe = Pipe()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            process.arguments = ["-C", path, "rev-parse", "--abbrev-ref", "HEAD"]
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+            do {
+                try process.run()
+                process.waitUntilExit()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let branch = String(data: data, encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                cont.resume(returning: (branch?.isEmpty == false) ? branch : nil)
+            } catch {
+                cont.resume(returning: nil)
+            }
+        }
+        gitBranch = result
+    }
+
     private func ensureServer() async {
         let sessions = await tmux.listSessions()
         if sessions.isEmpty {
+            // Clean up stale socket if a previous server crashed
+            let socketPath = "/private/tmp/tmux-\(getuid())/forge"
+            if FileManager.default.fileExists(atPath: socketPath) {
+                try? FileManager.default.removeItem(atPath: socketPath)
+                ForgeLog.log("[app] Removed stale tmux socket")
+            }
             await tmux.newSession(name: "forge-default", path: NSHomeDirectory())
         }
     }

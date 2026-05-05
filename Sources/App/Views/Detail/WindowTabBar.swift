@@ -23,7 +23,7 @@ struct WindowTabBar: View {
                 // Show sidebar toggle when sidebar is hidden (left position)
                 if !sidebarVisible && sidebarPosition != "right" {
                     IconButton(systemName: "sidebar.left") { onToggleSidebar() }
-                        .frame(width: 36, height: 28)
+                        .frame(width: 28, height: 28)
                         .padding(.leading, 8)
                         .help(KeyboardShortcuts.toggleSidebar.tooltip)
                 }
@@ -106,25 +106,23 @@ struct WindowTabBar: View {
                         Button("New Browser Tab") {}
                     }
 
-                HStack(spacing: 0) {
-                    IconButton(systemName: "rectangle.split.2x1") {
-                        controller.splitPane(direction: .horizontal)
-                    }
-                    .frame(width: 28, height: 28)
-                    .help(KeyboardShortcuts.splitHorizontal.tooltip)
-
-                    IconButton(systemName: "rectangle.split.1x2") {
-                        controller.splitPane(direction: .vertical)
-                    }
-                    .frame(width: 28, height: 28)
-                    .help(KeyboardShortcuts.splitVertical.tooltip)
+                IconButton(systemName: "rectangle.split.2x1") {
+                    controller.splitPane(direction: .horizontal)
                 }
+                .frame(width: 28, height: 28)
+                .help(KeyboardShortcuts.splitHorizontal.tooltip)
+
+                IconButton(systemName: "rectangle.split.1x2") {
+                    controller.splitPane(direction: .vertical)
+                }
+                .frame(width: 28, height: 28)
                 .padding(.trailing, 8)
+                .help(KeyboardShortcuts.splitVertical.tooltip)
 
                 // Show sidebar toggle when sidebar is hidden (right position)
                 if !sidebarVisible && sidebarPosition == "right" {
                     IconButton(systemName: "sidebar.right") { onToggleSidebar() }
-                        .frame(width: 36, height: 28)
+                        .frame(width: 28, height: 28)
                         .padding(.trailing, 8)
                         .help(KeyboardShortcuts.toggleSidebar.tooltip)
                 }
@@ -140,47 +138,6 @@ struct WindowTabBar: View {
     }
 }
 
-struct TitleBarRow: View {
-    let fullPath: String
-    let shortPath: String
-    let gitBranch: String?
-
-    var body: some View {
-        GeometryReader { geo in
-            let branchWidth = branchTextWidth(gitBranch)
-            let fullPathWidth = textWidth(fullPath)
-            let minGap: CGFloat = 10
-            let available = geo.size.width - branchWidth - minGap
-            let useFull = fullPathWidth <= available
-
-            HStack(spacing: 0) {
-                Text(useFull ? fullPath : shortPath)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                Spacer(minLength: 10)
-
-                if let branch = gitBranch {
-                    Text(branch)
-                        .lineLimit(1)
-                }
-            }
-            .font(.system(.caption))
-            .foregroundStyle(.secondary)
-            .frame(maxHeight: .infinity)
-        }
-    }
-
-    private func textWidth(_ text: String) -> CGFloat {
-        let font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
-        return (text as NSString).size(withAttributes: [.font: font]).width
-    }
-
-    private func branchTextWidth(_ branch: String?) -> CGFloat {
-        guard let branch else { return 0 }
-        return textWidth(branch)
-    }
-}
 
 struct WindowTab: View {
     var window: Window

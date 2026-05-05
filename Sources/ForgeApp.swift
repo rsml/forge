@@ -244,6 +244,18 @@ extension Notification.Name {
     static let forgeExpandAll = Notification.Name("forgeExpandAll")
     static let forgeRenameTab = Notification.Name("forgeRenameTab")
     static let forgeRenameProject = Notification.Name("forgeRenameProject")
+    static let forgeWindowTitleChanged = Notification.Name("forgeWindowTitleChanged")
+}
+
+// MARK: - NSColor Helpers
+
+extension NSColor {
+    /// Whether this color appears light based on perceived luminance (W3C formula).
+    var isLight: Bool {
+        guard let rgb = usingColorSpace(.sRGB) else { return false }
+        let luminance = 0.299 * rgb.redComponent + 0.587 * rgb.greenComponent + 0.114 * rgb.blueComponent
+        return luminance > 0.5
+    }
 }
 
 // MARK: - App Delegate
@@ -253,6 +265,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let controller = WorkspaceController(tmux: TmuxAdapter())
     private let debugServer = DebugServer()
     private var mainWindow: NSWindow?
+    private var appearanceObservation: NSKeyValueObservation?
+    private var titleBarOverlay: NSView?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -272,6 +286,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated { self?.updateWindowBackground() }
         }
         NotificationCenter.default.addObserver(
+            forName: NSWindow.willEnterFullScreenNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                // macOS 15.3+ regression: fullscreen titlebar becomes unexpectedly
+                // transparent. Disable during fullscreen, restore on exit.
+                if #available(macOS 15.3, *) {
+                    self?.mainWindow?.titlebarAppearsTransparent = false
+                }
+            }
+        }
+        NotificationCenter.default.addObserver(
             forName: NSWindow.didExitFullScreenNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.reapplyTitleBarStyle() }
@@ -280,6 +305,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.stripTitleBarChrome() }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: .forgeWindowTitleChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateWindowTitle() }
+        }
+
+        // Re-sync titlebar color when system appearance (dark/light mode) changes
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeOcclusionStateNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.syncAppearance() }
+        }
+        // Use KVO on effectiveAppearance for immediate dark/light mode response
+        appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
+            MainActor.assumeIsolated { self?.syncAppearance() }
         }
     }
 
@@ -297,33 +339,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.center()
         window.setFrameAutosaveName("ForgeMainWindow")
 
-        if let theme = ForgeConfigStore.shared.resolvedTheme {
-            window.backgroundColor = NSColor(theme.background)
-        }
-
         let rootView = MainView()
             .environment(controller)
         window.contentView = NSHostingView(rootView: rootView)
         window.makeKeyAndOrderFront(nil)
         self.mainWindow = window
+        syncAppearance()
 
         // SwiftUI re-adds title bar chrome during layout passes.
         // In release builds, decoration views appear at unpredictable times,
         // so poll every 100ms for 3 seconds to catch them all.
         let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.stripTitleBarChrome() }
+            MainActor.assumeIsolated {
+                self?.stripTitleBarChrome()
+                if self?.titleBarOverlay?.superview == nil {
+                    self?.installTitleBarOverlay()
+                    self?.updateWindowTitle()
+                }
+            }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { timer.invalidate() }
     }
 
     private func updateWindowBackground() {
-        guard let window = mainWindow else { return }
-        if let theme = ForgeConfigStore.shared.resolvedTheme {
-            window.backgroundColor = NSColor(theme.background)
-        } else {
-            window.backgroundColor = .windowBackgroundColor
-        }
-        stripTitleBarChrome()
+        syncAppearance()
     }
 
     private func reapplyTitleBarStyle() {
@@ -331,26 +370,128 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.titlebarSeparatorStyle = .none
-        updateWindowBackground()
-        stripTitleBarChrome()
+        syncAppearance()
+        installTitleBarOverlay()
     }
 
     private func stripTitleBarChrome() {
         guard let themeFrame = mainWindow?.contentView?.superview else { return }
-        Self.removeDecorationViews(in: themeFrame)
+        Self.hideTitleBarChrome(in: themeFrame)
     }
 
-    private static func removeDecorationViews(in view: NSView) {
+    /// Hide the NSVisualEffectView and decoration views inside the titlebar container.
+    /// Hiding is more resilient than removeFromSuperview across OS updates.
+    private static func hideTitleBarChrome(in view: NSView) {
         let name = String(describing: type(of: view))
         if name == "NSTitlebarContainerView" {
-            for child in view.subviews where String(describing: type(of: child)) == "_NSTitlebarDecorationView" {
-                child.removeFromSuperview()
+            for child in view.subviews {
+                let childName = String(describing: type(of: child))
+                if childName == "_NSTitlebarDecorationView" || child is NSVisualEffectView {
+                    child.isHidden = true
+                }
+            }
+            // Also set the container's layer background to match window
+            if let bg = view.window?.backgroundColor {
+                view.wantsLayer = true
+                view.layer?.backgroundColor = bg.cgColor
             }
             return
         }
         for sub in view.subviews {
-            removeDecorationViews(in: sub)
+            hideTitleBarChrome(in: sub)
         }
+    }
+
+    private func updateWindowTitle() {
+        if titleBarOverlay == nil || titleBarOverlay?.superview == nil {
+            installTitleBarOverlay()
+        }
+        guard let overlay = titleBarOverlay else { return }
+
+        let pathLabel = overlay.subviews.first { $0.identifier?.rawValue == "titlePath" } as? NSTextField
+        let branchLabel = overlay.subviews.first { $0.identifier?.rawValue == "titleBranch" } as? NSTextField
+
+        let session = controller.workspace.activeSession
+        if let path = session?.path {
+            pathLabel?.stringValue = path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
+        } else {
+            pathLabel?.stringValue = session?.name ?? ""
+        }
+        branchLabel?.stringValue = controller.gitBranch ?? ""
+    }
+
+    private func installTitleBarOverlay() {
+        guard let themeFrame = mainWindow?.contentView?.superview,
+              let container = Self.findView(named: "NSTitlebarContainerView", in: themeFrame)
+        else { return }
+
+        titleBarOverlay?.removeFromSuperview()
+
+        let overlay = NSView()
+        overlay.translatesAutoresizingMaskIntoConstraints = false
+
+        let pathLabel = NSTextField(labelWithString: "")
+        pathLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        pathLabel.textColor = .secondaryLabelColor
+        pathLabel.lineBreakMode = .byTruncatingMiddle
+        pathLabel.translatesAutoresizingMaskIntoConstraints = false
+        pathLabel.identifier = NSUserInterfaceItemIdentifier("titlePath")
+
+        let branchLabel = NSTextField(labelWithString: "")
+        branchLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        branchLabel.textColor = .secondaryLabelColor
+        branchLabel.lineBreakMode = .byTruncatingTail
+        branchLabel.translatesAutoresizingMaskIntoConstraints = false
+        branchLabel.identifier = NSUserInterfaceItemIdentifier("titleBranch")
+
+        overlay.addSubview(pathLabel)
+        overlay.addSubview(branchLabel)
+
+        pathLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        branchLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        NSLayoutConstraint.activate([
+            pathLabel.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 78),
+            pathLabel.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
+            branchLabel.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -12),
+            branchLabel.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
+            pathLabel.trailingAnchor.constraint(lessThanOrEqualTo: branchLabel.leadingAnchor, constant: -8),
+        ])
+
+        container.addSubview(overlay)
+        NSLayoutConstraint.activate([
+            overlay.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            overlay.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            overlay.topAnchor.constraint(equalTo: container.topAnchor),
+            overlay.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
+
+        titleBarOverlay = overlay
+    }
+
+    private static func findView(named name: String, in view: NSView) -> NSView? {
+        if String(describing: type(of: view)) == name { return view }
+        for sub in view.subviews {
+            if let found = findView(named: name, in: sub) { return found }
+        }
+        return nil
+    }
+
+    private func syncAppearance() {
+        guard let window = mainWindow else { return }
+        if let theme = ForgeConfigStore.shared.resolvedTheme {
+            let bgColor = NSColor(theme.background)
+            window.backgroundColor = bgColor
+            // Set window appearance to match background luminance so
+            // traffic lights and other chrome adapt correctly
+            window.appearance = bgColor.isLight
+                ? NSAppearance(named: .aqua)
+                : NSAppearance(named: .darkAqua)
+        } else {
+            window.backgroundColor = .windowBackgroundColor
+            window.appearance = nil
+        }
+        stripTitleBarChrome()
     }
 
     private func cleanUpMenuBar() {
