@@ -192,15 +192,38 @@ struct ForgeMenuCommands: Commands {
             }
             .keyboardShortcut(KeyboardShortcuts.selectTabLeft.key, modifiers: KeyboardShortcuts.selectTabLeft.modifiers)
 
-            Button("Select Tab Right") {
-                guard let session = controller.workspace.activeSession,
-                      let windowId = controller.workspace.activeWindowId,
-                      let idx = session.windows.firstIndex(where: { $0.id == windowId }),
-                      idx < session.windows.count - 1
-                else { return }
-                controller.selectWindow(session.windows[idx + 1])
+            if !ForgeConfigStore.shared.isStackMode {
+                Button("Select Tab Right") {
+                    guard let session = controller.workspace.activeSession,
+                          let windowId = controller.workspace.activeWindowId,
+                          let idx = session.windows.firstIndex(where: { $0.id == windowId }),
+                          idx < session.windows.count - 1
+                    else { return }
+                    controller.selectWindow(session.windows[idx + 1])
+                }
+                .keyboardShortcut(KeyboardShortcuts.selectTabRight.key, modifiers: KeyboardShortcuts.selectTabRight.modifiers)
             }
-            .keyboardShortcut(KeyboardShortcuts.selectTabRight.key, modifiers: KeyboardShortcuts.selectTabRight.modifiers)
+
+            if ForgeConfigStore.shared.isStackMode {
+                Divider()
+                Button("Done") {
+                    guard let uuid = controller.attentionManager?.currentWindowUUID else { return }
+                    controller.attentionManager?.markDone(uuid)
+                }
+                .keyboardShortcut(KeyboardShortcuts.stackDone.key, modifiers: KeyboardShortcuts.stackDone.modifiers)
+
+                Button("Hide") {
+                    guard let uuid = controller.attentionManager?.currentWindowUUID else { return }
+                    controller.attentionManager?.hide(uuid)
+                }
+                .keyboardShortcut(KeyboardShortcuts.stackHide.key, modifiers: KeyboardShortcuts.stackHide.modifiers)
+
+                Button("Move to Back") {
+                    guard let uuid = controller.attentionManager?.currentWindowUUID else { return }
+                    controller.attentionManager?.moveToBack(uuid)
+                }
+                .keyboardShortcut(KeyboardShortcuts.stackMoveToBack.key, modifiers: KeyboardShortcuts.stackMoveToBack.modifiers)
+            }
 
             Button("Move Tab Left") {
                 NotificationCenter.default.post(name: .forgeMoveTabLeft, object: nil)

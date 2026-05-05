@@ -8,6 +8,7 @@ struct WindowTabBar: View {
     var isFullScreen: Bool = false
     var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller
+    @Environment(AttentionManager.self) var attention
     @State private var draggedTabId: String?
     @State private var renamingWindowId: String?
     @State private var renameText = ""
@@ -68,6 +69,16 @@ struct WindowTabBar: View {
                                     Button("Rename...") {
                                         renamingWindowId = window.id
                                         renameText = window.name
+                                    }
+                                    Divider()
+                                    if attention.isHidden(window.uuid) {
+                                        Button("Unhide from Stack View") {
+                                            attention.unhide(window.uuid)
+                                        }
+                                    } else {
+                                        Button("Hide from Stack View") {
+                                            attention.hide(window.uuid)
+                                        }
                                     }
                                     Divider()
                                     Button("Close Tab", role: .destructive) {

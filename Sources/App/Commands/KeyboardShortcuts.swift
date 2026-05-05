@@ -19,6 +19,11 @@ enum KeyboardShortcuts {
     static var notifications: Shortcut { resolve("notifications", default: Shortcut("n", modifiers: [.command, .shift], label: "Notifications")) }
     static var toggleMode: Shortcut { resolve("toggleMode", default: Shortcut("m", modifiers: [.command, .shift], label: "Toggle Mode")) }
 
+    // MARK: - Stack
+    static var stackDone: Shortcut { resolve("stackDone", default: Shortcut(.return, modifiers: .command, label: "Done")) }
+    static var stackHide: Shortcut { resolve("stackHide", default: Shortcut("h", modifiers: [.command, .shift], label: "Hide")) }
+    static var stackMoveToBack: Shortcut { resolve("stackMoveToBack", default: Shortcut("]", modifiers: [.command, .shift], label: "Move to Back")) }
+
     // MARK: - Splits
     static var splitHorizontal: Shortcut { resolve("splitHorizontal", default: Shortcut("d", modifiers: .command, label: "Split Horizontally")) }
     static var splitVertical: Shortcut { resolve("splitVertical", default: Shortcut("d", modifiers: [.command, .shift], label: "Split Vertically")) }
@@ -49,6 +54,9 @@ enum KeyboardShortcuts {
         ("commandPalette", Shortcut("p", modifiers: .command, label: "Command Palette"), "View"),
         ("notifications", Shortcut("n", modifiers: [.command, .shift], label: "Notifications"), "View"),
         ("toggleMode", Shortcut("m", modifiers: [.command, .shift], label: "Toggle Mode"), "View"),
+        ("stackDone", Shortcut(.return, modifiers: .command, label: "Done"), "Stack"),
+        ("stackHide", Shortcut("h", modifiers: [.command, .shift], label: "Hide"), "Stack"),
+        ("stackMoveToBack", Shortcut("]", modifiers: [.command, .shift], label: "Move to Back"), "Stack"),
         ("splitHorizontal", Shortcut("d", modifiers: .command, label: "Split Horizontally"), "Splits"),
         ("splitVertical", Shortcut("d", modifiers: [.command, .shift], label: "Split Vertically"), "Splits"),
         ("selectTabLeft", Shortcut("[", modifiers: [.command, .shift], label: "Select Tab Left"), "Tabs"),
