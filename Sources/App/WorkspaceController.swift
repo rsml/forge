@@ -9,6 +9,7 @@ import ForgeDomain
 @MainActor
 final class WorkspaceController {
     let workspace = Workspace()
+    var attentionManager: AttentionManager?
     private(set) var gitBranch: String?
     private let tmux: any TmuxPort
     private var refreshTask: Task<Void, Never>?
@@ -29,6 +30,9 @@ final class WorkspaceController {
             await refresh()
             seedRecentDirectories()
             restoreUIState()
+            // Prune any hidden UUIDs from a previous session that no longer exist
+            let allUUIDs = Set(workspace.sessions.flatMap { $0.windows.map(\.uuid) })
+            attentionManager?.pruneStaleHiddenEntries(validUUIDs: allUUIDs)
 
             tmux.startControlMode { [weak self] event in
                 Task { @MainActor in
@@ -282,6 +286,7 @@ final class WorkspaceController {
                             pane.hasBell = true
                         }
                         found = true
+                        attentionManager?.handleEvent(.bell(windowUUID: window.uuid))
                         break
                     }
                 }
@@ -290,6 +295,16 @@ final class WorkspaceController {
                 }
             }
             return
+        }
+
+        if event.hasPrefix("%window-close") || event.hasPrefix("%unlinked-window-close") {
+            let parts = event.split(separator: " ")
+            if parts.count >= 2 {
+                let windowId = String(parts[1])
+                if let (_, window) = workspace.findWindow(byTmuxId: windowId) {
+                    attentionManager?.removeWindow(window.uuid)
+                }
+            }
         }
 
         // Structural events that require a state refresh
@@ -434,6 +449,13 @@ final class WorkspaceController {
             if let existing = window.panes.first(where: { $0.id == info.id }) {
                 existing.index = info.index
                 existing.active = info.active
+                // Detect command completion: non-shell → shell transition
+                let wasRunning = PaneStatus.from(command: existing.currentCommand) == .running
+                let nowIdle = PaneStatus.from(command: info.currentCommand) == .idle
+                if wasRunning && nowIdle {
+                    attentionManager?.handleEvent(.commandCompleted(windowUUID: window.uuid))
+                }
+                existing.previousCommand = existing.currentCommand
                 existing.currentCommand = info.currentCommand
                 existing.currentPath = info.currentPath
                 existing.width = info.width
