@@ -67,10 +67,8 @@ struct SessionRow: View {
                 if isRenaming {
                     InlineRenameField(text: $renameText, font: .system(.body, weight: .medium), onCancel: onRenameCancel, onCommit: onRenameCommit)
                 } else {
-                    Text(session.name)
-                        .font(primaryFont.weight(isActive ? .medium : .regular))
+                    TruncatingText(session.name, font: primaryFont.weight(isActive ? .medium : .regular))
                         .foregroundStyle(isActive ? .primary : .secondary)
-                        .lineLimit(1)
                     Spacer()
                 }
             }
@@ -217,10 +215,8 @@ struct SidebarTabRow: View {
             if isRenaming {
                 InlineRenameField(text: $renameText, font: .caption, onCancel: onRenameCancel, onCommit: onRenameCommit)
             } else {
-                Text(window.name)
-                    .font(secondaryFont)
+                TruncatingText(window.name, font: secondaryFont)
                     .foregroundStyle(isActive ? .primary : .secondary)
-                    .lineLimit(1)
 
                 if window.needsAttention {
                     AttentionDot(needsAttention: true, size: 5)

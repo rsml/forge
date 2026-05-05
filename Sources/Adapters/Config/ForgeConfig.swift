@@ -9,6 +9,7 @@ struct ForgeConfig: Codable {
     var appearance: AppearanceSettings?
     var terminal: TerminalSettings?
     var shortcuts: [String: ShortcutConfig]?
+    var projectOpenCounts: [String: Int]?
     var primaryFont: FontConfig?
     var secondaryFont: FontConfig?
     var terminalFont: FontConfig?

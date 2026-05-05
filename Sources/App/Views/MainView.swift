@@ -8,7 +8,7 @@ struct MainView: View {
     @State private var showNewProject = false
     @State private var showNotifications = false
 
-    @GestureState private var dragBaseWidth: CGFloat? = nil
+    @State private var dragStartWidth: CGFloat? = nil
 
     private static let minSidebarWidth: CGFloat = 120
     private static let maxSidebarWidth: CGFloat = 400
@@ -105,6 +105,10 @@ struct MainView: View {
         .onChange(of: controller.workspace.sessions.count) {
             autoFitSidebarWidth()
         }
+        .onChange(of: sidebarWidth) {
+            ForgeConfigStore.shared.sidebarWidth = sidebarWidth
+            NotificationCenter.default.post(name: .forgeWindowTitleChanged, object: nil)
+        }
     }
 
     @ViewBuilder
@@ -153,28 +157,34 @@ struct MainView: View {
 
     private var sidebarDivider: some View {
         Color.clear
-            .frame(width: 5)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 1)
-                    .updating($dragBaseWidth) { _, state, _ in
-                        if state == nil { state = sidebarWidth }
+            .frame(width: 1)
+            .overlay {
+                Color.clear
+                    .frame(width: 30)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                            .onChanged { value in
+                                if dragStartWidth == nil { dragStartWidth = sidebarWidth }
+                                let base = dragStartWidth!
+                                let delta = sidebarPosition == "right"
+                                    ? -value.translation.width
+                                    : value.translation.width
+                                sidebarWidth = min(max(base + delta, Self.minSidebarWidth), Self.maxSidebarWidth)
+                            }
+                            .onEnded { _ in
+                                dragStartWidth = nil
+                            }
+                    )
+                    .onHover { hovering in
+                        if hovering {
+                            NSCursor.resizeLeftRight.push()
+                        } else {
+                            NSCursor.pop()
+                        }
                     }
-                    .onChanged { value in
-                        guard let base = dragBaseWidth else { return }
-                        let delta = sidebarPosition == "right"
-                            ? -value.translation.width
-                            : value.translation.width
-                        sidebarWidth = min(max(base + delta, Self.minSidebarWidth), Self.maxSidebarWidth)
-                    }
-            )
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.resizeLeftRight.push()
-                } else {
-                    NSCursor.pop()
-                }
             }
+            .zIndex(1)
     }
 
     /// Grow sidebar to fit the longest session name, clamped to min/max.

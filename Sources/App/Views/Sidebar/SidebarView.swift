@@ -16,8 +16,7 @@ struct SidebarView: View {
         let toolbarOnBottom = tabBarPos == "bottom"
 
         VStack(spacing: 0) {
-            // Title bar zone — traffic lights live here; not interactive
-            Color.clear.frame(height: 28)
+            NotificationCenterRow(position: position)
 
             if !toolbarOnBottom {
                 toolbarRow
@@ -56,18 +55,6 @@ struct SidebarView: View {
                     NotificationCenter.default.post(name: .forgeCommandPalette, object: nil)
                 }
                 .help(KeyboardShortcuts.commandPalette.tooltip)
-                IconButton(systemName: "bell") {
-                    NotificationCenter.default.post(name: .forgeNotifications, object: nil)
-                }
-                .help(KeyboardShortcuts.notifications.tooltip)
-                .overlay(alignment: .topTrailing) {
-                    if controller.workspace.sessions.contains(where: { $0.needsAttention }) {
-                        Circle()
-                            .fill(Color.accentColor)
-                            .frame(width: 6, height: 6)
-                            .offset(x: -6, y: 6)
-                    }
-                }
                 IconButton(systemName: "plus") {
                     NotificationCenter.default.post(name: .forgeNewProject, object: nil)
                 }
@@ -77,18 +64,6 @@ struct SidebarView: View {
                     NotificationCenter.default.post(name: .forgeNewProject, object: nil)
                 }
                 .help(KeyboardShortcuts.newProject.tooltip)
-                IconButton(systemName: "bell") {
-                    NotificationCenter.default.post(name: .forgeNotifications, object: nil)
-                }
-                .help(KeyboardShortcuts.notifications.tooltip)
-                .overlay(alignment: .topTrailing) {
-                    if controller.workspace.sessions.contains(where: { $0.needsAttention }) {
-                        Circle()
-                            .fill(Color.accentColor)
-                            .frame(width: 6, height: 6)
-                            .offset(x: -6, y: 6)
-                    }
-                }
                 IconButton(systemName: "command") {
                     NotificationCenter.default.post(name: .forgeCommandPalette, object: nil)
                 }
@@ -97,7 +72,7 @@ struct SidebarView: View {
                     .help(KeyboardShortcuts.toggleSidebar.tooltip)
             }
         }
-        .frame(height: 28)
+        .frame(height: ForgeConfigStore.shared.titlebarHeight)
     }
 
     @ViewBuilder
@@ -196,7 +171,7 @@ struct SidebarView: View {
                         return true
                     }
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 0)
             .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

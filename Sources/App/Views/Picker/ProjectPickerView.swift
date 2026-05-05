@@ -1,5 +1,11 @@
 import SwiftUI
 
+enum ProjectSortMode: String, CaseIterable {
+    case recent = "Recent"
+    case mostUsed = "Most Opened"
+    case alphabetical = "Alphabetical"
+}
+
 struct ProjectPickerView: View {
     var onDismiss: (() -> Void)? = nil
     @Environment(WorkspaceController.self) var controller
@@ -8,6 +14,7 @@ struct ProjectPickerView: View {
     @State private var selectedPath: String?
     @State private var recentPaths: [String] = []
     @State private var errorMessage: String?
+    @State private var sortMode: ProjectSortMode = .recent
     @FocusState private var isSearchFocused: Bool
 
     var body: some View {
@@ -26,17 +33,45 @@ struct ProjectPickerView: View {
             Divider()
 
             List(selection: $selectedPath) {
-                let recentFiltered = displayRecent
-                if !recentFiltered.isEmpty {
-                    Section("Recent") {
-                        ForEach(recentFiltered, id: \.self) { path in
-                            ProjectRow(path: path)
+                let sorted = sortedPaths
+                if !sorted.isEmpty {
+                    Section {
+                        ForEach(sorted, id: \.self) { path in
+                            ProjectRow(path: path, openCount: openCount(for: path))
                                 .tag(path)
+                                .onTapGesture(count: 2) {
+                                    selectedPath = path
+                                    openProject()
+                                }
+                        }
+                    } header: {
+                        HStack {
+                            Text(sortMode.rawValue)
+                            Spacer()
+                            Menu {
+                                ForEach(ProjectSortMode.allCases, id: \.self) { mode in
+                                    Button {
+                                        sortMode = mode
+                                    } label: {
+                                        if mode == sortMode {
+                                            Label(mode.rawValue, systemImage: "checkmark")
+                                        } else {
+                                            Text(mode.rawValue)
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Image(systemName: "chevron.down")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .menuStyle(.borderlessButton)
+                            .fixedSize()
                         }
                     }
                 }
 
-                if !searchText.isEmpty && displayRecent.isEmpty {
+                if !searchText.isEmpty && sorted.isEmpty {
                     VStack {
                         Spacer()
                         Text("No matches found")
@@ -50,6 +85,7 @@ struct ProjectPickerView: View {
                 }
             }
             .listStyle(.plain)
+            .frame(idealHeight: 300)
 
             Divider()
 
@@ -102,14 +138,34 @@ struct ProjectPickerView: View {
 
     // MARK: - Display
 
-    private var displayRecent: [String] {
-        if searchText.isEmpty { return recentPaths }
-        let term = searchText.lowercased()
-        return recentPaths.filter { path in
-            guard !path.isEmpty else { return false }
-            return path.lowercased().contains(term) ||
-                URL(fileURLWithPath: path).lastPathComponent.lowercased().contains(term)
+    private var sortedPaths: [String] {
+        let filtered: [String]
+        if searchText.isEmpty {
+            filtered = recentPaths
+        } else {
+            let term = searchText.lowercased()
+            filtered = recentPaths.filter { path in
+                guard !path.isEmpty else { return false }
+                return path.lowercased().contains(term) ||
+                    URL(fileURLWithPath: path).lastPathComponent.lowercased().contains(term)
+            }
         }
+        switch sortMode {
+        case .recent:
+            return filtered
+        case .mostUsed:
+            let counts = ForgeConfigStore.shared.config.projectOpenCounts ?? [:]
+            return filtered.sorted { (counts[$0] ?? 0) > (counts[$1] ?? 0) }
+        case .alphabetical:
+            return filtered.sorted {
+                URL(fileURLWithPath: $0).lastPathComponent.localizedCaseInsensitiveCompare(
+                    URL(fileURLWithPath: $1).lastPathComponent) == .orderedAscending
+            }
+        }
+    }
+
+    private func openCount(for path: String) -> Int {
+        ForgeConfigStore.shared.config.projectOpenCounts?[path] ?? 0
     }
 
     /// The path that would be opened — either selected row, valid typed path, or nil
@@ -208,12 +264,16 @@ struct ProjectPickerView: View {
             if config.recentDirectories.count > 20 {
                 config.recentDirectories = Array(config.recentDirectories.prefix(20))
             }
+            var counts = config.projectOpenCounts ?? [:]
+            counts[path, default: 0] += 1
+            config.projectOpenCounts = counts
         }
     }
 }
 
 struct ProjectRow: View {
     let path: String
+    var openCount: Int = 0
 
     private var name: String {
         guard !path.isEmpty else { return "(unknown)" }
@@ -237,6 +297,13 @@ struct ProjectRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+            }
+            if openCount > 0 {
+                Spacer()
+                Text("\(openCount)")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .monospacedDigit()
             }
         }
     }
