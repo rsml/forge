@@ -271,6 +271,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var overlayLeadingConstraint: NSLayoutConstraint?
     private var overlayTrailingConstraint: NSLayoutConstraint?
     private var pathLabelLeadingConstraint: NSLayoutConstraint?
+    private var splitHButton: NSButton?
+    private var splitVButton: NSButton?
+    private var isFullScreen = false
+    private var branchTrailingToOverlay: NSLayoutConstraint?
+    private var branchTrailingToSplitH: NSLayoutConstraint?
 
     override init() {
         self.sidebarVisible = ForgeConfig.load().uiState?.sidebarVisible ?? true
@@ -298,6 +303,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             forName: NSWindow.willEnterFullScreenNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
+                self?.isFullScreen = true
+                self?.updateSplitIconVisibility()
+                self?.updateOverlayConstraints()
                 // macOS 15.3+ regression: fullscreen titlebar becomes unexpectedly
                 // transparent. Disable during fullscreen, restore on exit.
                 if #available(macOS 15.3, *) {
@@ -308,7 +316,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             forName: NSWindow.didExitFullScreenNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.reapplyTitleBarStyle() }
+            MainActor.assumeIsolated {
+                self?.isFullScreen = false
+                self?.updateSplitIconVisibility()
+                self?.reapplyTitleBarStyle()
+            }
         }
         NotificationCenter.default.addObserver(
             forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main
@@ -333,7 +345,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             forName: .forgeConfigChanged, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.updateOverlayConstraints() }
+            MainActor.assumeIsolated {
+                self?.updateOverlayConstraints()
+                self?.updateSplitIconVisibility()
+            }
         }
 
         // Re-sync titlebar color when system appearance (dark/light mode) changes
@@ -465,8 +480,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         branchLabel.translatesAutoresizingMaskIntoConstraints = false
         branchLabel.identifier = NSUserInterfaceItemIdentifier("titleBranch")
 
+        // Split pane buttons
+        let splitH = NSButton(image: NSImage(systemSymbolName: "rectangle.split.2x1", accessibilityDescription: "Split Horizontally")!, target: self, action: #selector(splitHorizontalAction))
+        splitH.isBordered = false
+        splitH.bezelStyle = .accessoryBarAction
+        splitH.contentTintColor = .secondaryLabelColor
+        splitH.imageScaling = .scaleProportionallyDown
+        splitH.toolTip = KeyboardShortcuts.splitHorizontal.tooltip
+        splitH.translatesAutoresizingMaskIntoConstraints = false
+
+        let splitV = NSButton(image: NSImage(systemSymbolName: "rectangle.split.1x2", accessibilityDescription: "Split Vertically")!, target: self, action: #selector(splitVerticalAction))
+        splitV.isBordered = false
+        splitV.bezelStyle = .accessoryBarAction
+        splitV.contentTintColor = .secondaryLabelColor
+        splitV.imageScaling = .scaleProportionallyDown
+        splitV.toolTip = KeyboardShortcuts.splitVertical.tooltip
+        splitV.translatesAutoresizingMaskIntoConstraints = false
+
+        splitHButton = splitH
+        splitVButton = splitV
+
         overlay.addSubview(pathLabel)
         overlay.addSubview(branchLabel)
+        overlay.addSubview(splitH)
+        overlay.addSubview(splitV)
 
         pathLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         branchLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -474,12 +511,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let pathLeading = pathLabel.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 78)
         pathLabelLeadingConstraint = pathLeading
 
+        let branchToOverlay = branchLabel.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -12)
+        let branchToSplitH = branchLabel.trailingAnchor.constraint(lessThanOrEqualTo: splitH.leadingAnchor, constant: -8)
+        branchTrailingToOverlay = branchToOverlay
+        branchTrailingToSplitH = branchToSplitH
+
         NSLayoutConstraint.activate([
             pathLeading,
             pathLabel.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
-            branchLabel.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -12),
             branchLabel.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
             pathLabel.trailingAnchor.constraint(lessThanOrEqualTo: branchLabel.leadingAnchor, constant: -8),
+
+            splitH.widthAnchor.constraint(equalToConstant: 20),
+            splitH.heightAnchor.constraint(equalToConstant: 20),
+            splitH.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
+
+            splitV.leadingAnchor.constraint(equalTo: splitH.trailingAnchor, constant: 2),
+            splitV.widthAnchor.constraint(equalToConstant: 20),
+            splitV.heightAnchor.constraint(equalToConstant: 20),
+            splitV.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
+            splitV.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -12),
         ])
 
         container.addSubview(overlay)
@@ -497,9 +548,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         titleBarOverlay = overlay
         updateOverlayConstraints()
+        updateSplitIconVisibility()
+
     }
 
     private func updateOverlayConstraints() {
+        if isFullScreen {
+            overlayLeadingConstraint?.constant = 0
+            overlayTrailingConstraint?.constant = 0
+            pathLabelLeadingConstraint?.constant = 12
+            return
+        }
+
         let position = ForgeConfigStore.shared.config.general?.sidebarPosition ?? "left"
         let effectivelyVisible = sidebarVisible && !controller.workspace.sessions.isEmpty
         let sidebarTotal: CGFloat = effectivelyVisible ? 161 : 0 // 160 sidebar + 1 separator
@@ -514,6 +574,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             pathLabelLeadingConstraint?.constant = effectivelyVisible ? 12 : 78
         }
     }
+
+    private func updateSplitIconVisibility() {
+        let tabPos = ForgeConfigStore.shared.config.general?.tabBarPosition ??
+                     ForgeConfigStore.shared.config.terminal?.tabBarPosition ??
+                     ForgeConfigStore.shared.config.appearance?.tabBarPosition ?? "top"
+        let show = (tabPos != "bottom" && !isFullScreen)
+        splitHButton?.isHidden = !show
+        splitVButton?.isHidden = !show
+        branchTrailingToSplitH?.isActive = show
+        branchTrailingToOverlay?.isActive = !show
+    }
+
+    @objc private func splitHorizontalAction() { controller.splitPane(direction: .horizontal) }
+    @objc private func splitVerticalAction() { controller.splitPane(direction: .vertical) }
 
     private static func findView(named name: String, in view: NSView) -> NSView? {
         if String(describing: type(of: view)) == name { return view }
