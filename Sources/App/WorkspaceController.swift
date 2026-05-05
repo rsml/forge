@@ -22,6 +22,7 @@ final class WorkspaceController {
             ForgeLog.log("[app] Connecting...")
             await ensureServer()
             await refresh()
+            seedRecentDirectories()
             restoreUIState()
 
             tmux.startControlMode { [weak self] event in
@@ -338,14 +339,30 @@ final class WorkspaceController {
         let activeSession = workspace.sessions.first { $0.id == workspace.activeSessionId }
         let activeWindow = activeSession?.windows.first { $0.id == workspace.activeWindowId }
 
-        var config = ForgeConfig.load()
-        var state = config.uiState ?? ForgeConfig.UIState()
-        state.activeSessionName = activeSession?.name
-        state.activeWindowIndex = activeWindow?.index
-        if let sidebarVisible { state.sidebarVisible = sidebarVisible }
-        if let expandedSessionNames { state.expandedSessionNames = expandedSessionNames }
-        config.uiState = state
-        config.save()
+        ForgeConfigStore.shared.update { config in
+            var state = config.uiState ?? ForgeConfig.UIState()
+            state.activeSessionName = activeSession?.name
+            state.activeWindowIndex = activeWindow?.index
+            if let sidebarVisible { state.sidebarVisible = sidebarVisible }
+            if let expandedSessionNames { state.expandedSessionNames = expandedSessionNames }
+            config.uiState = state
+        }
+    }
+
+    private func seedRecentDirectories() {
+        let paths = workspace.sessions.compactMap { session -> String? in
+            guard let path = session.path, !path.isEmpty, path != NSHomeDirectory() else { return nil }
+            return path
+        }
+        guard !paths.isEmpty else { return }
+        ForgeConfigStore.shared.update { config in
+            for path in paths where !config.recentDirectories.contains(path) {
+                config.recentDirectories.append(path)
+            }
+            if config.recentDirectories.count > 20 {
+                config.recentDirectories = Array(config.recentDirectories.prefix(20))
+            }
+        }
     }
 
     private func restoreUIState() {

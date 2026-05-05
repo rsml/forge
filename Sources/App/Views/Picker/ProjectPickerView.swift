@@ -79,7 +79,7 @@ struct ProjectPickerView: View {
         }
         .onKeyPress(.escape) { close(); return .handled }
         .onAppear {
-            recentPaths = ForgeConfig.load().recentDirectories
+            recentPaths = ForgeConfigStore.shared.config.recentDirectories
             if recentPaths.isEmpty {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     browseForFolder()
@@ -136,6 +136,7 @@ struct ProjectPickerView: View {
         }
         // Guard against re-opening an already open project — just switch to it
         if let existing = controller.workspace.sessions.first(where: { $0.path == path }) {
+            saveToRecent(path)
             controller.selectSession(existing)
             close()
             return
@@ -167,6 +168,7 @@ struct ProjectPickerView: View {
         if panel.runModal() == .OK, let url = panel.url {
             let path = url.path
             if let existing = controller.workspace.sessions.first(where: { $0.path == path }) {
+                saveToRecent(path)
                 controller.selectSession(existing)
                 close()
                 return
@@ -200,13 +202,13 @@ struct ProjectPickerView: View {
     }
 
     private func saveToRecent(_ path: String) {
-        var config = ForgeConfig.load()
-        config.recentDirectories.removeAll { $0 == path }
-        config.recentDirectories.insert(path, at: 0)
-        if config.recentDirectories.count > 20 {
-            config.recentDirectories = Array(config.recentDirectories.prefix(20))
+        ForgeConfigStore.shared.update { config in
+            config.recentDirectories.removeAll { $0 == path }
+            config.recentDirectories.insert(path, at: 0)
+            if config.recentDirectories.count > 20 {
+                config.recentDirectories = Array(config.recentDirectories.prefix(20))
+            }
         }
-        config.save()
     }
 }
 
