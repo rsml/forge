@@ -1,12 +1,13 @@
 import Foundation
 import Observation
 
-enum PaneStatus: String {
+public enum PaneStatus: String {
     case idle, running, needsAttention, error
 
-    static func from(command: String) -> PaneStatus {
+    public static func from(command: String) -> PaneStatus {
         let lower = command.lowercased()
-        if lower.isEmpty || lower == "zsh" || lower == "bash" || lower == "fish" {
+        let shells: Set<String> = ["zsh", "bash", "fish", "sh", "nu", "pwsh"]
+        if lower.isEmpty || shells.contains(lower) {
             return .idle
         }
         return .running
@@ -15,25 +16,27 @@ enum PaneStatus: String {
 
 @Observable
 @MainActor
-final class Pane: Identifiable {
-    let id: String
-    let windowId: String
-    var index: Int
-    var active: Bool
-    var currentCommand: String
-    var currentPath: String
-    var width: Int
-    var height: Int
-    var pid: Int
-    var status: PaneStatus
-    var hasBell: Bool = false
+public final class Pane: Identifiable {
+    public let id: String
+    public let windowId: String
+    public var index: Int
+    public var active: Bool
+    public var currentCommand: String
+    public var currentPath: String
+    public var width: Int
+    public var height: Int
+    public var pid: Int
+    public var status: PaneStatus
+    public var hasBell: Bool = false
+    /// The command that was running before the most recent command change.
+    public var previousCommand: String = ""
 
     /// True if this pane needs user attention (bell, idle agent, error)
-    var needsAttention: Bool {
+    public var needsAttention: Bool {
         hasBell || status == .needsAttention || status == .error
     }
 
-    init(id: String, windowId: String, index: Int, active: Bool = false,
+    public init(id: String, windowId: String, index: Int = 0, active: Bool = false,
          currentCommand: String = "", currentPath: String = "",
          width: Int = 80, height: Int = 24, pid: Int = 0) {
         self.id = id

@@ -3,21 +3,24 @@ import Observation
 
 @Observable
 @MainActor
-final class Window: Identifiable {
-    let id: String
-    let sessionId: String
-    var index: Int
-    var name: String
-    var active: Bool
-    var panes: [Pane] = []
+public final class Window: Identifiable {
+    public let id: String
+    public let sessionId: String
+    /// Stable identifier used for attention tracking; never reassigned after init.
+    public let uuid: UUID
+    public var index: Int
+    public var name: String
+    public var active: Bool
+    public var panes: [Pane] = []
 
-    var needsAttention: Bool {
+    public var needsAttention: Bool {
         panes.contains { $0.needsAttention }
     }
 
-    init(id: String, sessionId: String, index: Int, name: String, active: Bool = false) {
+    public init(id: String, sessionId: String, index: Int, name: String, active: Bool = false, uuid: UUID = UUID()) {
         self.id = id
         self.sessionId = sessionId
+        self.uuid = uuid
         self.index = index
         self.name = name
         self.active = active

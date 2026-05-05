@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import ForgeDomain
 
 /// A clickable key combo field. When clicked it enters "recording" mode and
 /// captures the next key press via an NSEvent monitor, then calls `onChange`.

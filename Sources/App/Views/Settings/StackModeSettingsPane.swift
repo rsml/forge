@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 struct StackModeSettingsPane: View {
     var body: some View {

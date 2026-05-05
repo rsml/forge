@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 struct MainView: View {
     @Environment(WorkspaceController.self) var controller

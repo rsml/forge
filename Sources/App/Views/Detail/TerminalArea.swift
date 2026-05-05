@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 struct TerminalArea: View {
     var session: Session

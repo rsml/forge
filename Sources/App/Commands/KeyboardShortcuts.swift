@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 /// Default keyboard shortcuts for all Forge actions.
 /// Overrides are resolved from ForgeConfigStore at access time.

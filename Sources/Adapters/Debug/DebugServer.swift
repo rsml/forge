@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import Network
+import ForgeDomain
 
 /// Lightweight HTTP debug server running inside Forge.
 /// Lets Claude (or any tool) take screenshots, read state, and send actions.

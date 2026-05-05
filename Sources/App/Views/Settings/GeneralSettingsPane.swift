@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 struct GeneralSettingsPane: View {
     private var store: ForgeConfigStore { .shared }

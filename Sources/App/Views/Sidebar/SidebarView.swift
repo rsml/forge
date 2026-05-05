@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 struct SidebarView: View {
     var position: String = "left"

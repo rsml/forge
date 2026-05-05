@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 struct ListModeSettingsPane: View {
     private var store: ForgeConfigStore { .shared }

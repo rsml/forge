@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 @main
 struct ForgeApp: App {

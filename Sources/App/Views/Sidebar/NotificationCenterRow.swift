@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 struct NotificationCenterRow: View {
     var position: String = "left"

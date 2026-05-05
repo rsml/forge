@@ -1,11 +1,12 @@
 import SwiftUI
+import ForgeDomain
 
 struct NotificationPanel: View {
     var onDismiss: (() -> Void)? = nil
     @Environment(WorkspaceController.self) var controller
     @Environment(\.dismiss) var dismiss
 
-    private var attentionItems: [(session: Session, window: Window)] {
+    private var attentionItems: [(session: Session, window: ForgeDomain.Window)] {
         controller.workspace.sessions.flatMap { session in
             session.windows.filter { $0.needsAttention }.map { (session: session, window: $0) }
         }

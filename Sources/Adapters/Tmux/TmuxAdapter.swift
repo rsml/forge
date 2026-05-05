@@ -1,4 +1,5 @@
 import Foundation
+import ForgeDomain
 
 /// Concrete implementation of TmuxPort using the tmux CLI + control mode
 @MainActor

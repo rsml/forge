@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Observation
+import ForgeDomain
 
 /// Orchestrates domain state and tmux adapter.
 /// Single @Observable object that all views consume.

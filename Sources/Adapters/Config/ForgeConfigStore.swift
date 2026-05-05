@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 @Observable @MainActor
 final class ForgeConfigStore {

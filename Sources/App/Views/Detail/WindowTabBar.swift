@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 struct WindowTabBar: View {
     var session: Session
@@ -142,7 +143,7 @@ struct WindowTabBar: View {
 
 
 struct WindowTab: View {
-    var window: Window
+    var window: ForgeDomain.Window
     let isActive: Bool
     var tabIndex: Int = 0
     var indicatorOnTop: Bool = false
