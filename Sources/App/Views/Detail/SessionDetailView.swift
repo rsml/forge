@@ -17,8 +17,12 @@ struct SessionDetailView: View {
         VStack(spacing: 0) {
             if !isFullScreen {
                 ZStack {
-                    ForgeConfigStore.shared.resolvedTheme?.background ?? Color(nsColor: .windowBackgroundColor)
-                    Color.white.opacity(0.06)
+                    if let theme = ForgeConfigStore.shared.resolvedTheme {
+                        theme.background
+                        Color.white.opacity(0.06)
+                    } else {
+                        Color(nsColor: .windowBackgroundColor)
+                    }
                 }
                 .frame(height: ForgeConfigStore.shared.titlebarHeight)
             }
