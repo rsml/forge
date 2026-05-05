@@ -267,6 +267,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindow: NSWindow?
     private var appearanceObservation: NSKeyValueObservation?
     private var titleBarOverlay: NSView?
+    private var sidebarVisible: Bool
+    private var overlayLeadingConstraint: NSLayoutConstraint?
+    private var overlayTrailingConstraint: NSLayoutConstraint?
+    private var pathLabelLeadingConstraint: NSLayoutConstraint?
+
+    override init() {
+        self.sidebarVisible = ForgeConfig.load().uiState?.sidebarVisible ?? true
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -311,6 +320,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             forName: .forgeWindowTitleChanged, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.updateWindowTitle() }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: .forgeToggleSidebar, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.sidebarVisible.toggle()
+                self?.updateOverlayConstraints()
+            }
+        }
+        NotificationCenter.default.addObserver(
+            forName: .forgeConfigChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateOverlayConstraints() }
         }
 
         // Re-sync titlebar color when system appearance (dark/light mode) changes
@@ -390,11 +413,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     child.isHidden = true
                 }
             }
-            // Also set the container's layer background to match window
-            if let bg = view.window?.backgroundColor {
-                view.wantsLayer = true
-                view.layer?.backgroundColor = bg.cgColor
-            }
             return
         }
         for sub in view.subviews {
@@ -418,6 +436,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             pathLabel?.stringValue = session?.name ?? ""
         }
         branchLabel?.stringValue = controller.gitBranch ?? ""
+        updateOverlayConstraints()
     }
 
     private func installTitleBarOverlay() {
@@ -430,15 +449,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let overlay = NSView()
         overlay.translatesAutoresizingMaskIntoConstraints = false
 
+        let titleFont = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
+
         let pathLabel = NSTextField(labelWithString: "")
-        pathLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        pathLabel.font = titleFont
         pathLabel.textColor = .secondaryLabelColor
         pathLabel.lineBreakMode = .byTruncatingMiddle
         pathLabel.translatesAutoresizingMaskIntoConstraints = false
         pathLabel.identifier = NSUserInterfaceItemIdentifier("titlePath")
 
         let branchLabel = NSTextField(labelWithString: "")
-        branchLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        branchLabel.font = titleFont
         branchLabel.textColor = .secondaryLabelColor
         branchLabel.lineBreakMode = .byTruncatingTail
         branchLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -450,8 +471,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pathLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         branchLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
+        let pathLeading = pathLabel.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 78)
+        pathLabelLeadingConstraint = pathLeading
+
         NSLayoutConstraint.activate([
-            pathLabel.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 78),
+            pathLeading,
             pathLabel.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
             branchLabel.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -12),
             branchLabel.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
@@ -459,14 +483,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ])
 
         container.addSubview(overlay)
+        let leading = overlay.leadingAnchor.constraint(equalTo: container.leadingAnchor)
+        let trailing = overlay.trailingAnchor.constraint(equalTo: container.trailingAnchor)
+        overlayLeadingConstraint = leading
+        overlayTrailingConstraint = trailing
+
         NSLayoutConstraint.activate([
-            overlay.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            overlay.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            leading,
+            trailing,
             overlay.topAnchor.constraint(equalTo: container.topAnchor),
             overlay.bottomAnchor.constraint(equalTo: container.bottomAnchor),
         ])
 
         titleBarOverlay = overlay
+        updateOverlayConstraints()
+    }
+
+    private func updateOverlayConstraints() {
+        let position = ForgeConfigStore.shared.config.general?.sidebarPosition ?? "left"
+        let effectivelyVisible = sidebarVisible && !controller.workspace.sessions.isEmpty
+        let sidebarTotal: CGFloat = effectivelyVisible ? 161 : 0 // 160 sidebar + 1 separator
+
+        if position == "right" {
+            overlayLeadingConstraint?.constant = 0
+            overlayTrailingConstraint?.constant = -sidebarTotal
+            pathLabelLeadingConstraint?.constant = 78
+        } else {
+            overlayLeadingConstraint?.constant = sidebarTotal
+            overlayTrailingConstraint?.constant = 0
+            pathLabelLeadingConstraint?.constant = effectivelyVisible ? 12 : 78
+        }
     }
 
     private static func findView(named name: String, in view: NSView) -> NSView? {

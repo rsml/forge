@@ -23,8 +23,7 @@ struct WindowTabBar: View {
                 // Show sidebar toggle when sidebar is hidden (left position)
                 if !sidebarVisible && sidebarPosition != "right" {
                     IconButton(systemName: "sidebar.left") { onToggleSidebar() }
-                        .frame(width: 28, height: 28)
-                        .padding(.leading, 8)
+                        .frame(width: 40, height: 28)
                         .help(KeyboardShortcuts.toggleSidebar.tooltip)
                 }
 
@@ -109,21 +108,19 @@ struct WindowTabBar: View {
                 IconButton(systemName: "rectangle.split.2x1") {
                     controller.splitPane(direction: .horizontal)
                 }
-                .frame(width: 28, height: 28)
+                .frame(width: 40, height: 28)
                 .help(KeyboardShortcuts.splitHorizontal.tooltip)
 
                 IconButton(systemName: "rectangle.split.1x2") {
                     controller.splitPane(direction: .vertical)
                 }
-                .frame(width: 28, height: 28)
-                .padding(.trailing, 8)
+                .frame(width: 40, height: 28)
                 .help(KeyboardShortcuts.splitVertical.tooltip)
 
                 // Show sidebar toggle when sidebar is hidden (right position)
                 if !sidebarVisible && sidebarPosition == "right" {
                     IconButton(systemName: "sidebar.right") { onToggleSidebar() }
-                        .frame(width: 28, height: 28)
-                        .padding(.trailing, 8)
+                        .frame(width: 40, height: 28)
                         .help(KeyboardShortcuts.toggleSidebar.tooltip)
                 }
             }
