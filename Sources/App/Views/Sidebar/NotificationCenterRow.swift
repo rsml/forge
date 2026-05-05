@@ -14,7 +14,7 @@ struct NotificationCenterRow: View {
     private var store: ForgeConfigStore { ForgeConfigStore.shared }
 
     private var iconName: String {
-        store.isStackMode ? "list.bullet" : "square.stack.3d.up"
+        store.isStackMode ? "list.bullet" : "rectangle.stack"
     }
 
     private var tooltipText: String {
