@@ -1,7 +1,7 @@
 # Forge
 
 Native macOS tmux frontend built with SwiftUI (macOS 14+, Swift 6.0). Uses SwiftTerm for terminal rendering.
-Hexagonal architecture: domain logic in `Domain/`, adapters in `Adapters/`, boundaries defined by port protocols.
+Feature-based architecture with a shared domain kernel. See `CONTEXT.md` for domain glossary, `docs/adr/` for architectural decisions.
 
 ## Build & Run
 
@@ -15,38 +15,73 @@ tail -20 /tmp/forge.log   # log categories: [app] [control] [tmux] [attention] [
 
 ## Architecture
 
-See `CONTEXT.md` for the domain glossary. See `docs/adr/` for architectural decision records.
-
 ```
 Sources/
-  Domain/          # Models (Workspace > Project > Tab > Pane), Ports (TmuxPort)
-  App/             # SwiftUI views, WorkspaceController, AttentionManager, Commands
-  Adapters/        # Tmux/ (adapter, control mode, command runner)
-                   # Debug/ (DebugServer), Logging/ (ForgeLog), Config/, Theme/
-  ForgeApp.swift   # Entry point
+  Core/                          # Shared kernel (SPM: ForgeCore). Models, Ports, pure logic.
+    Models/                      # Workspace > Project > Tab > Pane
+    Ports/                       # TmuxPort, GitPort, AttentionPort, NotificationPort
+    StateMerger.swift            # Pure state reconciliation (tmux → domain)
+    ContentDetector.swift        # Pattern matching for interactive prompts
+    TmuxEventParser.swift        # Parse tmux control mode events
+
+  Features/                      # Vertical slices — each feature owns its own layers
+    Attention/                   # AttentionManager (queue + content scanning), MacNotificationAdapter
+    Sidebar/                     # SidebarProjectList, ProjectRow, TruncatingText, IconButton, etc.
+    Stack/                       # StackView, StackToolbar, StackEmptyState
+    TabBar/                      # WindowTabBar
+    Terminal/                    # ForgeTerminalView, TerminalArea, ProjectDetailView
+    CommandPalette/              # CommandPalette, CommandRegistry
+    ProjectPicker/               # ProjectPickerView
+    Settings/                    # All settings panes
+    TitleBar/                    # TitleBarManager, TitleBarOverlay (chrome, fullscreen)
+    Shared/                      # Cross-feature UI: MainView, Tooltip, KeyboardShortcuts, etc.
+
+  Infrastructure/                # Cross-feature adapters
+    Tmux/                        # TmuxAdapter, TmuxControlMode, TmuxCommandRunner, TmuxStateParser, TmuxSyncEngine
+    Git/                         # GitAdapter
+    Config/                      # ForgeConfig, ForgeConfigStore, UIStatePersistence
+    Theme/                       # ThemeParser, ThemeDefinition
+    Debug/                       # DebugServer
+    Logging/                     # ForgeLog
+
+  WorkspaceController.swift      # Thin orchestrator: owns Workspace, routes events (115 lines)
+  WorkspaceController+Actions.swift  # Command methods: thin delegation to tmux port (208 lines)
+  MenuCommands.swift             # Menu bar commands
+  ForgeApp.swift                 # Composition root + AppDelegate
 ```
 
 ### Dependency Direction
-- `App/` and `Adapters/` depend on `Domain/`. `Domain/` depends on nothing.
-- Port protocols live in `Domain/Ports/`. Port implementations live in `Adapters/`. Never in `App/`.
-- Views and controllers consume ports, never concrete adapters.
-- No cross-imports between adapter modules (e.g., `Tmux/` must not import `Debug/`).
+- **Core/** is the shared kernel. Features depend on it, not on each other.
+- **Features/** are vertical slices. Each feature materializes only the layers it needs (flat files for view-only, `Domain/`/`Ports/`/`Adapters/` subfolders when it has its own domain logic).
+- **Infrastructure/** holds adapters that serve multiple features. Feature-specific adapters live inside the feature.
+- Port protocols live in `Core/Ports/`. Cross-feature port implementations live in `Infrastructure/`. Feature-specific implementations live in the feature.
+- No cross-imports between features. Communication goes through Core or the orchestrator.
 
 ### Where Does This Code Go?
-- **Domain/** — Pure functions on domain models, decision logic, value types. Zero framework imports (no AppKit, no SwiftUI). If it has no framework imports, it's probably Domain.
-- **App/** — State orchestration (controllers), SwiftUI views, commands. Wires ports together but doesn't implement them.
-- **Adapters/** — Infrastructure: I/O, processes, system APIs, persistence. Every port implementation lives here.
+- **Core/** — Pure functions on domain models, decision logic, value types. Zero framework imports (no AppKit, no SwiftUI). If it has no framework imports, it's probably Core.
+- **Features/** — Views, feature-specific controllers, feature-specific adapters. Each feature is a self-contained vertical slice.
+- **Infrastructure/** — Adapters that serve multiple features: I/O, processes, system APIs, persistence.
+- **Tested domain logic lives in Core/** (the `ForgeCore` SPM target). When a feature's domain grows large enough to warrant its own test target, extract a new SPM target.
+
+### Key Components
+- **WorkspaceController** — Thin orchestrator (~115 lines). Owns Workspace model, routes tmux control mode events, delegates commands to tmux port. Does NOT own refresh logic or content scanning.
+- **TmuxSyncEngine** (`Infrastructure/Tmux/`) — Owns the refresh cycle: query tmux, merge state via StateMerger, debounce, periodic polling, git branch tracking. Calls post-refresh hooks for features to participate.
+- **AttentionManager** (`Features/Attention/`) — Owns the attention queue AND content scanning. Registered as a post-refresh hook on TmuxSyncEngine. Also owns MacNotificationAdapter.
+- **UIStatePersistence** (`Infrastructure/Config/`) — Save/restore active project+tab selection, sidebar state, recent directories.
+- **TitleBarManager** (`Features/TitleBar/`) — All title bar visual management: overlay installation, chrome stripping, fullscreen handling, appearance sync. Domain logic (mode toggle) stays in AppDelegate.
+- **ForgeConfigStore** — `@Observable` config store. Injected via `@Environment` in views, constructor in non-view types. `.shared` only referenced at the composition root (AppDelegate).
 
 ### Blessed Patterns
 - One pattern per problem. If the codebase already solves something, use that solution — don't invent a parallel one.
 - One dispatch mechanism per class of operation. Don't mix NotificationCenter, direct method calls, and closures for the same kind of action.
+- Post-refresh hooks for features to participate in the sync cycle (e.g., content scanning).
 - Tmux control mode (`-CC`) for push-based state updates.
 - Isolated tmux socket: `-L forge` with custom config `forge-tmux.conf`.
 - Bundled tmux binary looked up next to executable, falls back to system.
 
 ### File Discipline
 - **Hard limit: 300 lines per file.** Files over 300 lines must be split before merging. Find a natural seam — don't just chop arbitrarily.
-- One type per file, named to match the type.
+- One type per file, named to match the type. Extensions in `Type+Category.swift` files are fine.
 
 ## Rules
 
@@ -60,7 +95,7 @@ Sources/
 - `WorkspaceController` is the single `@Observable` object that owns workspace state. All views consume it via `@Environment`.
 - `@State` is only for local, view-scoped UI state (hover, animation, text field values). Never domain state.
 - Domain models (`Workspace`, `Project`, `Tab`, `Pane`) are `@Observable @MainActor`.
-- No `.shared` singletons consumed by views. Inject via `@Environment` or constructor. Singletons are permitted only at the composition root (`ForgeApp`/`AppDelegate`).
+- No `.shared` singletons consumed by views or non-view types. Inject via `@Environment` (views) or constructor (non-view types). `.shared` is permitted only at the composition root (`AppDelegate`).
 
 ### Concurrency
 - `@MainActor` for all observable state, ports, and controllers.
@@ -72,8 +107,8 @@ Sources/
 - When a mutating adapter call fails, surface feedback to the user (toast, log, or revert optimistic update).
 
 ### Testing Strategy
-- **Domain**: TDD with Swift Testing (`@Test`, `#expect`). Pure logic, no side effects.
-- **Adapters**: Integration tests against real tmux when needed.
+- **Core**: TDD with Swift Testing (`@Test`, `#expect`). Pure logic, no side effects.
+- **Infrastructure**: Integration tests against real tmux when needed.
 - **UI**: Visual verification via debug server screenshots.
 
 ### Code Discipline
@@ -89,7 +124,7 @@ Sources/
 - Fallback when no theme: `Color(red: 0.1, green: 0.1, blue: 0.1)`.
 - Color hierarchy: `.primary` / `.labelColor` for active elements, `.secondary` / `.secondaryLabelColor` for inactive, `.tertiary` for minor hints (chevrons).
 - Accent color (`Color.accentColor`) for active indicators, attention dots, and selection highlights.
-- Window appearance (light/dark) is derived from theme background luminance — set automatically in `syncAppearance()`.
+- Window appearance (light/dark) is derived from theme background luminance — set automatically in `TitleBarManager.syncAppearance()`.
 
 ### Components
 - **Tooltips**: Custom tooltip system (`Tooltip.swift`), never native `.toolTip` or `.help()`. Format: label on first line, keyboard shortcut on second line (no parens). Use `.tooltip(Shortcut)` or `.tooltip(label, shortcut:)` for SwiftUI views; `.setForgeTooltip()` for AppKit views.
@@ -97,7 +132,7 @@ Sources/
 - **Truncation tooltips**: Sidebar text (project names, tab names) uses `TruncatingText` which shows a tooltip only when ellipsized.
 
 ### Title Bar
-- Window created programmatically in `AppDelegate.createMainWindow()` — not via SwiftUI `Window` scene.
+- Window created programmatically in `AppDelegate.createMainWindow()` — not via SwiftUI `Window` scene. Title bar managed by `TitleBarManager` (`Features/TitleBar/`).
 - `titlebarAppearsTransparent = true`, `titleVisibility = .hidden`, `titlebarSeparatorStyle = .none`.
 - `_NSTitlebarDecorationView` and `NSVisualEffectView` inside the title bar are **hidden** (not removed) — more resilient to macOS re-adding them during layout passes.
 - Stripping runs on a 100ms repeating timer for 3s at launch, plus on `didBecomeKeyNotification` and after fullscreen exit.
