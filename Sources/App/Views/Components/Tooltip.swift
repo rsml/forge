@@ -1,73 +1,100 @@
 import SwiftUI
 
-// MARK: - Tooltip Content
-
-private struct TooltipContent: View {
-    let label: String
-    let hint: String?
-
-    var body: some View {
-        VStack(spacing: 2) {
-            Text(label)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white)
-            if let hint {
-                Text(hint)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Color.black.opacity(0.85))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
-    }
-}
-
-// MARK: - Tooltip Panel (floating NSPanel, never clipped)
+// MARK: - Tooltip Panel (floating NSPanel, pure AppKit rendering)
 
 @MainActor
 private final class TooltipPanel: NSPanel {
     static let shared = TooltipPanel()
     private weak var ownerWindow: NSWindow?
+    private var generation = 0
+
+    private let labelField: NSTextField
+    private let hintField: NSTextField
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
     private init() {
+        labelField = NSTextField(labelWithString: "")
+        labelField.font = .systemFont(ofSize: 12, weight: .medium)
+        labelField.textColor = .white
+        labelField.alignment = .center
+        labelField.lineBreakMode = .byClipping
+
+        hintField = NSTextField(labelWithString: "")
+        hintField.font = .systemFont(ofSize: 11)
+        hintField.textColor = .white.withAlphaComponent(0.7)
+        hintField.alignment = .center
+        hintField.lineBreakMode = .byClipping
+
+        let pill = NSView()
+        pill.wantsLayer = true
+        pill.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.85).cgColor
+        pill.layer?.cornerRadius = 6
+        pill.layer?.shadowColor = NSColor.black.cgColor
+        pill.layer?.shadowOpacity = 0.25
+        pill.layer?.shadowRadius = 4
+        pill.layer?.shadowOffset = CGSize(width: 0, height: -2)
+
         super.init(
             contentRect: .zero,
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: true
         )
+
         isOpaque = false
         backgroundColor = .clear
         level = .floating
         hasShadow = false
         ignoresMouseEvents = true
         animationBehavior = .none
+
+        pill.addSubview(labelField)
+        pill.addSubview(hintField)
+        contentView = pill
     }
 
     func show(label: String, hint: String?, anchorScreenRect: CGRect, ownerWindow: NSWindow?) {
-        let hosting = NSHostingView(rootView: TooltipContent(label: label, hint: hint))
-        let size = hosting.fittingSize
+        generation += 1
 
-        contentView = hosting
+        labelField.stringValue = label
+        hintField.stringValue = hint ?? ""
+        hintField.isHidden = hint == nil
+
+        labelField.sizeToFit()
+        if hint != nil { hintField.sizeToFit() }
+
+        let hPad: CGFloat = 10, vPad: CGFloat = 6, spacing: CGFloat = 2
+        let labelSize = labelField.frame.size
+        let hintSize = hint != nil ? hintField.frame.size : .zero
+
+        let innerW = max(labelSize.width, hintSize.width)
+        let innerH = labelSize.height + (hint != nil ? spacing + hintSize.height : 0)
+        let size = NSSize(width: ceil(innerW + hPad * 2), height: ceil(innerH + vPad * 2))
+
+        // Layout (NSView origin is bottom-left)
+        let hintY = vPad
+        let labelY = vPad + (hint != nil ? hintSize.height + spacing : 0)
+        labelField.frame = NSRect(
+            x: hPad + (innerW - labelSize.width) / 2, y: labelY,
+            width: labelSize.width, height: labelSize.height
+        )
+        if hint != nil {
+            hintField.frame = NSRect(
+                x: hPad + (innerW - hintSize.width) / 2, y: hintY,
+                width: hintSize.width, height: hintSize.height
+            )
+        }
+
         setContentSize(size)
 
         let screen = NSScreen.screens.first(where: { $0.frame.contains(anchorScreenRect.origin) }) ?? NSScreen.main
         guard let visibleFrame = screen?.visibleFrame else { return }
 
-        // Center horizontally below anchor (screen coords are bottom-up)
         var x = anchorScreenRect.midX - size.width / 2
         var y = anchorScreenRect.minY - size.height - 4
-
-        // Clamp horizontal
         x = max(visibleFrame.minX + 4, min(x, visibleFrame.maxX - size.width - 4))
-
-        // If below screen bottom, show above instead
         if y < visibleFrame.minY + 4 {
             y = anchorScreenRect.maxY + 4
         }
@@ -75,7 +102,6 @@ private final class TooltipPanel: NSPanel {
         setFrameOrigin(NSPoint(x: x, y: y))
         alphaValue = 0
 
-        // Attach as child so tooltip moves with the window
         if let ownerWindow, self.parent != ownerWindow {
             self.ownerWindow?.removeChildWindow(self)
             ownerWindow.addChildWindow(self, ordered: .above)
@@ -90,12 +116,13 @@ private final class TooltipPanel: NSPanel {
     }
 
     func hideTooltip() {
+        let gen = generation
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.1
             self.animator().alphaValue = 0
         } completionHandler: { [weak self] in
             Task { @MainActor in
-                guard let self else { return }
+                guard let self, self.generation == gen else { return }
                 self.ownerWindow?.removeChildWindow(self)
                 self.ownerWindow = nil
                 self.orderOut(nil)

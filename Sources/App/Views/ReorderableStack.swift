@@ -129,6 +129,15 @@ struct ReorderableStack<Item: Identifiable, Content: View>: View {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 let isDragging = draggedIndex == index
                 content(item, isDragging)
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear
+                                .preference(
+                                    key: ItemFramePreferenceKey.self,
+                                    value: [index: geo.frame(in: .named(coordinateSpaceID))]
+                                )
+                        }
+                    )
                     .offset(
                         x: axis == .horizontal ? (isDragging ? dragOffset : neighborOffset(for: index)) : 0,
                         y: axis == .vertical ? (isDragging ? dragOffset : neighborOffset(for: index)) : 0
@@ -141,15 +150,6 @@ struct ReorderableStack<Item: Identifiable, Content: View>: View {
                     )
                     .scaleEffect(isDragging ? 1.03 : 1.0)
                     .animation(.spring(response: 0.25, dampingFraction: 0.85), value: neighborOffset(for: index))
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear
-                                .preference(
-                                    key: ItemFramePreferenceKey.self,
-                                    value: [index: geo.frame(in: .named(coordinateSpaceID))]
-                                )
-                        }
-                    )
                     .gesture(
                         DragGesture(minimumDistance: 3, coordinateSpace: .named(coordinateSpaceID))
                             .onChanged { value in
