@@ -1,14 +1,5 @@
 import SwiftUI
 
-// MARK: - Frame Measurement
-
-struct ItemFramePreferenceKey: PreferenceKey {
-    nonisolated(unsafe) static var defaultValue: [Int: CGRect] = [:]
-    static func reduce(value: inout [Int: CGRect], nextValue: () -> [Int: CGRect]) {
-        value.merge(nextValue(), uniquingKeysWith: { $1 })
-    }
-}
-
 // MARK: - ReorderableStack
 
 struct ReorderableStack<Item: Identifiable, Content: View>: View {
@@ -132,10 +123,9 @@ struct ReorderableStack<Item: Identifiable, Content: View>: View {
                     .background(
                         GeometryReader { geo in
                             Color.clear
-                                .preference(
-                                    key: ItemFramePreferenceKey.self,
-                                    value: [index: geo.frame(in: .named(coordinateSpaceID))]
-                                )
+                                .onChange(of: geo.frame(in: .named(coordinateSpaceID)), initial: true) { _, newFrame in
+                                    itemFrames[index] = newFrame
+                                }
                         }
                     )
                     .offset(
@@ -223,9 +213,6 @@ struct ReorderableStack<Item: Identifiable, Content: View>: View {
             }
         }
         .coordinateSpace(name: coordinateSpaceID)
-        .onPreferenceChange(ItemFramePreferenceKey.self) { frames in
-            itemFrames = frames
-        }
         .background(
             GeometryReader { geo in
                 Color.clear.onAppear { containerSize = geo.size }
@@ -239,9 +226,10 @@ struct ReorderableStack<Item: Identifiable, Content: View>: View {
             }
             return .handled
         }
-        .onChange(of: items.count) {
-            // Cancel drag if items array changes (e.g., tmux event adds/removes a window)
+        .onChange(of: items.count) { _, newCount in
+            // Cancel drag and purge stale frame entries when items change
             if draggedIndex != nil { cancelDrag() }
+            itemFrames = itemFrames.filter { $0.key < newCount }
         }
     }
 }
