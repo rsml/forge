@@ -5,6 +5,9 @@ struct MainView: View {
     @Environment(ForgeConfigStore.self) private var configStore
     @Environment(WorkspaceController.self) var controller
     @Environment(AppState.self) private var appState
+    @Environment(CommandRegistry.self) private var commandRegistry
+    @Environment(ModifierKeyMonitor.self) private var modifierKeyMonitor
+    @Environment(NotificationToastState.self) private var toastState
     @State private var sidebarWidth: CGFloat = 160
 
     @State private var dragStartWidth: CGFloat? = nil
@@ -98,12 +101,12 @@ struct MainView: View {
                 }
             }
         }
-        .modifier(NotificationToastOverlay(state: NotificationToastState.shared))
+        .modifier(NotificationToastOverlay(state: toastState))
         .foregroundStyle(themeForeground ?? Color.primary)
         .ignoresSafeArea()
         .onAppear {
-            CommandRegistry.shared.setup(controller: controller, appState: appState)
-            ModifierKeyMonitor.shared.onOptionNumber = { n in
+            commandRegistry.setup(controller: controller, appState: appState)
+            modifierKeyMonitor.onOptionNumber = { n in
                 let sessions = controller.workspace.projects
                 guard sessions.count >= n else { return }
                 controller.selectProject(sessions[n - 1])

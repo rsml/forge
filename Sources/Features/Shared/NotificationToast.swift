@@ -39,7 +39,6 @@ struct NotificationToast: View {
 /// Manages showing/hiding notification toasts with animation.
 @Observable @MainActor
 final class NotificationToastState {
-    static let shared = NotificationToastState()
 
     private(set) var current: ToastItem?
     private var dismissTask: Task<Void, Never>?

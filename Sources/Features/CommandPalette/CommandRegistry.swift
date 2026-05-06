@@ -9,12 +9,9 @@ struct Command {
     let execute: (String) -> Void
 }
 
-@MainActor
+@Observable @MainActor
 final class CommandRegistry {
-    static let shared = CommandRegistry()
     private(set) var commands: [Command] = []
-
-    private init() {}
 
     func register(_ command: Command) {
         commands.append(command)

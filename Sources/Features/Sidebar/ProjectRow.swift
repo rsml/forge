@@ -21,12 +21,12 @@ struct SidebarProjectRow: View {
     @Environment(ForgeConfigStore.self) private var configStore
     @Environment(WorkspaceController.self) var controller
     @Environment(AttentionManager.self) var attention
+    @Environment(ModifierKeyMonitor.self) private var modifiers
     @State private var isHeaderHovered = false
     @State private var isChevronHovered = false
     @State private var hoveredTabId: String?
 
     var body: some View {
-        let modifiers = ModifierKeyMonitor.shared
 
         VStack(alignment: .leading, spacing: 0) {
             // Project header — fixed height, vertically centered
@@ -179,6 +179,7 @@ struct InlineRenameField: View {
 /// A tab row inside a project's expanded sidebar view.
 struct SidebarTabRow: View {
     @Environment(ForgeConfigStore.self) private var configStore
+    @Environment(ModifierKeyMonitor.self) private var modifiers
     var tab: ForgeCore.Tab
     var isActive: Bool
     var isHovered: Bool
@@ -190,7 +191,6 @@ struct SidebarTabRow: View {
     var onRenameCancel: () -> Void = {}
 
     var body: some View {
-        let modifiers = ModifierKeyMonitor.shared
 
         HStack(spacing: 0) {
             // Cmd held: show tab number instead of active indicator

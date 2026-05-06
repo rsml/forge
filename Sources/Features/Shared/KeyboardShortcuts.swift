@@ -71,8 +71,11 @@ enum KeyboardShortcuts {
 
     // MARK: - Resolution
 
+    /// Set once by AppDelegate at startup. Avoids `.shared` access from static context.
+    static weak var config: ForgeConfigStore?
+
     private static func resolve(_ id: String, default shortcut: Shortcut) -> Shortcut {
-        guard let override = ForgeConfigStore.shared.config.shortcuts?[id] else { return shortcut }
+        guard let override = config?.config.shortcuts?[id] else { return shortcut }
         return Shortcut(from: override, label: shortcut.label)
     }
 }

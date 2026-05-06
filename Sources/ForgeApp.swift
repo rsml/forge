@@ -39,6 +39,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let configStore = ForgeConfigStore.shared
     lazy var controller = WorkspaceController(tmux: TmuxAdapter(), git: GitAdapter(), config: configStore)
     let appState = AppState(sidebarVisible: ForgeConfig.load().uiState?.sidebarVisible ?? true)
+    let commandRegistry = CommandRegistry()
+    let modifierKeyMonitor = ModifierKeyMonitor()
+    let toastState = NotificationToastState()
     private(set) var attentionManager: AttentionManager!
     private let debugServer = DebugServer()
     private var mainWindow: NSWindow?
@@ -55,7 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.applicationIconImage = icon
         }
 
-        let notifier = MacNotificationAdapter()
+        KeyboardShortcuts.config = configStore
+        let notifier = MacNotificationAdapter(toastState: toastState)
         attentionManager = AttentionManager(notifier: notifier, config: configStore)
         controller.attentionManager = attentionManager
 
@@ -109,6 +113,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .environment(attentionManager!)
             .environment(configStore)
             .environment(appState)
+            .environment(commandRegistry)
+            .environment(modifierKeyMonitor)
+            .environment(toastState)
         window.contentView = NSHostingView(rootView: rootView)
         window.makeKeyAndOrderFront(nil)
         self.mainWindow = window

@@ -3,6 +3,7 @@ import ForgeCore
 import UserNotifications
 
 struct GeneralSettingsPane: View {
+    @Environment(NotificationToastState.self) private var toastState
     private var store: ForgeConfigStore { .shared }
     @State private var authorizationDenied = false
     @State private var showFilePicker = false
@@ -58,7 +59,7 @@ struct GeneralSettingsPane: View {
 
                 Button("Send Test Notification") {
                     let sound = store.config.general?.notificationSound
-                    let notifier = MacNotificationAdapter()
+                    let notifier = MacNotificationAdapter(toastState: toastState)
                     Task {
                         _ = await notifier.requestPermission()
                         await notifier.send(
@@ -83,7 +84,7 @@ struct GeneralSettingsPane: View {
             set: { newValue in
                 if newValue {
                     Task {
-                        let notifier = MacNotificationAdapter()
+                        let notifier = MacNotificationAdapter(toastState: toastState)
                         _ = await notifier.requestPermission()
                         store.update { config in
                             if config.general == nil { config.general = ForgeConfig.GeneralSettings() }
@@ -145,7 +146,7 @@ struct GeneralSettingsPane: View {
     }
 
     private func previewSound(_ sound: String?) {
-        MacNotificationAdapter().playSound(sound)
+        MacNotificationAdapter(toastState: toastState).playSound(sound)
     }
 
     private func checkAuthorizationStatus() {

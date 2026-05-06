@@ -4,14 +4,13 @@ import AppKit
 @Observable
 @MainActor
 final class ModifierKeyMonitor {
-    static let shared = ModifierKeyMonitor()
     var commandPressed = false
     var optionPressed = false
     private nonisolated(unsafe) var flagsMonitor: Any?
     private nonisolated(unsafe) var keyMonitor: Any?
     var onOptionNumber: ((Int) -> Void)?
 
-    private init() {
+    init() {
         flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             Task { @MainActor in
                 self?.commandPressed = event.modifierFlags.contains(.command)

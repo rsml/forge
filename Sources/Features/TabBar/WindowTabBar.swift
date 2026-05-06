@@ -135,6 +135,7 @@ struct WindowTabBar: View {
 
 struct WindowTab: View {
     @Environment(ForgeConfigStore.self) private var configStore
+    @Environment(ModifierKeyMonitor.self) private var modifiers
     var tab: ForgeCore.Tab
     let isActive: Bool
     var tabIndex: Int = 0
@@ -145,7 +146,6 @@ struct WindowTab: View {
     private var secondaryFont: Font { configStore.secondaryFont }
 
     var body: some View {
-        let modifiers = ModifierKeyMonitor.shared
 
         VStack(spacing: 0) {
             if indicatorOnTop {

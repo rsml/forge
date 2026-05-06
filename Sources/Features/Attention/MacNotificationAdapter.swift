@@ -8,6 +8,11 @@ import ForgeCore
 /// Always shows an in-app toast banner. Additionally uses `UNUserNotificationCenter`
 /// when running as a proper .app bundle (for background notifications).
 final class MacNotificationAdapter: NotificationPort, @unchecked Sendable {
+    private let toastState: NotificationToastState
+
+    init(toastState: NotificationToastState) {
+        self.toastState = toastState
+    }
 
     private var hasBundle: Bool {
         Bundle.main.bundleIdentifier != nil
@@ -26,7 +31,7 @@ final class MacNotificationAdapter: NotificationPort, @unchecked Sendable {
     func send(title: String, body: String, sound: String?) async {
         // Always show in-app toast
         await MainActor.run {
-            NotificationToastState.shared.show(title: title, message: body)
+            toastState.show(title: title, message: body)
         }
 
         // Play sound

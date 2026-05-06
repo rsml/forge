@@ -3,6 +3,7 @@ import ForgeCore
 
 struct CommandPalette: View {
     @Environment(WorkspaceController.self) var controller
+    @Environment(CommandRegistry.self) private var registry
     @Binding var isPresented: Bool
     @State private var query = ""
     @State private var selectedIndex = 0
@@ -10,7 +11,6 @@ struct CommandPalette: View {
     @FocusState private var isFieldFocused: Bool
 
     private var results: [CommandItem] {
-        let registry = CommandRegistry.shared
         let sorted = registry.commands.sorted { $0.name < $1.name }
         if query.isEmpty {
             var items: [CommandItem] = []
