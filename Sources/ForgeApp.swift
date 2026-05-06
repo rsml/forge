@@ -316,6 +316,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pathLabelLeadingConstraint: NSLayoutConstraint?
     private var splitHButton: NSButton?
     private var splitVButton: NSButton?
+    private var listModeButton: NSButton?
     private var isFullScreen = false
     private var branchTrailingToOverlay: NSLayoutConstraint?
     private var branchTrailingToSplitH: NSLayoutConstraint?
@@ -410,6 +411,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                     ForgeConfigStore.shared.isStackMode = true
                 }
+                self.updateSplitIconVisibility()
+                self.updateWindowTitle()
             }
         }
 
@@ -597,6 +600,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         splitHButton = splitH
         splitVButton = splitV
 
+        // List mode toggle button (shown only in stack mode, to the left of the path)
+        let listBtn = NSButton(image: NSImage(systemSymbolName: "list.bullet", accessibilityDescription: "Switch to List Mode")!, target: self, action: #selector(toggleModeAction))
+        listBtn.isBordered = false
+        listBtn.bezelStyle = .accessoryBarAction
+        listBtn.contentTintColor = .secondaryLabelColor
+        listBtn.imageScaling = .scaleProportionallyDown
+        listBtn.toolTip = KeyboardShortcuts.toggleMode.tooltip
+        listBtn.translatesAutoresizingMaskIntoConstraints = false
+        listModeButton = listBtn
+
+        overlay.addSubview(listBtn)
         overlay.addSubview(pathLabel)
         overlay.addSubview(branchLabel)
         overlay.addSubview(splitH)
@@ -604,6 +618,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         pathLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         branchLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        // In stack mode, list button sits at 78px (after traffic lights), path follows it.
+        // In list mode, list button is hidden and path uses pathLabelLeadingConstraint directly.
+        NSLayoutConstraint.activate([
+            listBtn.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 74),
+            listBtn.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
+            listBtn.widthAnchor.constraint(equalToConstant: 20),
+            listBtn.heightAnchor.constraint(equalToConstant: 20),
+        ])
 
         let pathLeading = pathLabel.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 78)
         pathLabelLeadingConstraint = pathLeading
@@ -657,6 +680,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        // In stack mode: no sidebar, show list-mode button, path starts after it
+        let isStack = ForgeConfigStore.shared.isStackMode
+        listModeButton?.isHidden = !isStack
+        if isStack {
+            overlayLeadingConstraint?.constant = 0
+            overlayTrailingConstraint?.constant = 0
+            pathLabelLeadingConstraint?.constant = 98  // 74 (button leading) + 20 (button) + 4 (gap)
+            return
+        }
+
         let position = ForgeConfigStore.shared.config.general?.sidebarPosition ?? "left"
         let effectivelyVisible = sidebarVisible && !controller.workspace.sessions.isEmpty
         let sidebarTotal: CGFloat = effectivelyVisible ? ForgeConfigStore.shared.sidebarWidth + 1 : 0
@@ -673,6 +706,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateSplitIconVisibility() {
+        // Hide split icons in stack mode — the stack toolbar handles actions
+        if ForgeConfigStore.shared.isStackMode {
+            splitHButton?.isHidden = true
+            splitVButton?.isHidden = true
+            branchTrailingToSplitH?.isActive = false
+            branchTrailingToOverlay?.isActive = true
+            return
+        }
         let tabPos = ForgeConfigStore.shared.config.general?.tabBarPosition ??
                      ForgeConfigStore.shared.config.terminal?.tabBarPosition ??
                      ForgeConfigStore.shared.config.appearance?.tabBarPosition ?? "top"
@@ -685,6 +726,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func splitHorizontalAction() { controller.splitPane(direction: .horizontal) }
     @objc private func splitVerticalAction() { controller.splitPane(direction: .vertical) }
+    @objc private func toggleModeAction() {
+        NotificationCenter.default.post(name: .forgeToggleMode, object: nil)
+    }
 
     private static func findView(named name: String, in view: NSView) -> NSView? {
         if String(describing: type(of: view)) == name { return view }

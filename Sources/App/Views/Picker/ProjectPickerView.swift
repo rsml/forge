@@ -33,39 +33,40 @@ struct ProjectPickerView: View {
 
             Divider()
 
+            HStack {
+                Menu {
+                    ForEach(ProjectSortMode.allCases, id: \.self) { mode in
+                        Button {
+                            sortMode = mode
+                        } label: {
+                            if mode == sortMode {
+                                Label(mode.rawValue, systemImage: "checkmark")
+                            } else {
+                                Text(mode.rawValue)
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(sortMode.rawValue.uppercased())
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+
             ScrollView {
                 let sorted = sortedPaths
                 if !sorted.isEmpty {
                     VStack(spacing: 0) {
-                        HStack {
-                            Text(sortMode.rawValue)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .textCase(.uppercase)
-                            Spacer()
-                            Menu {
-                                ForEach(ProjectSortMode.allCases, id: \.self) { mode in
-                                    Button {
-                                        sortMode = mode
-                                    } label: {
-                                        if mode == sortMode {
-                                            Label(mode.rawValue, systemImage: "checkmark")
-                                        } else {
-                                            Text(mode.rawValue)
-                                        }
-                                    }
-                                }
-                            } label: {
-                                Image(systemName: "chevron.down")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .menuStyle(.borderlessButton)
-                            .fixedSize()
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-
                         ForEach(sorted, id: \.self) { path in
                             ProjectRow(path: path, openCount: openCount(for: path))
                                 .padding(.vertical, 8)
