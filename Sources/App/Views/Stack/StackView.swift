@@ -22,29 +22,29 @@ struct StackView: View {
                 .frame(height: ForgeConfigStore.shared.titlebarHeight)
             }
 
-            if let uuid = attention.currentWindowUUID,
-               let (session, window) = controller.workspace.findWindow(byUUID: uuid) {
+            if let uuid = attention.currentTabUUID,
+               let (project, tab) = controller.workspace.findTab(byUUID: uuid) {
                 ZStack {
                     // Background layer: next item preview or empty state
                     backgroundLayer
 
                     // Foreground layer: current terminal + toolbar with animation
-                    foregroundLayer(session: session, window: window)
+                    foregroundLayer(project: project, tab: tab)
                         .scaleEffect(isDismissing ? 0.85 : 1.0)
                         .offset(y: isDismissing ? -800 : 0)
                         .opacity(isDismissing ? 0.5 : 1.0)
                 }
-            } else if let staleUUID = attention.currentWindowUUID {
-                let _ = { attention.removeWindow(staleUUID) }()
+            } else if let staleUUID = attention.currentTabUUID {
+                let _ = { attention.removeTab(staleUUID) }()
                 StackEmptyState()
             } else {
                 StackEmptyState()
             }
         }
-        .onChange(of: attention.currentWindowUUID) { _, newUUID in
+        .onChange(of: attention.currentTabUUID) { _, newUUID in
             if let uuid = newUUID,
-               let (_, window) = controller.workspace.findWindow(byUUID: uuid) {
-                controller.selectWindow(window)
+               let (_, tab) = controller.workspace.findTab(byUUID: uuid) {
+                controller.selectTab(tab)
             }
         }
         .toolbar(.hidden, for: .automatic)
@@ -68,14 +68,14 @@ struct StackView: View {
     @ViewBuilder
     private var backgroundLayer: some View {
         if let nextUUID = attention.nextWindowUUID,
-           let (nextSession, nextWindow) = controller.workspace.findWindow(byUUID: nextUUID) {
+           let (nextSession, nextWindow) = controller.workspace.findTab(byUUID: nextUUID) {
             VStack(spacing: 0) {
                 if toolbarPosition == "top" {
-                    StackToolbar(session: nextSession, window: nextWindow)
+                    StackToolbar(project: nextSession, tab: nextWindow)
                     Color(red: 0.1, green: 0.1, blue: 0.1)
                 } else {
                     Color(red: 0.1, green: 0.1, blue: 0.1)
-                    StackToolbar(session: nextSession, window: nextWindow)
+                    StackToolbar(project: nextSession, tab: nextWindow)
                 }
             }
         } else {
@@ -84,14 +84,14 @@ struct StackView: View {
     }
 
     @ViewBuilder
-    private func foregroundLayer(session: Session, window: ForgeDomain.Window) -> some View {
+    private func foregroundLayer(project: Project, tab: ForgeDomain.Tab) -> some View {
         VStack(spacing: 0) {
             if toolbarPosition == "top" {
-                StackToolbar(session: session, window: window, onDismiss: handleDismiss)
-                TerminalArea(session: session)
+                StackToolbar(project: project, tab: tab, onDismiss: handleDismiss)
+                TerminalArea(project: project)
             } else {
-                TerminalArea(session: session)
-                StackToolbar(session: session, window: window, onDismiss: handleDismiss)
+                TerminalArea(project: project)
+                StackToolbar(project: project, tab: tab, onDismiss: handleDismiss)
             }
         }
     }

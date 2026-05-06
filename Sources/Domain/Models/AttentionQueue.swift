@@ -1,6 +1,6 @@
 import Foundation
 
-/// A FIFO queue of window UUIDs awaiting attention.
+/// A FIFO queue of tab UUIDs awaiting attention.
 /// Pure value type with no framework dependencies.
 public struct AttentionQueue {
     private var items: [UUID] = []

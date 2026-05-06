@@ -18,7 +18,7 @@ public enum PaneStatus: String {
 @MainActor
 public final class Pane: Identifiable {
     public let id: String
-    public let windowId: String
+    public let tabId: String
     public var index: Int
     public var active: Bool
     public var currentCommand: String
@@ -37,11 +37,11 @@ public final class Pane: Identifiable {
         hasBell || hasContentMatch || status == .needsAttention || status == .error
     }
 
-    public init(id: String, windowId: String, index: Int = 0, active: Bool = false,
+    public init(id: String, tabId: String, index: Int = 0, active: Bool = false,
          currentCommand: String = "", currentPath: String = "",
          width: Int = 80, height: Int = 24, pid: Int = 0) {
         self.id = id
-        self.windowId = windowId
+        self.tabId = tabId
         self.index = index
         self.active = active
         self.currentCommand = currentCommand

@@ -6,30 +6,30 @@ public protocol AttentionPort: AnyObject {
     /// Process an incoming attention event (bell, command completion, etc.).
     func handleEvent(_ event: AttentionEvent)
 
-    /// Mark the given window as handled and advance the queue.
-    func markDone(_ windowUUID: UUID)
+    /// Mark the given tab as handled and advance the queue.
+    func markDone(_ tabUUID: UUID)
 
-    /// Suppress the window from the active queue without removing it entirely.
-    func hide(_ windowUUID: UUID)
+    /// Suppress the tab from the active queue without removing it entirely.
+    func hide(_ tabUUID: UUID)
 
-    /// Move the window to the back of the queue.
-    func moveToBack(_ windowUUID: UUID)
+    /// Move the tab to the back of the queue.
+    func moveToBack(_ tabUUID: UUID)
 
-    /// Restore a previously hidden window back into the queue.
-    func unhide(_ windowUUID: UUID)
+    /// Restore a previously hidden tab back into the queue.
+    func unhide(_ tabUUID: UUID)
 
-    /// Remove the window from all tracking (e.g. window was closed).
-    func removeWindow(_ windowUUID: UUID)
+    /// Remove the tab from all tracking (e.g. tab was closed).
+    func removeTab(_ tabUUID: UUID)
 
-    /// The UUID of the window currently at the front of the attention queue.
-    var currentWindowUUID: UUID? { get }
+    /// The UUID of the tab currently at the front of the attention queue.
+    var currentTabUUID: UUID? { get }
 
     /// Total number of windows in the active (non-hidden) queue.
     var queueCount: Int { get }
 
-    /// Returns `true` if the window is anywhere in the attention queue.
-    func needsAttention(_ windowUUID: UUID) -> Bool
+    /// Returns `true` if the tab is anywhere in the attention queue.
+    func needsAttention(_ tabUUID: UUID) -> Bool
 
-    /// Returns `true` if the window has been hidden from the queue.
-    func isHidden(_ windowUUID: UUID) -> Bool
+    /// Returns `true` if the tab has been hidden from the queue.
+    func isHidden(_ tabUUID: UUID) -> Bool
 }

@@ -54,8 +54,8 @@ struct ForgeMenuCommands: Commands {
             .keyboardShortcut(KeyboardShortcuts.newProject.key, modifiers: KeyboardShortcuts.newProject.modifiers)
 
             Button("New Tab") {
-                if let session = controller.workspace.activeSession {
-                    controller.addWindow(in: session)
+                if let project = controller.workspace.activeProject {
+                    controller.addTab(in: project)
                 }
             }
             .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
@@ -73,15 +73,15 @@ struct ForgeMenuCommands: Commands {
             .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)
 
             Button("Close Project") {
-                guard let session = controller.workspace.activeSession else { return }
+                guard let project = controller.workspace.activeProject else { return }
                 let alert = NSAlert()
-                alert.messageText = "Close project \"\(session.name)\"?"
+                alert.messageText = "Close project \"\(project.name)\"?"
                 alert.informativeText = "This will close all tabs and remove the project from Forge."
                 alert.addButton(withTitle: "Close Project")
                 alert.addButton(withTitle: "Cancel")
                 alert.alertStyle = .warning
                 guard alert.runModal() == .alertFirstButtonReturn else { return }
-                controller.removeSession(session)
+                controller.removeProject(project)
             }
             .keyboardShortcut(KeyboardShortcuts.closeProject.key, modifiers: KeyboardShortcuts.closeProject.modifiers)
 
@@ -157,24 +157,24 @@ struct ForgeMenuCommands: Commands {
             .keyboardShortcut(KeyboardShortcuts.clearScrollback.key, modifiers: KeyboardShortcuts.clearScrollback.modifiers)
         }
 
-        // MARK: Window — tab and project navigation
-        CommandMenu("Window") {
+        // MARK: Tab — tab and project navigation
+        CommandMenu("Tab") {
             Menu("Switch to Tab") {
                 ForEach(1...9, id: \.self) { n in
                     Button("Tab \(n)") {
-                        guard let session = controller.workspace.activeSession,
-                              session.windows.count >= n
+                        guard let project = controller.workspace.activeProject,
+                              project.tabs.count >= n
                         else { return }
-                        controller.selectWindow(session.windows[n - 1])
+                        controller.selectTab(project.tabs[n - 1])
                     }
                     .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command)
                 }
             }
 
             Menu("Switch to Project") {
-                ForEach(Array(controller.workspace.sessions.enumerated().prefix(9)), id: \.element.id) { index, session in
-                    Button(session.name) {
-                        controller.selectSession(session)
+                ForEach(Array(controller.workspace.projects.enumerated().prefix(9)), id: \.element.id) { index, project in
+                    Button(project.name) {
+                        controller.selectProject(project)
                     }
                     .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .option)
                 }
@@ -183,23 +183,23 @@ struct ForgeMenuCommands: Commands {
             Divider()
 
             Button("Select Tab Left") {
-                guard let session = controller.workspace.activeSession,
-                      let windowId = controller.workspace.activeWindowId,
-                      let idx = session.windows.firstIndex(where: { $0.id == windowId }),
+                guard let project = controller.workspace.activeProject,
+                      let tabId = controller.workspace.activeTabId,
+                      let idx = project.tabs.firstIndex(where: { $0.id == tabId }),
                       idx > 0
                 else { return }
-                controller.selectWindow(session.windows[idx - 1])
+                controller.selectTab(project.tabs[idx - 1])
             }
             .keyboardShortcut(KeyboardShortcuts.selectTabLeft.key, modifiers: KeyboardShortcuts.selectTabLeft.modifiers)
 
             if !ForgeConfigStore.shared.isStackMode {
                 Button("Select Tab Right") {
-                    guard let session = controller.workspace.activeSession,
-                          let windowId = controller.workspace.activeWindowId,
-                          let idx = session.windows.firstIndex(where: { $0.id == windowId }),
-                          idx < session.windows.count - 1
+                    guard let project = controller.workspace.activeProject,
+                          let tabId = controller.workspace.activeTabId,
+                          let idx = project.tabs.firstIndex(where: { $0.id == tabId }),
+                          idx < project.tabs.count - 1
                     else { return }
-                    controller.selectWindow(session.windows[idx + 1])
+                    controller.selectTab(project.tabs[idx + 1])
                 }
                 .keyboardShortcut(KeyboardShortcuts.selectTabRight.key, modifiers: KeyboardShortcuts.selectTabRight.modifiers)
             }
@@ -235,24 +235,24 @@ struct ForgeMenuCommands: Commands {
             Divider()
 
             Button("Next Project") {
-                let sessions = controller.workspace.sessions
+                let sessions = controller.workspace.projects
                 guard sessions.count > 1,
-                      let activeId = controller.workspace.activeSessionId,
+                      let activeId = controller.workspace.activeProjectId,
                       let idx = sessions.firstIndex(where: { $0.id == activeId })
                 else { return }
                 let next = sessions[(idx + 1) % sessions.count]
-                controller.selectSession(next)
+                controller.selectProject(next)
             }
             .keyboardShortcut(KeyboardShortcuts.nextProject.key, modifiers: KeyboardShortcuts.nextProject.modifiers)
 
             Button("Previous Project") {
-                let sessions = controller.workspace.sessions
+                let sessions = controller.workspace.projects
                 guard sessions.count > 1,
-                      let activeId = controller.workspace.activeSessionId,
+                      let activeId = controller.workspace.activeProjectId,
                       let idx = sessions.firstIndex(where: { $0.id == activeId })
                 else { return }
                 let prev = sessions[(idx - 1 + sessions.count) % sessions.count]
-                controller.selectSession(prev)
+                controller.selectProject(prev)
             }
             .keyboardShortcut(KeyboardShortcuts.prevProject.key, modifiers: KeyboardShortcuts.prevProject.modifiers)
         }
@@ -392,25 +392,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 if ForgeConfigStore.shared.isStackMode {
-                    // Stack → List: restore the window that was showing in stack as the active selection
-                    if let uuid = self.attentionManager?.currentWindowUUID,
-                       let (session, window) = self.controller.workspace.findWindow(byUUID: uuid) {
-                        self.controller.workspace.activeSessionId = session.id
-                        self.controller.workspace.activeWindowId = window.id
+                    // Stack → List: restore the tab that was showing in stack as the active selection
+                    if let uuid = self.attentionManager?.currentTabUUID,
+                       let (project, tab) = self.controller.workspace.findTab(byUUID: uuid) {
+                        self.controller.workspace.activeProjectId = project.id
+                        self.controller.workspace.activeTabId = tab.id
                     }
                     ForgeConfigStore.shared.isStackMode = false
                 } else {
-                    // List → Stack: promote current window to front of queue if it needs attention
-                    if let windowId = self.controller.workspace.activeWindowId,
-                       let window = self.controller.workspace.activeSession?.windows.first(where: { $0.id == windowId }),
-                       window.needsAttention {
-                        self.attentionManager?.promoteToFront(window.uuid)
+                    // List → Stack: promote current tab to front of queue if it needs attention
+                    if let tabId = self.controller.workspace.activeTabId,
+                       let tab = self.controller.workspace.activeProject?.tabs.first(where: { $0.id == tabId }),
+                       tab.needsAttention {
+                        self.attentionManager?.promoteToFront(tab.uuid)
                     }
                     ForgeConfigStore.shared.isStackMode = true
-                    // Select the queue front so TerminalArea shows the right window
-                    if let uuid = self.attentionManager?.currentWindowUUID,
-                       let (_, window) = self.controller.workspace.findWindow(byUUID: uuid) {
-                        self.controller.selectWindow(window)
+                    // Select the queue front so TerminalArea shows the right tab
+                    if let uuid = self.attentionManager?.currentTabUUID,
+                       let (_, tab) = self.controller.workspace.findTab(byUUID: uuid) {
+                        self.controller.selectTab(tab)
                     }
                 }
                 self.updateSplitIconVisibility()
@@ -543,18 +543,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let branchLabel = overlay.subviews.first { $0.identifier?.rawValue == "titleBranch" } as? NSTextField
 
         // In stack mode, show the path/branch of the window currently at the front of the queue.
-        let session: Session?
+        let project: Project?
         if ForgeConfigStore.shared.isStackMode,
-           let uuid = attentionManager?.currentWindowUUID,
-           let (stackSession, _) = controller.workspace.findWindow(byUUID: uuid) {
-            session = stackSession
+           let uuid = attentionManager?.currentTabUUID,
+           let (stackSession, _) = controller.workspace.findTab(byUUID: uuid) {
+            project = stackSession
         } else {
-            session = controller.workspace.activeSession
+            project = controller.workspace.activeProject
         }
-        if let path = session?.path {
+        if let path = project?.path {
             pathLabel?.stringValue = path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
         } else {
-            pathLabel?.stringValue = session?.name ?? ""
+            pathLabel?.stringValue = project?.name ?? ""
         }
         branchLabel?.stringValue = controller.gitBranch ?? ""
         updateOverlayConstraints()
@@ -697,7 +697,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let position = ForgeConfigStore.shared.config.general?.sidebarPosition ?? "left"
-        let effectivelyVisible = sidebarVisible && !controller.workspace.sessions.isEmpty
+        let effectivelyVisible = sidebarVisible && !controller.workspace.projects.isEmpty
         let sidebarTotal: CGFloat = effectivelyVisible ? ForgeConfigStore.shared.sidebarWidth + 1 : 0
 
         if position == "right" {

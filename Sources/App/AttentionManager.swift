@@ -10,7 +10,7 @@ final class AttentionManager: AttentionPort {
     private let notifier: any NotificationPort
     private let config: ForgeConfigStore
 
-    var currentWindowUUID: UUID? { queue.peek() }
+    var currentTabUUID: UUID? { queue.peek() }
     var nextWindowUUID: UUID? { queue.peekSecond() }
     var queueCount: Int { queue.count }
 
@@ -20,7 +20,7 @@ final class AttentionManager: AttentionPort {
         self.hiddenSet = loadHiddenSet(from: config)
     }
 
-    /// Call after initial tmux sync to prune stale UUIDs from a previous session.
+    /// Call after initial tmux sync to prune stale UUIDs from a previous project.
     func pruneStaleHiddenEntries(validUUIDs: Set<UUID>) {
         let stale = hiddenSet.subtracting(validUUIDs)
         if !stale.isEmpty {
@@ -30,54 +30,54 @@ final class AttentionManager: AttentionPort {
     }
 
     func handleEvent(_ event: AttentionEvent) {
-        let uuid = event.windowUUID
+        let uuid = event.tabUUID
         guard !hiddenSet.contains(uuid) else { return }
         queue.enqueue(uuid)
 
         let settings = config.config.stackView
-        if settings?.notify == "always" {
-            Task { await notifier.send(title: "Terminal needs attention", body: "A terminal is waiting for input", sound: settings?.notificationSound) }
+        if settings?.notify == "always" && config.config.general?.notificationsEnabled == true {
+            Task { await notifier.send(title: "Terminal needs attention", body: "A terminal is waiting for input", sound: config.config.general?.notificationSound) }
         }
         if settings?.bringToForeground == "always" {
             NSApp.activate()
         }
     }
 
-    func markDone(_ windowUUID: UUID) {
-        queue.remove(windowUUID)
+    func markDone(_ tabUUID: UUID) {
+        queue.remove(tabUUID)
     }
 
-    func hide(_ windowUUID: UUID) {
-        queue.remove(windowUUID)
-        hiddenSet.insert(windowUUID)
+    func hide(_ tabUUID: UUID) {
+        queue.remove(tabUUID)
+        hiddenSet.insert(tabUUID)
         persistHiddenSet()
     }
 
-    func moveToBack(_ windowUUID: UUID) {
-        queue.moveToBack(windowUUID)
+    func moveToBack(_ tabUUID: UUID) {
+        queue.moveToBack(tabUUID)
     }
 
-    func unhide(_ windowUUID: UUID) {
-        hiddenSet.remove(windowUUID)
+    func unhide(_ tabUUID: UUID) {
+        hiddenSet.remove(tabUUID)
         persistHiddenSet()
     }
 
-    func removeWindow(_ windowUUID: UUID) {
-        queue.remove(windowUUID)
-        hiddenSet.remove(windowUUID)
+    func removeTab(_ tabUUID: UUID) {
+        queue.remove(tabUUID)
+        hiddenSet.remove(tabUUID)
     }
 
-    func needsAttention(_ windowUUID: UUID) -> Bool {
-        queue.contains(windowUUID)
+    func needsAttention(_ tabUUID: UUID) -> Bool {
+        queue.contains(tabUUID)
     }
 
-    func isHidden(_ windowUUID: UUID) -> Bool {
-        hiddenSet.contains(windowUUID)
+    func isHidden(_ tabUUID: UUID) -> Bool {
+        hiddenSet.contains(tabUUID)
     }
 
-    func promoteToFront(_ windowUUID: UUID) {
-        queue.remove(windowUUID)
-        queue.insertAtFront(windowUUID)
+    func promoteToFront(_ tabUUID: UUID) {
+        queue.remove(tabUUID)
+        queue.insertAtFront(tabUUID)
     }
 
     private func persistHiddenSet() {
@@ -88,11 +88,11 @@ final class AttentionManager: AttentionPort {
             if config.stackView == nil {
                 config.stackView = ForgeConfig.StackViewSettings()
             }
-            config.stackView?.hiddenWindowUUIDs = uuids
+            config.stackView?.hiddenTabUUIDs = uuids
         }
     }
 
     private func loadHiddenSet(from config: ForgeConfigStore) -> Set<UUID> {
-        Set((config.config.stackView?.hiddenWindowUUIDs ?? []).compactMap(UUID.init))
+        Set((config.config.stackView?.hiddenTabUUIDs ?? []).compactMap(UUID.init))
     }
 }

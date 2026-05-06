@@ -44,6 +44,8 @@ struct ForgeConfig: Codable {
         var warnOnMoveTab: Bool?
         var sidebarPosition: String?    // "left" or "right"
         var tabBarPosition: String?     // "top" or "bottom"
+        var notificationsEnabled: Bool?  // defaults to false
+        var notificationSound: String?   // system sound name or custom file path
     }
 
     struct TerminalSettings: Codable {
@@ -67,10 +69,10 @@ struct ForgeConfig: Codable {
     }
 
     struct UIState: Codable {
-        var activeSessionName: String?
-        var activeWindowIndex: Int?
+        var activeProjectName: String?
+        var activeTabIndex: Int?
         var sidebarVisible: Bool?
-        var expandedSessionNames: [String]?
+        var expandedProjectNames: [String]?
     }
 
     struct StackViewSettings: Codable, Equatable {
@@ -78,7 +80,7 @@ struct ForgeConfig: Codable {
         var bringToForeground: String?      // "never" or "always"
         var notify: String?                 // "always" or "never"
         var notificationSound: String?      // system sound name or custom file path
-        var hiddenWindowUUIDs: [String]?    // persisted hidden set
+        var hiddenTabUUIDs: [String]?    // persisted hidden set
         var contentPatterns: [String]?      // user-defined patterns merged with defaults
 
         public init() {}

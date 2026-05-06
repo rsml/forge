@@ -14,9 +14,9 @@ struct CommandPalette: View {
         let sorted = registry.commands.sorted { $0.name < $1.name }
         if query.isEmpty {
             var items: [CommandItem] = []
-            for session in controller.workspace.sessions {
-                items.append(CommandItem(title: session.name, subtitle: "Project", icon: "folder", action: { [weak controller] in
-                    controller?.selectSession(session)
+            for project in controller.workspace.projects {
+                items.append(CommandItem(title: project.name, subtitle: "Project", icon: "folder", action: { [weak controller] in
+                    controller?.selectProject(project)
                 }))
             }
             let commonCommands = ["go", "new-project", "new-tab", "theme", "toggle-sidebar"]
@@ -40,17 +40,17 @@ struct CommandPalette: View {
         // Plain text: fuzzy search sessions + windows
         let term = query.lowercased()
         var items: [CommandItem] = []
-        for session in controller.workspace.sessions {
-            if session.name.lowercased().contains(term) {
-                items.append(CommandItem(title: session.name, subtitle: "Project", icon: "folder", action: { [weak controller] in
-                    controller?.selectSession(session)
+        for project in controller.workspace.projects {
+            if project.name.lowercased().contains(term) {
+                items.append(CommandItem(title: project.name, subtitle: "Project", icon: "folder", action: { [weak controller] in
+                    controller?.selectProject(project)
                 }))
             }
-            for window in session.windows {
+            for window in project.tabs {
                 if window.name.lowercased().contains(term) {
-                    items.append(CommandItem(title: window.name, subtitle: session.name, icon: "rectangle.topthird.inset.filled", action: { [weak controller] in
-                        controller?.selectSession(session)
-                        controller?.selectWindow(window)
+                    items.append(CommandItem(title: window.name, subtitle: project.name, icon: "rectangle.topthird.inset.filled", action: { [weak controller] in
+                        controller?.selectProject(project)
+                        controller?.selectTab(window)
                     }))
                 }
             }

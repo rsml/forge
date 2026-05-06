@@ -7,11 +7,11 @@ struct NotificationPanel: View {
     @Environment(AttentionManager.self) var attention
     @Environment(\.dismiss) var dismiss
 
-    private var attentionItems: [(session: Session, window: ForgeDomain.Window)] {
-        controller.workspace.sessions.flatMap { session in
-            session.windows
+    private var attentionItems: [(project: Project, tab: ForgeDomain.Tab)] {
+        controller.workspace.projects.flatMap { project in
+            project.tabs
                 .filter { $0.needsAttention && !attention.isHidden($0.uuid) }
-                .map { (session: session, window: $0) }
+                .map { (project: project, tab: $0) }
         }
     }
 
@@ -43,20 +43,20 @@ struct NotificationPanel: View {
                 .padding(.vertical, 16)
             } else {
                 List {
-                    ForEach(attentionItems, id: \.window.id) { item in
+                    ForEach(attentionItems, id: \.tab.id) { item in
                         Button {
-                            controller.selectSession(item.session)
-                            // Navigate to the window that needs attention
-                            controller.selectWindow(item.window)
+                            controller.selectProject(item.project)
+                            // Navigate to the tab that needs attention
+                            controller.selectTab(item.tab)
                             close()
                         } label: {
                             HStack {
                                 AttentionDot(needsAttention: true, size: 6)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.session.name)
+                                    Text(item.project.name)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
-                                    Text(item.window.name)
+                                    Text(item.tab.name)
                                         .font(.body)
                                 }
                                 Spacer()
@@ -74,9 +74,9 @@ struct NotificationPanel: View {
             HStack {
                 if let latest = attentionItems.first {
                     Button("Jump to Latest") {
-                        controller.selectSession(latest.session)
-                        // selectWindow automatically clears hasBell for this window's panes
-                        controller.selectWindow(latest.window)
+                        controller.selectProject(latest.project)
+                        // selectTab automatically clears hasBell for this tab's panes
+                        controller.selectTab(latest.tab)
                         close()
                     }
                 }
@@ -93,9 +93,9 @@ struct NotificationPanel: View {
     }
 
     private func clearAll() {
-        for session in controller.workspace.sessions {
-            for window in session.windows {
-                for pane in window.panes {
+        for project in controller.workspace.projects {
+            for tab in project.tabs {
+                for pane in tab.panes {
                     pane.hasBell = false
                     pane.hasContentMatch = false
                 }

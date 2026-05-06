@@ -2,14 +2,14 @@ import SwiftUI
 import ForgeDomain
 
 struct WindowTabBar: View {
-    var session: Session
+    var project: Project
     var sidebarVisible: Bool = true
     var sidebarPosition: String = "left"
     var isFullScreen: Bool = false
     var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller
     @Environment(AttentionManager.self) var attention
-    @State private var renamingWindowId: String?
+    @State private var renamingTabId: String?
     @State private var renameText = ""
 
     private var tabBarOnBottom: Bool {
@@ -20,7 +20,7 @@ struct WindowTabBar: View {
     }
 
     var body: some View {
-        // Tab bar only (title bar is in SessionDetailView)
+        // Tab bar only (title bar is in ProjectDetailView)
         HStack(spacing: 0) {
                 // Show sidebar toggle when sidebar is hidden (left position)
                 if !sidebarVisible && sidebarPosition != "right" {
@@ -30,56 +30,56 @@ struct WindowTabBar: View {
                 }
 
                 ScrollView(.horizontal, showsIndicators: false) {
-                    ReorderableStack(session.windows, axis: .horizontal, spacing: 1) { window, isDragging in
-                        if renamingWindowId == window.id {
-                            InlineRenameField(text: $renameText, font: .system(.caption, weight: .regular), onCancel: { renamingWindowId = nil }) {
+                    ReorderableStack(project.tabs, axis: .horizontal, spacing: 1) { tab, isDragging in
+                        if renamingTabId == tab.id {
+                            InlineRenameField(text: $renameText, font: .system(.caption, weight: .regular), onCancel: { renamingTabId = nil }) {
                                 if !renameText.isEmpty {
-                                    controller.renameWindow(window, to: renameText)
+                                    controller.renameTab(tab, to: renameText)
                                 }
-                                renamingWindowId = nil
+                                renamingTabId = nil
                             }
                             .fixedSize()
                             .frame(height: 28)
                         } else {
                             WindowTab(
-                                window: window,
-                                isActive: window.id == controller.workspace.activeWindowId,
-                                tabIndex: session.windows.firstIndex(where: { $0.id == window.id }).map { $0 + 1 } ?? 0,
+                                tab: tab,
+                                isActive: tab.id == controller.workspace.activeTabId,
+                                tabIndex: project.tabs.firstIndex(where: { $0.id == tab.id }).map { $0 + 1 } ?? 0,
                                 indicatorOnTop: tabBarOnBottom,
-                                notificationsDisabled: attention.isHidden(window.uuid)
+                                notificationsDisabled: attention.isHidden(tab.uuid)
                             )
                             .onTapGesture {
-                                controller.selectWindow(window)
+                                controller.selectTab(tab)
                             }
                             .contextMenu {
                                 Button("New Tab") {
-                                    controller.addWindow(in: session)
+                                    controller.addTab(in: project)
                                 }
                                 .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
                                 Button("New Browser Tab") {}
                                 Divider()
                                 Button("Rename") {
-                                    renamingWindowId = window.id
-                                    renameText = window.name
+                                    renamingTabId = tab.id
+                                    renameText = tab.name
                                 }
                                 .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
-                                if attention.isHidden(window.uuid) {
+                                if attention.isHidden(tab.uuid) {
                                     Button("Enable Notifications") {
-                                        attention.unhide(window.uuid)
+                                        attention.unhide(tab.uuid)
                                     }
                                 } else {
                                     Button("Disable Notifications") {
-                                        attention.hide(window.uuid)
+                                        attention.hide(tab.uuid)
                                     }
                                 }
                                 Button("Close Tab", role: .destructive) {
-                                    controller.removeWindow(window, in: session)
+                                    controller.removeTab(tab, in: project)
                                 }
                                 .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)
                             }
                         }
                     } onReorder: { from, to in
-                        controller.reorderWindow(in: session, from: from, to: to)
+                        controller.reorderTab(in: project, from: from, to: to)
                     }
                     .padding(.horizontal, 4)
                 }
@@ -89,11 +89,11 @@ struct WindowTabBar: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) {
-                        controller.addWindow(in: session)
+                        controller.addTab(in: project)
                     }
                     .contextMenu {
                         Button("New Tab") {
-                            controller.addWindow(in: session)
+                            controller.addTab(in: project)
                         }
                         .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
                         Button("New Browser Tab") {}
@@ -125,17 +125,17 @@ struct WindowTabBar: View {
         .frame(height: 28)
         .background(ForgeConfigStore.shared.resolvedTheme?.background ?? Color(nsColor: .controlBackgroundColor))
         .onReceive(NotificationCenter.default.publisher(for: .forgeRenameTab)) { _ in
-            guard let windowId = controller.workspace.activeWindowId,
-                  let window = session.windows.first(where: { $0.id == windowId }) else { return }
-            renamingWindowId = window.id
-            renameText = window.name
+            guard let tabId = controller.workspace.activeTabId,
+                  let tab = project.tabs.first(where: { $0.id == tabId }) else { return }
+            renamingTabId = tab.id
+            renameText = tab.name
         }
     }
 }
 
 
 struct WindowTab: View {
-    var window: ForgeDomain.Window
+    var tab: ForgeDomain.Tab
     let isActive: Bool
     var tabIndex: Int = 0
     var indicatorOnTop: Bool = false
@@ -168,8 +168,8 @@ struct WindowTab: View {
                         .foregroundStyle(Color.accentColor)
                         .frame(width: 14)
                 }
-                AttentionDot(needsAttention: window.needsAttention && !notificationsDisabled, size: 8)
-                Text(window.name)
+                AttentionDot(needsAttention: tab.needsAttention && !notificationsDisabled, size: 8)
+                Text(tab.name)
                     .font(secondaryFont)
                     .foregroundStyle((isActive || isHovered) ? .primary : .secondary)
                     .lineLimit(1)

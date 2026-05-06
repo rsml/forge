@@ -3,9 +3,9 @@ import Observation
 
 @Observable
 @MainActor
-public final class Window: Identifiable {
+public final class Tab: Identifiable {
     public let id: String
-    public let sessionId: String
+    public let projectId: String
     /// Stable identifier used for attention tracking; never reassigned after init.
     public let uuid: UUID
     public var index: Int
@@ -17,9 +17,9 @@ public final class Window: Identifiable {
         panes.contains { $0.needsAttention }
     }
 
-    public init(id: String, sessionId: String, index: Int, name: String, active: Bool = false, uuid: UUID = UUID()) {
+    public init(id: String, projectId: String, index: Int, name: String, active: Bool = false, uuid: UUID = UUID()) {
         self.id = id
-        self.sessionId = sessionId
+        self.projectId = projectId
         self.uuid = uuid
         self.index = index
         self.name = name

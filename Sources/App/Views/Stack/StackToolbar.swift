@@ -2,8 +2,8 @@ import SwiftUI
 import ForgeDomain
 
 struct StackToolbar: View {
-    let session: Session
-    let window: ForgeDomain.Window
+    let project: Project
+    let tab: ForgeDomain.Tab
     var onDismiss: ((WorkspaceController.StackDismissAction) -> Void)?
 
     var body: some View {
@@ -27,9 +27,9 @@ struct StackToolbar: View {
 
     private var labels: some View {
         HStack(spacing: 6) {
-            Text(session.name)
+            Text(project.name)
                 .font(.system(size: 12, weight: .medium))
-            Text(window.name)
+            Text(tab.name)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
         }

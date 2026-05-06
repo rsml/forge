@@ -24,17 +24,17 @@ final class CommandRegistry {
         commands = []
 
         // Navigation
-        register(Command(name: "go", description: "Jump to session or tab", icon: "arrow.right.circle") { arg in
+        register(Command(name: "go", description: "Jump to project or tab", icon: "arrow.right.circle") { arg in
             let term = arg.lowercased()
-            for session in controller.workspace.sessions {
-                if session.name.lowercased().contains(term) {
-                    controller.selectSession(session)
+            for project in controller.workspace.projects {
+                if project.name.lowercased().contains(term) {
+                    controller.selectProject(project)
                     return
                 }
-                for window in session.windows {
-                    if window.name.lowercased().contains(term) {
-                        controller.selectSession(session)
-                        controller.selectWindow(window)
+                for tab in project.tabs {
+                    if tab.name.lowercased().contains(term) {
+                        controller.selectProject(project)
+                        controller.selectTab(tab)
                         return
                     }
                 }
@@ -43,42 +43,42 @@ final class CommandRegistry {
 
         register(Command(name: "tab", description: "Jump to tab number", icon: "number") { arg in
             guard let n = Int(arg),
-                  let session = controller.workspace.activeSession,
-                  n > 0, n <= session.windows.count else { return }
-            controller.selectWindow(session.windows[n - 1])
+                  let project = controller.workspace.activeProject,
+                  n > 0, n <= project.tabs.count else { return }
+            controller.selectTab(project.tabs[n - 1])
         })
 
-        // Session/Tab management
+        // Project/Tab management
         register(Command(name: "new-project", description: "Open project picker", icon: "folder.badge.plus") { _ in
             NotificationCenter.default.post(name: .forgeNewProject, object: nil)
         })
 
-        register(Command(name: "new-tab", description: "Create tab in current session", icon: "plus.rectangle") { _ in
-            if let session = controller.workspace.activeSession {
-                controller.addWindow(in: session)
+        register(Command(name: "new-tab", description: "Create tab in current project", icon: "plus.rectangle") { _ in
+            if let project = controller.workspace.activeProject {
+                controller.addTab(in: project)
             }
         })
 
         register(Command(name: "close-tab", description: "Close current tab", icon: "xmark.rectangle") { _ in
-            if let session = controller.workspace.activeSession,
-               let windowId = controller.workspace.activeWindowId,
-               let window = session.windows.first(where: { $0.id == windowId }) {
-                controller.removeWindow(window, in: session)
+            if let project = controller.workspace.activeProject,
+               let tabId = controller.workspace.activeTabId,
+               let tab = project.tabs.first(where: { $0.id == tabId }) {
+                controller.removeTab(tab, in: project)
             }
         })
 
         register(Command(name: "rename-tab", description: "Rename current tab", icon: "pencil") { arg in
             guard !arg.isEmpty,
-                  let windowId = controller.workspace.activeWindowId,
-                  let session = controller.workspace.activeSession,
-                  let window = session.windows.first(where: { $0.id == windowId }) else { return }
-            controller.renameWindow(window, to: arg)
+                  let tabId = controller.workspace.activeTabId,
+                  let project = controller.workspace.activeProject,
+                  let tab = project.tabs.first(where: { $0.id == tabId }) else { return }
+            controller.renameTab(tab, to: arg)
         })
 
-        register(Command(name: "rename-project", description: "Rename current session", icon: "pencil.circle") { arg in
+        register(Command(name: "rename-project", description: "Rename current project", icon: "pencil.circle") { arg in
             guard !arg.isEmpty,
-                  let session = controller.workspace.activeSession else { return }
-            controller.renameSession(session, to: arg)
+                  let project = controller.workspace.activeProject else { return }
+            controller.renameProject(project, to: arg)
         })
 
         // Sidebar

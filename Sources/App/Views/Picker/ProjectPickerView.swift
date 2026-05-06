@@ -203,9 +203,9 @@ struct ProjectPickerView: View {
             return
         }
         // Guard against re-opening an already open project — just switch to it
-        if let existing = controller.workspace.sessions.first(where: { $0.path == path }) {
+        if let existing = controller.workspace.projects.first(where: { $0.path == path }) {
             saveToRecent(path)
-            controller.selectSession(existing)
+            controller.selectProject(existing)
             close()
             return
         }
@@ -215,14 +215,14 @@ struct ProjectPickerView: View {
             selectedPath = nil
             return
         }
-        // Derive a unique session name to avoid tmux session name conflicts
+        // Derive a unique project name to avoid tmux project name conflicts
         let baseName = path.isEmpty ? "project" : URL(fileURLWithPath: path).lastPathComponent
-        let existingNames = Set(controller.workspace.sessions.map(\.name))
+        let existingNames = Set(controller.workspace.projects.map(\.name))
         let sessionName = uniqueSessionName(baseName, existing: existingNames)
         errorMessage = nil
         saveToRecent(path)
         Task { @MainActor in
-            await controller.addSession(name: sessionName, path: path)
+            await controller.addProject(name: sessionName, path: path)
             close()
         }
     }
@@ -235,19 +235,19 @@ struct ProjectPickerView: View {
         panel.message = "Choose a project directory"
         if panel.runModal() == .OK, let url = panel.url {
             let path = url.path
-            if let existing = controller.workspace.sessions.first(where: { $0.path == path }) {
+            if let existing = controller.workspace.projects.first(where: { $0.path == path }) {
                 saveToRecent(path)
-                controller.selectSession(existing)
+                controller.selectProject(existing)
                 close()
                 return
             }
             guard isDirectory(path) else { return }
             let baseName = URL(fileURLWithPath: path).lastPathComponent
-            let existingNames = Set(controller.workspace.sessions.map(\.name))
+            let existingNames = Set(controller.workspace.projects.map(\.name))
             let sessionName = uniqueSessionName(baseName, existing: existingNames)
             saveToRecent(path)
             Task { @MainActor in
-                await controller.addSession(name: sessionName, path: path)
+                await controller.addProject(name: sessionName, path: path)
                 close()
             }
         }

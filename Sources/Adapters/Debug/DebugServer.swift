@@ -203,9 +203,9 @@ final class DebugServer {
         }
 
         let ws = ctrl.workspace
-        let sessions: [[String: Any]] = ws.sessions.map { session in
-            let windows: [[String: Any]] = session.windows.map { window in
-                let panes: [[String: Any]] = window.panes.map { pane in
+        let sessions: [[String: Any]] = ws.projects.map { project in
+            let windows: [[String: Any]] = project.tabs.map { tab in
+                let panes: [[String: Any]] = tab.panes.map { pane in
                     [
                         "id": pane.id,
                         "index": pane.index,
@@ -218,30 +218,30 @@ final class DebugServer {
                     ]
                 }
                 return [
-                    "id": window.id,
-                    "index": window.index,
-                    "name": window.name,
-                    "active": window.active,
+                    "id": tab.id,
+                    "index": tab.index,
+                    "name": tab.name,
+                    "active": tab.active,
                     "panes": panes
                 ]
             }
             return [
-                "id": session.id,
-                "name": session.name,
-                "windowCount": session.windowCount,
-                "attached": session.attached,
-                "path": session.path ?? "",
-                "needsAttention": session.needsAttention,
+                "id": project.id,
+                "name": project.name,
+                "tabCount": project.tabCount,
+                "attached": project.attached,
+                "path": project.path ?? "",
+                "needsAttention": project.needsAttention,
                 "windows": windows
             ]
         }
 
         let state: [String: Any] = [
             "connected": ws.connected,
-            "activeSessionId": ws.activeSessionId ?? "",
-            "activeWindowId": ws.activeWindowId ?? "",
+            "activeProjectId": ws.activeProjectId ?? "",
+            "activeTabId": ws.activeTabId ?? "",
             "activePaneId": ws.activePaneId ?? "",
-            "sessionCount": ws.sessions.count,
+            "sessionCount": ws.projects.count,
             "sessions": sessions
         ]
 
@@ -265,55 +265,55 @@ final class DebugServer {
         let args = json["args"] as? [String: Any] ?? [:]
 
         switch action {
-        case "selectSession":
+        case "selectProject":
             if let id = args["id"] as? String,
-               let session = ctrl.workspace.session(byId: id) {
-                ctrl.selectSession(session)
-                return jsonResponse(["ok": true, "selected": session.name])
+               let project = ctrl.workspace.project(byId: id) {
+                ctrl.selectProject(project)
+                return jsonResponse(["ok": true, "selected": project.name])
             }
             // Also support by name
             if let name = args["name"] as? String,
-               let session = ctrl.workspace.sessions.first(where: { $0.name == name }) {
-                ctrl.selectSession(session)
-                return jsonResponse(["ok": true, "selected": session.name])
+               let project = ctrl.workspace.projects.first(where: { $0.name == name }) {
+                ctrl.selectProject(project)
+                return jsonResponse(["ok": true, "selected": project.name])
             }
-            return jsonResponse(["error": "Session not found"], status: "404 Not Found")
+            return jsonResponse(["error": "Project not found"], status: "404 Not Found")
 
-        case "selectWindow":
+        case "selectTab":
             if let id = args["id"] as? String,
-               let session = ctrl.workspace.activeSession,
-               let window = session.windows.first(where: { $0.id == id }) {
-                ctrl.selectWindow(window)
-                return jsonResponse(["ok": true, "selected": window.name])
+               let project = ctrl.workspace.activeProject,
+               let tab = project.tabs.first(where: { $0.id == id }) {
+                ctrl.selectTab(tab)
+                return jsonResponse(["ok": true, "selected": tab.name])
             }
             if let index = args["index"] as? Int,
-               let session = ctrl.workspace.activeSession,
-               let window = session.windows.first(where: { $0.index == index }) {
-                ctrl.selectWindow(window)
-                return jsonResponse(["ok": true, "selected": window.name])
+               let project = ctrl.workspace.activeProject,
+               let tab = project.tabs.first(where: { $0.index == index }) {
+                ctrl.selectTab(tab)
+                return jsonResponse(["ok": true, "selected": tab.name])
             }
-            return jsonResponse(["error": "Window not found"], status: "404 Not Found")
+            return jsonResponse(["error": "Tab not found"], status: "404 Not Found")
 
-        case "addSession":
-            let name = args["name"] as? String ?? "new-session"
+        case "addProject":
+            let name = args["name"] as? String ?? "new-project"
             let path = args["path"] as? String ?? NSHomeDirectory()
-            await ctrl.addSession(name: name, path: path)
+            await ctrl.addProject(name: name, path: path)
             return jsonResponse(["ok": true, "created": name])
 
-        case "removeSession":
+        case "removeProject":
             if let name = args["name"] as? String,
-               let session = ctrl.workspace.sessions.first(where: { $0.name == name }) {
-                ctrl.removeSession(session)
+               let project = ctrl.workspace.projects.first(where: { $0.name == name }) {
+                ctrl.removeProject(project)
                 return jsonResponse(["ok": true, "removed": name])
             }
-            return jsonResponse(["error": "Session not found"], status: "404 Not Found")
+            return jsonResponse(["error": "Project not found"], status: "404 Not Found")
 
-        case "addWindow":
-            if let session = ctrl.workspace.activeSession {
-                ctrl.addWindow(in: session)
-                return jsonResponse(["ok": true, "session": session.name])
+        case "addTab":
+            if let project = ctrl.workspace.activeProject {
+                ctrl.addTab(in: project)
+                return jsonResponse(["ok": true, "project": project.name])
             }
-            return jsonResponse(["error": "No active session"])
+            return jsonResponse(["error": "No active project"])
 
         case "refresh":
             await ctrl.refresh()

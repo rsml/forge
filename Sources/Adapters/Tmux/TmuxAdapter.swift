@@ -11,26 +11,26 @@ final class TmuxAdapter: TmuxPort {
         configPath: runner.configPath
     )
 
-    func listSessions() async -> [SessionInfo] {
-        guard let output = await runner.run("list-sessions", "-F", TmuxStateParser.sessionFormat),
+    func listProjects() async -> [ProjectInfo] {
+        guard let output = await runner.run("list-sessions", "-F", TmuxStateParser.projectFormat),
               !output.isEmpty else { return [] }
-        return TmuxStateParser.parseSessions(output)
+        return TmuxStateParser.parseProjects(output)
     }
 
-    func listWindows(session: String) async -> [WindowInfo] {
-        guard let output = await runner.run("list-windows", "-t", session, "-F", TmuxStateParser.windowFormat),
+    func listTabs(project: String) async -> [TabInfo] {
+        guard let output = await runner.run("list-windows", "-t", project, "-F", TmuxStateParser.tabFormat),
               !output.isEmpty else { return [] }
-        return TmuxStateParser.parseWindows(output)
+        return TmuxStateParser.parseTabs(output)
     }
 
-    func listAllWindows() async -> [WindowInfo] {
-        guard let output = await runner.run("list-windows", "-a", "-F", TmuxStateParser.windowFormat),
+    func listAllTabs() async -> [TabInfo] {
+        guard let output = await runner.run("list-windows", "-a", "-F", TmuxStateParser.tabFormat),
               !output.isEmpty else { return [] }
-        return TmuxStateParser.parseWindows(output)
+        return TmuxStateParser.parseTabs(output)
     }
 
-    func listPanes(window: String) async -> [PaneInfo] {
-        guard let output = await runner.run("list-panes", "-t", window, "-F", TmuxStateParser.paneFormat),
+    func listPanes(tab: String) async -> [PaneInfo] {
+        guard let output = await runner.run("list-panes", "-t", tab, "-F", TmuxStateParser.paneFormat),
               !output.isEmpty else { return [] }
         return TmuxStateParser.parsePanes(output)
     }
@@ -41,33 +41,33 @@ final class TmuxAdapter: TmuxPort {
         return TmuxStateParser.parsePanes(output)
     }
 
-    func newSession(name: String, path: String) async {
-        _ = await runner.run("new-session", "-d", "-s", name, "-c", path)
+    func newProject(name: String, path: String) async {
+        _ = await runner.run("new-project", "-d", "-s", name, "-c", path)
     }
 
-    func killSession(name: String) async {
-        controlMode.send("kill-session -t \(name)")
+    func killProject(name: String) async {
+        controlMode.send("kill-project -t \(name)")
     }
 
-    func renameSession(target: String, newName: String) async {
-        controlMode.send("rename-session -t \(target) \(newName)")
+    func renameProject(target: String, newName: String) async {
+        controlMode.send("rename-project -t \(target) \(newName)")
     }
 
-    func newWindow(session: String, path: String?) async {
-        var cmd = "new-window -t '\(session):'"
+    func newTab(project: String, path: String?) async {
+        var cmd = "new-window -t '\(project):'"
         if let path { cmd += " -c '\(path)'" }
         controlMode.send(cmd)
     }
 
-    func killWindow(id: String) async {
+    func killTab(id: String) async {
         controlMode.send("kill-window -t \(id)")
     }
 
-    func selectWindow(id: String) async {
+    func selectTab(id: String) async {
         controlMode.send("select-window -t \(id)")
     }
 
-    func renameWindow(id: String, newName: String) async {
+    func renameTab(id: String, newName: String) async {
         controlMode.send("rename-window -t \(id) \(newName)")
     }
 
@@ -79,8 +79,8 @@ final class TmuxAdapter: TmuxPort {
         controlMode.send("select-pane -t \(id)")
     }
 
-    func switchClient(session: String) async {
-        controlMode.send("switch-client -t \(session)")
+    func switchClient(project: String) async {
+        controlMode.send("switch-client -t \(project)")
     }
 
     func splitWindow(id: String, direction: SplitDirection) async {
@@ -88,18 +88,18 @@ final class TmuxAdapter: TmuxPort {
         controlMode.send("split-window \(flag) -t \(id)")
     }
 
-    func swapWindow(id: String, offset: Int) async {
+    func swapTab(id: String, offset: Int) async {
         let target = offset > 0 ? "+\(offset)" : "\(offset)"
         controlMode.send("swap-window -s \(id) -t \(target)")
     }
 
-    func reorderWindow(id: String, swapWith: [String]) async {
+    func reorderTab(id: String, swapWith: [String]) async {
         for targetId in swapWith {
             controlMode.send("swap-window -s \(id) -t \(targetId)")
         }
     }
 
-    func moveWindow(id: String, toSession: String) async {
+    func moveTab(id: String, toSession: String) async {
         controlMode.send("move-window -s \(id) -t '\(toSession):'")
     }
 

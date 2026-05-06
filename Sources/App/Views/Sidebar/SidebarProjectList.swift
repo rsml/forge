@@ -5,9 +5,9 @@ struct SidebarProjectList: View {
     var position: String = "left"
     var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller
-    @State private var expandedSessions: Set<String> = []
-    @State private var renamingSessionId: String?
-    @State private var renamingWindowId: String?
+    @State private var expandedProjects: Set<String> = []
+    @State private var renamingProjectId: String?
+    @State private var renamingTabId: String?
     @State private var renameText = ""
 
     var body: some View {
@@ -30,18 +30,18 @@ struct SidebarProjectList: View {
         }
         .onAppear {
             // Restore expanded sessions from saved state
-            if let names = ForgeConfig.load().uiState?.expandedSessionNames {
+            if let names = ForgeConfig.load().uiState?.expandedProjectNames {
                 let nameSet = Set(names)
-                expandedSessions = Set(controller.workspace.sessions
+                expandedProjects = Set(controller.workspace.projects
                     .filter { nameSet.contains($0.name) }
                     .map(\.id))
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .forgeRenameProject)) { _ in
-            guard let session = controller.workspace.activeSession else { return }
-            renamingWindowId = nil
-            renameText = session.name
-            renamingSessionId = session.id
+            guard let project = controller.workspace.activeProject else { return }
+            renamingTabId = nil
+            renameText = project.name
+            renamingProjectId = project.id
         }
     }
 
@@ -79,75 +79,75 @@ struct SidebarProjectList: View {
     private var projectList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 2) {
-                ReorderableStack(controller.workspace.sessions, axis: .vertical, spacing: 2, hitTestHeight: 28) { session, isDragging in
-                    SessionRow(
-                        session: session,
-                        isActive: session.id == controller.workspace.activeSessionId,
-                        activeWindowId: controller.workspace.activeWindowId,
+                ReorderableStack(controller.workspace.projects, axis: .vertical, spacing: 2, hitTestHeight: 28) { project, isDragging in
+                    SidebarProjectRow(
+                        project: project,
+                        isActive: project.id == controller.workspace.activeProjectId,
+                        activeTabId: controller.workspace.activeTabId,
                         isExpanded: Binding(
-                            get: { expandedSessions.contains(session.id) },
+                            get: { expandedProjects.contains(project.id) },
                             set: {
-                                if $0 { expandedSessions.insert(session.id) } else { expandedSessions.remove(session.id) }
-                                let names = controller.workspace.sessions
-                                    .filter { expandedSessions.contains($0.id) }
+                                if $0 { expandedProjects.insert(project.id) } else { expandedProjects.remove(project.id) }
+                                let names = controller.workspace.projects
+                                    .filter { expandedProjects.contains($0.id) }
                                     .map(\.name)
-                                controller.saveUIState(expandedSessionNames: names)
+                                controller.saveUIState(expandedProjectNames: names)
                             }
                         ),
-                        isRenaming: renamingSessionId == session.id,
+                        isRenaming: renamingProjectId == project.id,
                         renameText: $renameText,
                         onRenameCommit: {
                             if !renameText.isEmpty {
-                                session.name = renameText // Optimistic update
-                                controller.renameSession(session, to: renameText)
+                                project.name = renameText // Optimistic update
+                                controller.renameProject(project, to: renameText)
                             }
-                            renamingSessionId = nil
+                            renamingProjectId = nil
                         },
-                        onRenameCancel: { renamingSessionId = nil },
+                        onRenameCancel: { renamingProjectId = nil },
                         onSelect: {
-                            controller.selectSession(session)
+                            controller.selectProject(project)
                         },
-                        onSelectWindow: { window in
-                            controller.selectSession(session)
-                            controller.selectWindow(window)
+                        onSelectTab: { tab in
+                            controller.selectProject(project)
+                            controller.selectTab(tab)
                         },
-                        renamingWindowId: renamingWindowId,
-                        onStartWindowRename: { window in
-                            renamingSessionId = nil
-                            renamingWindowId = window.id
-                            renameText = window.name
+                        renamingTabId: renamingTabId,
+                        onStartTabRename: { tab in
+                            renamingProjectId = nil
+                            renamingTabId = tab.id
+                            renameText = tab.name
                         },
-                        onRenameWindowCommit: {
+                        onRenameTabCommit: {
                             if !renameText.isEmpty,
-                               let window = session.windows.first(where: { $0.id == renamingWindowId }) {
-                                window.name = renameText // Optimistic update
-                                controller.renameWindow(window, to: renameText)
+                               let tab = project.tabs.first(where: { $0.id == renamingTabId }) {
+                                tab.name = renameText // Optimistic update
+                                controller.renameTab(tab, to: renameText)
                             }
-                            renamingWindowId = nil
+                            renamingTabId = nil
                         },
-                        onRenameWindowCancel: { renamingWindowId = nil },
-                        onTabDraggedOut: { window, edge in
-                            let sessions = controller.workspace.sessions
-                            guard let srcIdx = sessions.firstIndex(where: { $0.id == session.id }) else { return }
+                        onRenameTabCancel: { renamingTabId = nil },
+                        onTabDraggedOut: { tab, edge in
+                            let sessions = controller.workspace.projects
+                            guard let srcIdx = sessions.firstIndex(where: { $0.id == project.id }) else { return }
                             let targetIdx = edge == .top ? srcIdx - 1 : srcIdx + 1
                             guard sessions.indices.contains(targetIdx) else { return }
-                            controller.moveWindow(window, from: session, to: sessions[targetIdx])
+                            controller.moveTab(tab, from: project, to: sessions[targetIdx])
                         },
-                        projectIndex: controller.workspace.sessions.firstIndex(where: { $0.id == session.id }).map { $0 + 1 } ?? 0
+                        projectIndex: controller.workspace.projects.firstIndex(where: { $0.id == project.id }).map { $0 + 1 } ?? 0
                     )
                     .contextMenu {
                         Button("Rename...") {
-                            renamingWindowId = nil
-                            renameText = session.name
-                            renamingSessionId = session.id
+                            renamingTabId = nil
+                            renameText = project.name
+                            renamingProjectId = project.id
                         }
                         Divider()
-                        Button("New Tab") { controller.addWindow(in: session) }
+                        Button("New Tab") { controller.addTab(in: project) }
                         Divider()
-                        Button("Close Project", role: .destructive) { controller.removeSession(session) }
+                        Button("Close Project", role: .destructive) { controller.removeProject(project) }
                     }
                 } onReorder: { from, to in
-                    controller.workspace.sessions.move(fromOffsets: IndexSet(integer: from), toOffset: to)
+                    controller.workspace.projects.move(fromOffsets: IndexSet(integer: from), toOffset: to)
                 }
             }
             .padding(.horizontal, 0)

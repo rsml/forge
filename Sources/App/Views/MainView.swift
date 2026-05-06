@@ -34,7 +34,7 @@ struct MainView: View {
     }
 
     private var showSidebar: Bool {
-        sidebarVisible && !controller.workspace.sessions.isEmpty
+        sidebarVisible && !controller.workspace.projects.isEmpty
     }
 
     var body: some View {
@@ -94,9 +94,9 @@ struct MainView: View {
         .onAppear {
             CommandRegistry.shared.setup(controller: controller)
             ModifierKeyMonitor.shared.onOptionNumber = { n in
-                let sessions = controller.workspace.sessions
+                let sessions = controller.workspace.projects
                 guard sessions.count >= n else { return }
-                controller.selectSession(sessions[n - 1])
+                controller.selectProject(sessions[n - 1])
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .forgeCommandPalette)) { _ in
@@ -112,7 +112,7 @@ struct MainView: View {
         .onReceive(NotificationCenter.default.publisher(for: .forgeNotifications)) { _ in
             showNotifications = true
         }
-        .onChange(of: controller.workspace.sessions.count) {
+        .onChange(of: controller.workspace.projects.count) {
             autoFitSidebarWidth()
         }
         .onChange(of: sidebarWidth) {
@@ -135,9 +135,9 @@ struct MainView: View {
     @ViewBuilder
     private var detailContent: some View {
         VStack(spacing: 0) {
-            if let session = controller.workspace.activeSession {
-                SessionDetailView(
-                    session: session,
+            if let project = controller.workspace.activeProject {
+                ProjectDetailView(
+                    project: project,
                     sidebarVisible: sidebarVisible,
                     onToggleSidebar: {
                         withAnimation(.easeInOut(duration: 0.2)) { sidebarVisible.toggle() }
@@ -197,10 +197,10 @@ struct MainView: View {
             .zIndex(1)
     }
 
-    /// Grow sidebar to fit the longest session name, clamped to min/max.
+    /// Grow sidebar to fit the longest project name, clamped to min/max.
     private func autoFitSidebarWidth() {
         let font = NSFont.systemFont(ofSize: 13, weight: .medium)
-        let maxName = controller.workspace.sessions
+        let maxName = controller.workspace.projects
             .map { ($0.name as NSString).size(withAttributes: [.font: font]).width }
             .max() ?? 0
         // name + chevron(16) + dot(8) + spacing(6+6) + horizontal padding(2*2)

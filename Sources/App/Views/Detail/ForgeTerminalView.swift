@@ -51,7 +51,7 @@ struct ForgeTerminalView: NSViewRepresentable {
 
         // Hide tmux status bar — Forge provides the tab UI
         let shell = "/bin/zsh"
-        let cmd = "\(tmuxPath) \(socketArg) \(configArg)set-option -g mouse off 2>/dev/null; \(tmuxPath) \(socketArg) \(configArg)set-option -g status off 2>/dev/null; \(tmuxPath) \(socketArg) \(configArg)attach-session -t \(sessionName)"
+        let cmd = "\(tmuxPath) \(socketArg) \(configArg)set-option -g mouse off 2>/dev/null; \(tmuxPath) \(socketArg) \(configArg)set-option -g status off 2>/dev/null; \(tmuxPath) \(socketArg) \(configArg)attach-project -t \(sessionName)"
         terminal.startProcess(
             executable: shell,
             args: ["-c", cmd],

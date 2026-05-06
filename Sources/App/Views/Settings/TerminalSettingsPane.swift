@@ -37,7 +37,7 @@ struct TerminalSettingsPane: View {
                     .labelsHidden()
                 }
 
-                Toggle("Use tmux for session persistence", isOn: Binding(
+                Toggle("Use tmux for project persistence", isOn: Binding(
                     get: { store.config.terminal?.useTmuxPersistence ?? true },
                     set: { newValue in
                         store.update {

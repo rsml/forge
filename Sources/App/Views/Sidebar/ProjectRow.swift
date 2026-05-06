@@ -1,8 +1,8 @@
 import SwiftUI
 import ForgeDomain
 
-struct SessionRow: View {
-    var session: Session
+struct SidebarProjectRow: View {
+    var project: Project
     var isActive: Bool
 
     private var primaryFont: Font {
@@ -11,26 +11,26 @@ struct SessionRow: View {
         let size = CGFloat(config?.size ?? 13)
         return .custom(family, size: size)
     }
-    var activeWindowId: String?
+    var activeTabId: String?
     @Binding var isExpanded: Bool
     var isRenaming: Bool
     @Binding var renameText: String
     var onRenameCommit: () -> Void
     var onRenameCancel: () -> Void = {}
     var onSelect: () -> Void
-    var onSelectWindow: (ForgeDomain.Window) -> Void
-    var renamingWindowId: String?
-    var onStartWindowRename: (ForgeDomain.Window) -> Void = { _ in }
-    var onRenameWindowCommit: () -> Void = {}
-    var onRenameWindowCancel: () -> Void = {}
-    var onTabDraggedOut: ((ForgeDomain.Window, Edge) -> Void)?
+    var onSelectTab: (ForgeDomain.Tab) -> Void
+    var renamingTabId: String?
+    var onStartTabRename: (ForgeDomain.Tab) -> Void = { _ in }
+    var onRenameTabCommit: () -> Void = {}
+    var onRenameTabCancel: () -> Void = {}
+    var onTabDraggedOut: ((ForgeDomain.Tab, Edge) -> Void)?
     var projectIndex: Int = 0
 
     @Environment(WorkspaceController.self) var controller
     @Environment(AttentionManager.self) var attention
     @State private var isHeaderHovered = false
     @State private var isChevronHovered = false
-    @State private var hoveredWindowId: String?
+    @State private var hoveredTabId: String?
 
     var body: some View {
         let modifiers = ModifierKeyMonitor.shared
@@ -68,11 +68,11 @@ struct SessionRow: View {
                 if isRenaming {
                     InlineRenameField(text: $renameText, font: .system(.body, weight: .medium), onCancel: onRenameCancel, onCommit: onRenameCommit)
                 } else {
-                    TruncatingText(session.name, font: primaryFont.weight(isActive ? .medium : .regular))
+                    TruncatingText(project.name, font: primaryFont.weight(isActive ? .medium : .regular))
                         .foregroundStyle(isActive ? .primary : .secondary)
                     Spacer()
 
-                    if !isExpanded && session.windows.contains(where: { $0.needsAttention && !attention.isHidden($0.uuid) }) {
+                    if !isExpanded && project.tabs.contains(where: { $0.needsAttention && !attention.isHidden($0.uuid) }) {
                         AttentionDot(needsAttention: true, size: 9)
                             .padding(.trailing, 4)
                     }
@@ -92,49 +92,49 @@ struct SessionRow: View {
                 onSelect()
             }
 
-            // Expanded window list
+            // Expanded tab list
             if isExpanded {
-                ReorderableStack(session.windows, axis: .vertical, spacing: 0) { window, isDragging in
+                ReorderableStack(project.tabs, axis: .vertical, spacing: 0) { tab, isDragging in
                     SidebarTabRow(
-                        window: window,
-                        isActive: isActive && window.id == activeWindowId,
-                        isHovered: hoveredWindowId == window.id,
-                        isRenaming: renamingWindowId == window.id,
-                        notificationsDisabled: attention.isHidden(window.uuid),
-                        tabIndex: session.windows.firstIndex(where: { $0.id == window.id }).map { $0 + 1 } ?? 0,
+                        tab: tab,
+                        isActive: isActive && tab.id == activeTabId,
+                        isHovered: hoveredTabId == tab.id,
+                        isRenaming: renamingTabId == tab.id,
+                        notificationsDisabled: attention.isHidden(tab.uuid),
+                        tabIndex: project.tabs.firstIndex(where: { $0.id == tab.id }).map { $0 + 1 } ?? 0,
                         renameText: $renameText,
-                        onRenameCommit: onRenameWindowCommit,
-                        onRenameCancel: onRenameWindowCancel
+                        onRenameCommit: onRenameTabCommit,
+                        onRenameCancel: onRenameTabCancel
                     )
                     .contentShape(Rectangle())
                     .onHover { hovering in
-                        hoveredWindowId = hovering ? window.id : nil
+                        hoveredTabId = hovering ? tab.id : nil
                     }
                     .onTapGesture {
-                        onSelectWindow(window)
+                        onSelectTab(tab)
                     }
                     .contextMenu {
-                        Button("Rename") { onStartWindowRename(window) }
+                        Button("Rename") { onStartTabRename(tab) }
                             .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
-                        if attention.isHidden(window.uuid) {
+                        if attention.isHidden(tab.uuid) {
                             Button("Enable Notifications") {
-                                attention.unhide(window.uuid)
+                                attention.unhide(tab.uuid)
                             }
                         } else {
                             Button("Disable Notifications") {
-                                attention.hide(window.uuid)
+                                attention.hide(tab.uuid)
                             }
                         }
                         Button("Close Tab", role: .destructive) {
-                            onSelectWindow(window)
+                            onSelectTab(tab)
                         }
                         .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)
                     }
                 } onReorder: { from, to in
-                    controller.reorderWindow(in: session, from: from, to: to)
+                    controller.reorderTab(in: project, from: from, to: to)
                 } onDragExit: { index, edge in
-                    guard let onTabDraggedOut, index < session.windows.count else { return }
-                    onTabDraggedOut(session.windows[index], edge)
+                    guard let onTabDraggedOut, index < project.tabs.count else { return }
+                    onTabDraggedOut(project.tabs[index], edge)
                 }
                 .padding(.leading, 0)
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -184,7 +184,7 @@ struct InlineRenameField: View {
 
 /// A tab row inside a project's expanded sidebar view.
 struct SidebarTabRow: View {
-    var window: ForgeDomain.Window
+    var tab: ForgeDomain.Tab
     var isActive: Bool
     var isHovered: Bool
     var isRenaming: Bool = false
@@ -223,12 +223,12 @@ struct SidebarTabRow: View {
             if isRenaming {
                 InlineRenameField(text: $renameText, font: .caption, onCancel: onRenameCancel, onCommit: onRenameCommit)
             } else {
-                TruncatingText(window.name, font: secondaryFont)
+                TruncatingText(tab.name, font: secondaryFont)
                     .foregroundStyle(isActive ? .primary : .secondary)
 
                 Spacer()
 
-                if window.needsAttention && !notificationsDisabled {
+                if tab.needsAttention && !notificationsDisabled {
                     AttentionDot(needsAttention: true, size: 6)
                         .padding(.trailing, 4)
                 }

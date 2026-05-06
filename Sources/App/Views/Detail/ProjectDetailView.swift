@@ -1,8 +1,8 @@
 import SwiftUI
 import ForgeDomain
 
-struct SessionDetailView: View {
-    var session: Session
+struct ProjectDetailView: View {
+    var project: Project
     var sidebarVisible: Bool = true
     var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller
@@ -28,11 +28,11 @@ struct SessionDetailView: View {
                 .frame(height: ForgeConfigStore.shared.titlebarHeight)
             }
             if tabBarPosition == "bottom" {
-                TerminalArea(session: session)
-                WindowTabBar(session: session, sidebarVisible: sidebarVisible, sidebarPosition: sidebarPosition, isFullScreen: isFullScreen, onToggleSidebar: onToggleSidebar)
+                TerminalArea(project: project)
+                WindowTabBar(project: project, sidebarVisible: sidebarVisible, sidebarPosition: sidebarPosition, isFullScreen: isFullScreen, onToggleSidebar: onToggleSidebar)
             } else {
-                WindowTabBar(session: session, sidebarVisible: sidebarVisible, sidebarPosition: sidebarPosition, isFullScreen: isFullScreen, onToggleSidebar: onToggleSidebar)
-                TerminalArea(session: session)
+                WindowTabBar(project: project, sidebarVisible: sidebarVisible, sidebarPosition: sidebarPosition, isFullScreen: isFullScreen, onToggleSidebar: onToggleSidebar)
+                TerminalArea(project: project)
             }
         }
         .toolbar(.hidden, for: .automatic)
