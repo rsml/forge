@@ -24,17 +24,26 @@ struct StackView: View {
 
             if let uuid = attention.currentTabUUID,
                let (project, tab) = controller.workspace.findTab(byUUID: uuid) {
-                ZStack {
-                    // Background layer: next item card or empty state
-                    backgroundLayer
-                        .scaleEffect(isDismissing ? 1.0 : 0.96)
-                        .overlay { Color.black.opacity(isDismissing ? 0.0 : 0.3) }
+                GeometryReader { geo in
+                    ZStack {
+                        // Background layer: next item card — visible through foreground padding
+                        backgroundLayer
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .scaleEffect(isDismissing ? 1.0 : 0.96)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.black.opacity(isDismissing ? 0.0 : 0.3))
+                                    .scaleEffect(isDismissing ? 1.0 : 0.96)
+                            }
 
-                    // Foreground layer: current terminal + toolbar with animation
-                    foregroundLayer(project: project, tab: tab)
-                        .scaleEffect(isDismissing ? 0.92 : 1.0)
-                        .offset(y: isDismissing ? -800 : 0)
-                        .shadow(color: .black.opacity(0.4), radius: 12, y: 3)
+                        // Foreground layer: current terminal + toolbar
+                        foregroundLayer(project: project, tab: tab)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .padding(4)
+                            .scaleEffect(isDismissing ? 0.92 : 1.0)
+                            .offset(y: isDismissing ? -(geo.size.height + 100) : 0)
+                            .shadow(color: .black.opacity(0.4), radius: 12, y: 3)
+                    }
                 }
             } else if let staleUUID = attention.currentTabUUID {
                 let _ = { attention.removeTab(staleUUID) }()
