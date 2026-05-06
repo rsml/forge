@@ -370,8 +370,29 @@ final class WorkspaceController {
                                       attached: info.attached, path: info.path))
             }
         }
+        // Remember the index of the active session before replacing the array
+        let oldActiveId = workspace.activeSessionId
+        let oldIndex = oldActiveId.flatMap { id in workspace.sessions.firstIndex(where: { $0.id == id }) }
+
         workspace.sessions = updated
-        if workspace.activeSessionId == nil, let first = workspace.sessions.first {
+
+        // If the active session was removed, select its neighbor
+        let activeStillExists = workspace.activeSessionId.flatMap { id in
+            updated.contains(where: { $0.id == id })
+        } ?? false
+        if !activeStillExists, !updated.isEmpty {
+            let fallbackIndex: Int
+            if let oldIndex {
+                fallbackIndex = oldIndex > 0 ? oldIndex - 1 : 0
+            } else {
+                fallbackIndex = 0
+            }
+            let target = updated[min(fallbackIndex, updated.count - 1)]
+            workspace.activeSessionId = target.id
+            if let window = target.windows.first(where: { $0.active }) ?? target.windows.first {
+                workspace.activeWindowId = window.id
+            }
+        } else if workspace.activeSessionId == nil, let first = updated.first {
             workspace.activeSessionId = first.id
         }
     }
