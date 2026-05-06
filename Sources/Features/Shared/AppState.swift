@@ -20,6 +20,7 @@ final class AppState {
     // Inline rename (nil = not renaming)
     var renamingTabId: String? = nil
     var renamingProjectId: String? = nil
+    var renameText: String = ""
 
     // Stack action trigger — StackView observes this to run animations
     var pendingStackAction: WorkspaceController.StackDismissAction? = nil
@@ -75,11 +76,13 @@ final class AppState {
                let project = controller.workspace.activeProject,
                let tab = project.tabs.first(where: { $0.id == tabId }) {
                 renamingTabId = tab.id
+                renameText = tab.name
             }
         case .renameProject:
             renamingTabId = nil
             if let project = controller.workspace.activeProject {
                 renamingProjectId = project.id
+                renameText = project.name
             }
 
         // Mode toggle — domain logic
@@ -114,5 +117,33 @@ final class AppState {
         case .stackHide:       pendingStackAction = .hide
         case .stackMoveToBack: pendingStackAction = .moveToBack
         }
+    }
+
+    // MARK: - Rename Helpers
+
+    func startProjectRename(_ project: Project) {
+        renamingTabId = nil
+        renameText = project.name
+        renamingProjectId = project.id
+    }
+
+    func startTabRename(_ tab: ForgeCore.Tab) {
+        renamingProjectId = nil
+        renamingTabId = tab.id
+        renameText = tab.name
+    }
+
+    func commitProjectRename(_ project: Project) {
+        guard !renameText.isEmpty else { renamingProjectId = nil; return }
+        project.name = renameText
+        controller?.renameProject(project, to: renameText)
+        renamingProjectId = nil
+    }
+
+    func commitTabRename(_ tab: ForgeCore.Tab) {
+        guard !renameText.isEmpty else { renamingTabId = nil; return }
+        tab.name = renameText
+        controller?.renameTab(tab, to: renameText)
+        renamingTabId = nil
     }
 }

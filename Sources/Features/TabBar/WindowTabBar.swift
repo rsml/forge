@@ -11,7 +11,6 @@ struct WindowTabBar: View {
     @Environment(WorkspaceController.self) var controller
     @Environment(AttentionManager.self) var attention
     @Environment(AppState.self) private var appState
-    @State private var renameText = ""
 
     private var tabBarOnBottom: Bool {
         let pos = configStore.config.general?.tabBarPosition ??
@@ -33,12 +32,15 @@ struct WindowTabBar: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     ReorderableStack(project.tabs, axis: .horizontal, spacing: 1) { tab, isDragging in
                         if appState.renamingTabId == tab.id {
-                            InlineRenameField(text: $renameText, font: .system(.caption, weight: .regular), onCancel: { appState.renamingTabId = nil }) {
-                                if !renameText.isEmpty {
-                                    controller.renameTab(tab, to: renameText)
-                                }
-                                appState.renamingTabId = nil
-                            }
+                            InlineRenameField(
+                                text: Binding(
+                                    get: { appState.renameText },
+                                    set: { appState.renameText = $0 }
+                                ),
+                                font: .system(.caption, weight: .regular),
+                                onCancel: { appState.renamingTabId = nil },
+                                onCommit: { appState.commitTabRename(tab) }
+                            )
                             .fixedSize()
                             .frame(height: 28)
                         } else {
@@ -60,8 +62,7 @@ struct WindowTabBar: View {
                                 Button("New Browser Tab") {}
                                 Divider()
                                 Button("Rename") {
-                                    appState.renamingTabId = tab.id
-                                    renameText = tab.name
+                                    appState.startTabRename(tab)
                                 }
                                 .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
                                 if attention.isHidden(tab.uuid) {
@@ -125,10 +126,6 @@ struct WindowTabBar: View {
             }
         .frame(height: 28)
         .background(configStore.resolvedTheme?.background.color ?? Color(nsColor: .controlBackgroundColor))
-        .onChange(of: appState.renamingTabId) { _, newId in
-            guard let newId, let tab = project.tabs.first(where: { $0.id == newId }) else { return }
-            renameText = tab.name
-        }
     }
 }
 

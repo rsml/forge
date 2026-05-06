@@ -68,39 +68,7 @@ struct MainView: View {
                 }
             }
         }
-        .overlay {
-            if appState.activeModal == .commandPalette {
-                ModalContainer(isPresented: Binding(
-                    get: { appState.activeModal == .commandPalette },
-                    set: { if !$0 { appState.dispatch(.dismissModal) } }
-                ), width: 500, maxHeight: 400) {
-                    CommandPalette(isPresented: Binding(
-                        get: { appState.activeModal == .commandPalette },
-                        set: { if !$0 { appState.dispatch(.dismissModal) } }
-                    ))
-                }
-            }
-        }
-        .overlay {
-            if appState.activeModal == .projectPicker {
-                ModalContainer(isPresented: Binding(
-                    get: { appState.activeModal == .projectPicker },
-                    set: { if !$0 { appState.dispatch(.dismissModal) } }
-                ), width: 520, maxHeight: 480) {
-                    ProjectPickerView(onDismiss: { appState.dispatch(.dismissModal) })
-                }
-            }
-        }
-        .overlay {
-            if appState.activeModal == .notifications {
-                ModalContainer(isPresented: Binding(
-                    get: { appState.activeModal == .notifications },
-                    set: { if !$0 { appState.dispatch(.dismissModal) } }
-                ), width: 380, maxHeight: 440) {
-                    NotificationPanel(onDismiss: { appState.dispatch(.dismissModal) })
-                }
-            }
-        }
+        .modifier(ModalOverlays())
         .modifier(NotificationToastOverlay(state: toastState))
         .foregroundStyle(themeForeground ?? Color.primary)
         .ignoresSafeArea()

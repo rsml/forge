@@ -7,7 +7,6 @@ struct SidebarProjectList: View {
     var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller
     @Environment(AppState.self) private var appState
-    @State private var renameText = ""
 
     var body: some View {
         let tabBarPos = configStore.config.general?.tabBarPosition ??
@@ -26,10 +25,6 @@ struct SidebarProjectList: View {
             if toolbarOnBottom {
                 toolbarRow
             }
-        }
-        .onChange(of: appState.renamingProjectId) { _, newId in
-            guard let newId, let project = controller.workspace.projects.first(where: { $0.id == newId }) else { return }
-            renameText = project.name
         }
     }
 
@@ -82,31 +77,6 @@ struct SidebarProjectList: View {
                                 controller.saveUIState(expandedProjectNames: names)
                             }
                         ),
-                        isRenaming: appState.renamingProjectId == project.id,
-                        renameText: $renameText,
-                        onRenameCommit: {
-                            if !renameText.isEmpty {
-                                project.name = renameText // Optimistic update
-                                controller.renameProject(project, to: renameText)
-                            }
-                            appState.renamingProjectId = nil
-                        },
-                        onRenameCancel: { appState.renamingProjectId = nil },
-                        renamingTabId: appState.renamingTabId,
-                        onStartTabRename: { tab in
-                            appState.renamingProjectId = nil
-                            appState.renamingTabId = tab.id
-                            renameText = tab.name
-                        },
-                        onRenameTabCommit: {
-                            if !renameText.isEmpty,
-                               let tab = project.tabs.first(where: { $0.id == appState.renamingTabId }) {
-                                tab.name = renameText // Optimistic update
-                                controller.renameTab(tab, to: renameText)
-                            }
-                            appState.renamingTabId = nil
-                        },
-                        onRenameTabCancel: { appState.renamingTabId = nil },
                         onTabDraggedOut: { tab, edge in
                             let sessions = controller.workspace.projects
                             guard let srcIdx = sessions.firstIndex(where: { $0.id == project.id }) else { return }
@@ -117,11 +87,7 @@ struct SidebarProjectList: View {
                         projectIndex: controller.workspace.projects.firstIndex(where: { $0.id == project.id }).map { $0 + 1 } ?? 0
                     )
                     .contextMenu {
-                        Button("Rename...") {
-                            appState.renamingTabId = nil
-                            renameText = project.name
-                            appState.renamingProjectId = project.id
-                        }
+                        Button("Rename...") { appState.startProjectRename(project) }
                         Divider()
                         Button("New Tab") { controller.addTab(in: project) }
                         Divider()
