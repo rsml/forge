@@ -8,6 +8,7 @@ struct ForgeApp: App {
     var body: some Scene {
         Settings {
             SettingsView()
+                .environment(appDelegate.toastState)
         }
         .commands {
             ForgeMenuCommands(controller: appDelegate.controller, config: appDelegate.configStore, appState: appDelegate.appState)
