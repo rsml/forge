@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import ForgeDomain
+@testable import ForgeCore
 
 // Tests for notification/bell event system
 @Suite("Bell Event Handling")

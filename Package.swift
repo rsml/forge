@@ -8,21 +8,21 @@ let package = Package(
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", from: "1.2.0"),
     ],
     targets: [
-        // Pure domain types — no SwiftUI/AppKit deps, fully testable.
+        // Shared kernel — domain models, ports, pure logic. No framework deps.
         .target(
-            name: "ForgeDomain",
+            name: "ForgeCore",
             dependencies: [],
-            path: "Sources/Domain"
+            path: "Sources/Core"
         ),
         .executableTarget(
             name: "Forge",
-            dependencies: ["SwiftTerm", "ForgeDomain"],
+            dependencies: ["SwiftTerm", "ForgeCore"],
             path: "Sources",
-            exclude: ["Domain"]
+            exclude: ["Core"]
         ),
         .testTarget(
             name: "ForgeTests",
-            dependencies: ["ForgeDomain"],
+            dependencies: ["ForgeCore"],
             path: "Tests/ForgeTests"
         ),
     ]

@@ -1,0 +1,26 @@
+import SwiftUI
+import ForgeCore
+
+struct SettingsView: View {
+    var body: some View {
+        TabView {
+            GeneralSettingsPane()
+                .tabItem { Label("General", systemImage: "gearshape") }
+            ListModeSettingsPane()
+                .tabItem { Label("List Mode", systemImage: "sidebar.left") }
+            StackModeSettingsPane()
+                .tabItem { Label("Stack Mode", systemImage: "rectangle.stack") }
+            ThemeSettingsPane()
+                .tabItem { Label("Theme", systemImage: "paintbrush.fill") }
+            FontSettingsPane()
+                .tabItem { Label("Fonts", systemImage: "textformat") }
+            TerminalSettingsPane()
+                .tabItem { Label("Terminal", systemImage: "terminal") }
+            ShortcutsSettingsPane()
+                .tabItem { Label("Shortcuts", systemImage: "keyboard") }
+            AboutPane()
+                .tabItem { Label("About", systemImage: "info.circle") }
+        }
+        .frame(width: 700, height: 550)
+    }
+}

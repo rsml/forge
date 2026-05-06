@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import ForgeDomain
+@testable import ForgeCore
 
 @Suite("AttentionQueue")
 struct AttentionQueueTests {
