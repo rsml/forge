@@ -4,6 +4,7 @@ import ForgeCore
 struct ForgeMenuCommands: Commands {
     let controller: WorkspaceController
     let config: ForgeConfigStore
+    let appState: AppState
 
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
@@ -33,7 +34,7 @@ struct ForgeMenuCommands: Commands {
         // MARK: File
         CommandGroup(replacing: .newItem) {
             Button("New Project...") {
-                NotificationCenter.default.post(name: .forgeNewProject, object: nil)
+                appState.dispatch(.showProjectPicker)
             }
             .keyboardShortcut(KeyboardShortcuts.newProject.key, modifiers: KeyboardShortcuts.newProject.modifiers)
 
@@ -72,12 +73,12 @@ struct ForgeMenuCommands: Commands {
             Divider()
 
             Button("Rename Tab...") {
-                NotificationCenter.default.post(name: .forgeRenameTab, object: nil)
+                appState.dispatch(.renameTab)
             }
             .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
 
             Button("Rename Project...") {
-                NotificationCenter.default.post(name: .forgeRenameProject, object: nil)
+                appState.dispatch(.renameProject)
             }
             .keyboardShortcut(KeyboardShortcuts.renameProject.key, modifiers: KeyboardShortcuts.renameProject.modifiers)
         }
@@ -102,22 +103,22 @@ struct ForgeMenuCommands: Commands {
         // MARK: View
         CommandMenu("View") {
             Button("Command Palette") {
-                NotificationCenter.default.post(name: .forgeCommandPalette, object: nil)
+                appState.dispatch(.showCommandPalette)
             }
             .keyboardShortcut(KeyboardShortcuts.commandPalette.key, modifiers: KeyboardShortcuts.commandPalette.modifiers)
 
             Button("Toggle Sidebar") {
-                NotificationCenter.default.post(name: .forgeToggleSidebar, object: nil)
+                appState.dispatch(.toggleSidebar)
             }
             .keyboardShortcut(KeyboardShortcuts.toggleSidebar.key, modifiers: KeyboardShortcuts.toggleSidebar.modifiers)
 
             Button("Notifications") {
-                NotificationCenter.default.post(name: .forgeNotifications, object: nil)
+                appState.dispatch(.showNotifications)
             }
             .keyboardShortcut(KeyboardShortcuts.notifications.key, modifiers: KeyboardShortcuts.notifications.modifiers)
 
             Button("Toggle Mode") {
-                NotificationCenter.default.post(name: .forgeToggleMode, object: nil)
+                appState.dispatch(.toggleMode)
             }
             .keyboardShortcut(KeyboardShortcuts.toggleMode.key, modifiers: KeyboardShortcuts.toggleMode.modifiers)
 
@@ -191,28 +192,28 @@ struct ForgeMenuCommands: Commands {
             if config.isStackMode {
                 Divider()
                 Button("Done") {
-                    NotificationCenter.default.post(name: .forgeStackDone, object: nil)
+                    appState.dispatch(.stackDone)
                 }
                 .keyboardShortcut(KeyboardShortcuts.stackDone.key, modifiers: KeyboardShortcuts.stackDone.modifiers)
 
                 Button("Disable Notifications") {
-                    NotificationCenter.default.post(name: .forgeStackHide, object: nil)
+                    appState.dispatch(.stackHide)
                 }
                 .keyboardShortcut(KeyboardShortcuts.stackHide.key, modifiers: KeyboardShortcuts.stackHide.modifiers)
 
                 Button("Move to Back") {
-                    NotificationCenter.default.post(name: .forgeStackMoveToBack, object: nil)
+                    appState.dispatch(.stackMoveToBack)
                 }
                 .keyboardShortcut(KeyboardShortcuts.stackMoveToBack.key, modifiers: KeyboardShortcuts.stackMoveToBack.modifiers)
             }
 
             Button("Move Tab Left") {
-                NotificationCenter.default.post(name: .forgeMoveTabLeft, object: nil)
+                appState.dispatch(.moveTabLeft)
             }
             .keyboardShortcut(KeyboardShortcuts.moveTabLeft.key, modifiers: KeyboardShortcuts.moveTabLeft.modifiers)
 
             Button("Move Tab Right") {
-                NotificationCenter.default.post(name: .forgeMoveTabRight, object: nil)
+                appState.dispatch(.moveTabRight)
             }
             .keyboardShortcut(KeyboardShortcuts.moveTabRight.key, modifiers: KeyboardShortcuts.moveTabRight.modifiers)
 

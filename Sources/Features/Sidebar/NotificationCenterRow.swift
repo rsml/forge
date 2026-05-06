@@ -3,6 +3,7 @@ import ForgeCore
 
 struct NotificationCenterRow: View {
     @Environment(ForgeConfigStore.self) private var store
+    @Environment(AppState.self) private var appState
     var position: String = "left"
     @State private var isFullScreen = false
 
@@ -27,7 +28,7 @@ struct NotificationCenterRow: View {
             Spacer(minLength: 0)
 
             Button {
-                NotificationCenter.default.post(name: .forgeToggleMode, object: nil)
+                appState.dispatch(.toggleMode)
             } label: {
                 Image(systemName: iconName)
                     .font(.system(size: 11, weight: .medium))
@@ -48,9 +49,6 @@ struct NotificationCenterRow: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in
             isFullScreen = false
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .forgeToggleMode)) { _ in
-            // Handled by AppDelegate, which has access to AttentionManager.
         }
     }
 }

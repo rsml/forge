@@ -6,9 +6,7 @@ struct SidebarProjectList: View {
     var position: String = "left"
     var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller
-    @State private var expandedProjects: Set<String> = []
-    @State private var renamingProjectId: String?
-    @State private var renamingTabId: String?
+    @Environment(AppState.self) private var appState
     @State private var renameText = ""
 
     var body: some View {
@@ -29,20 +27,9 @@ struct SidebarProjectList: View {
                 toolbarRow
             }
         }
-        .onAppear {
-            // Restore expanded sessions from saved state
-            if let names = ForgeConfig.load().uiState?.expandedProjectNames {
-                let nameSet = Set(names)
-                expandedProjects = Set(controller.workspace.projects
-                    .filter { nameSet.contains($0.name) }
-                    .map(\.id))
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .forgeRenameProject)) { _ in
-            guard let project = controller.workspace.activeProject else { return }
-            renamingTabId = nil
+        .onChange(of: appState.renamingProjectId) { _, newId in
+            guard let newId, let project = controller.workspace.projects.first(where: { $0.id == newId }) else { return }
             renameText = project.name
-            renamingProjectId = project.id
         }
     }
 
@@ -53,20 +40,20 @@ struct SidebarProjectList: View {
                 IconButton(systemName: "sidebar.right") { onToggleSidebar() }
                     .tooltip(KeyboardShortcuts.toggleSidebar)
                 IconButton(systemName: "command") {
-                    NotificationCenter.default.post(name: .forgeCommandPalette, object: nil)
+                    appState.dispatch(.showCommandPalette)
                 }
                 .tooltip(KeyboardShortcuts.commandPalette)
                 IconButton(systemName: "plus") {
-                    NotificationCenter.default.post(name: .forgeNewProject, object: nil)
+                    appState.dispatch(.showProjectPicker)
                 }
                 .tooltip(KeyboardShortcuts.newProject)
             } else {
                 IconButton(systemName: "plus") {
-                    NotificationCenter.default.post(name: .forgeNewProject, object: nil)
+                    appState.dispatch(.showProjectPicker)
                 }
                 .tooltip(KeyboardShortcuts.newProject)
                 IconButton(systemName: "command") {
-                    NotificationCenter.default.post(name: .forgeCommandPalette, object: nil)
+                    appState.dispatch(.showCommandPalette)
                 }
                 .tooltip(KeyboardShortcuts.commandPalette)
                 IconButton(systemName: "sidebar.left") { onToggleSidebar() }
@@ -86,40 +73,40 @@ struct SidebarProjectList: View {
                         isActive: project.id == controller.workspace.activeProjectId,
                         activeTabId: controller.workspace.activeTabId,
                         isExpanded: Binding(
-                            get: { expandedProjects.contains(project.id) },
+                            get: { appState.expandedProjectIds.contains(project.id) },
                             set: {
-                                if $0 { expandedProjects.insert(project.id) } else { expandedProjects.remove(project.id) }
+                                if $0 { appState.expandedProjectIds.insert(project.id) } else { appState.expandedProjectIds.remove(project.id) }
                                 let names = controller.workspace.projects
-                                    .filter { expandedProjects.contains($0.id) }
+                                    .filter { appState.expandedProjectIds.contains($0.id) }
                                     .map(\.name)
                                 controller.saveUIState(expandedProjectNames: names)
                             }
                         ),
-                        isRenaming: renamingProjectId == project.id,
+                        isRenaming: appState.renamingProjectId == project.id,
                         renameText: $renameText,
                         onRenameCommit: {
                             if !renameText.isEmpty {
                                 project.name = renameText // Optimistic update
                                 controller.renameProject(project, to: renameText)
                             }
-                            renamingProjectId = nil
+                            appState.renamingProjectId = nil
                         },
-                        onRenameCancel: { renamingProjectId = nil },
-                        renamingTabId: renamingTabId,
+                        onRenameCancel: { appState.renamingProjectId = nil },
+                        renamingTabId: appState.renamingTabId,
                         onStartTabRename: { tab in
-                            renamingProjectId = nil
-                            renamingTabId = tab.id
+                            appState.renamingProjectId = nil
+                            appState.renamingTabId = tab.id
                             renameText = tab.name
                         },
                         onRenameTabCommit: {
                             if !renameText.isEmpty,
-                               let tab = project.tabs.first(where: { $0.id == renamingTabId }) {
+                               let tab = project.tabs.first(where: { $0.id == appState.renamingTabId }) {
                                 tab.name = renameText // Optimistic update
                                 controller.renameTab(tab, to: renameText)
                             }
-                            renamingTabId = nil
+                            appState.renamingTabId = nil
                         },
-                        onRenameTabCancel: { renamingTabId = nil },
+                        onRenameTabCancel: { appState.renamingTabId = nil },
                         onTabDraggedOut: { tab, edge in
                             let sessions = controller.workspace.projects
                             guard let srcIdx = sessions.firstIndex(where: { $0.id == project.id }) else { return }
@@ -131,9 +118,9 @@ struct SidebarProjectList: View {
                     )
                     .contextMenu {
                         Button("Rename...") {
-                            renamingTabId = nil
+                            appState.renamingTabId = nil
                             renameText = project.name
-                            renamingProjectId = project.id
+                            appState.renamingProjectId = project.id
                         }
                         Divider()
                         Button("New Tab") { controller.addTab(in: project) }
@@ -150,7 +137,7 @@ struct SidebarProjectList: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) {
-            NotificationCenter.default.post(name: .forgeNewProject, object: nil)
+            appState.dispatch(.showProjectPicker)
         }
     }
 }

@@ -10,7 +10,7 @@ struct WindowTabBar: View {
     var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller
     @Environment(AttentionManager.self) var attention
-    @State private var renamingTabId: String?
+    @Environment(AppState.self) private var appState
     @State private var renameText = ""
 
     private var tabBarOnBottom: Bool {
@@ -32,12 +32,12 @@ struct WindowTabBar: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     ReorderableStack(project.tabs, axis: .horizontal, spacing: 1) { tab, isDragging in
-                        if renamingTabId == tab.id {
-                            InlineRenameField(text: $renameText, font: .system(.caption, weight: .regular), onCancel: { renamingTabId = nil }) {
+                        if appState.renamingTabId == tab.id {
+                            InlineRenameField(text: $renameText, font: .system(.caption, weight: .regular), onCancel: { appState.renamingTabId = nil }) {
                                 if !renameText.isEmpty {
                                     controller.renameTab(tab, to: renameText)
                                 }
-                                renamingTabId = nil
+                                appState.renamingTabId = nil
                             }
                             .fixedSize()
                             .frame(height: 28)
@@ -60,7 +60,7 @@ struct WindowTabBar: View {
                                 Button("New Browser Tab") {}
                                 Divider()
                                 Button("Rename") {
-                                    renamingTabId = tab.id
+                                    appState.renamingTabId = tab.id
                                     renameText = tab.name
                                 }
                                 .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
@@ -125,10 +125,8 @@ struct WindowTabBar: View {
             }
         .frame(height: 28)
         .background(configStore.resolvedTheme?.background ?? Color(nsColor: .controlBackgroundColor))
-        .onReceive(NotificationCenter.default.publisher(for: .forgeRenameTab)) { _ in
-            guard let tabId = controller.workspace.activeTabId,
-                  let tab = project.tabs.first(where: { $0.id == tabId }) else { return }
-            renamingTabId = tab.id
+        .onChange(of: appState.renamingTabId) { _, newId in
+            guard let newId, let tab = project.tabs.first(where: { $0.id == newId }) else { return }
             renameText = tab.name
         }
     }

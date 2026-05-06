@@ -10,7 +10,7 @@ struct ForgeApp: App {
             SettingsView()
         }
         .commands {
-            ForgeMenuCommands(controller: appDelegate.controller, config: appDelegate.configStore)
+            ForgeMenuCommands(controller: appDelegate.controller, config: appDelegate.configStore, appState: appDelegate.appState)
         }
     }
 }
@@ -19,21 +19,7 @@ struct ForgeApp: App {
 
 extension Notification.Name {
     static let forgeConfigChanged = Notification.Name("forgeConfigChanged")
-    static let forgeNewProject = Notification.Name("forgeNewProject")
-    static let forgeCommandPalette = Notification.Name("forgeCommandPalette")
-    static let forgeToggleSidebar = Notification.Name("forgeToggleSidebar")
-    static let forgeMoveTabLeft = Notification.Name("forgeMoveTabLeft")
-    static let forgeMoveTabRight = Notification.Name("forgeMoveTabRight")
-    static let forgeNotifications = Notification.Name("forgeNotifications")
-    static let forgeCollapseAll = Notification.Name("forgeCollapseAll")
-    static let forgeExpandAll = Notification.Name("forgeExpandAll")
-    static let forgeRenameTab = Notification.Name("forgeRenameTab")
-    static let forgeRenameProject = Notification.Name("forgeRenameProject")
-    static let forgeToggleMode = Notification.Name("forgeToggleMode")
     static let forgeWindowTitleChanged = Notification.Name("forgeWindowTitleChanged")
-    static let forgeStackDone = Notification.Name("forgeStackDone")
-    static let forgeStackHide = Notification.Name("forgeStackHide")
-    static let forgeStackMoveToBack = Notification.Name("forgeStackMoveToBack")
 }
 
 // MARK: - NSColor Helpers
@@ -52,6 +38,7 @@ extension NSColor {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let configStore = ForgeConfigStore.shared
     lazy var controller = WorkspaceController(tmux: TmuxAdapter(), git: GitAdapter(), config: configStore)
+    let appState = AppState(sidebarVisible: ForgeConfig.load().uiState?.sidebarVisible ?? true)
     private(set) var attentionManager: AttentionManager!
     private let debugServer = DebugServer()
     private var mainWindow: NSWindow?
@@ -73,43 +60,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.attentionManager = attentionManager
 
         createMainWindow()
+        appState.bind(controller: controller, titleBarManager: titleBarManager, attentionManager: attentionManager, config: configStore)
         controller.connect()
+
+        // Restore expanded project IDs after connect
+        Task { @MainActor in
+            // Give connect() a moment to populate workspace
+            try? await Task.sleep(for: .milliseconds(500))
+            if let names = ForgeConfig.load().uiState?.expandedProjectNames {
+                let nameSet = Set(names)
+                self.appState.expandedProjectIds = Set(self.controller.workspace.projects.filter { nameSet.contains($0.name) }.map(\.id))
+            }
+        }
+
         debugServer.start(controller: controller)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.cleanUpMenuBar()
-        }
-
-        NotificationCenter.default.addObserver(
-            forName: .forgeToggleMode, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                if self.configStore.isStackMode {
-                    if let uuid = self.attentionManager?.currentTabUUID,
-                       let (project, tab) = self.controller.workspace.findTab(byUUID: uuid) {
-                        self.controller.workspace.activeProjectId = project.id
-                        self.controller.workspace.activeTabId = tab.id
-                    }
-                    self.configStore.isStackMode = false
-                } else {
-                    if let tabId = self.controller.workspace.activeTabId,
-                       let tab = self.controller.workspace.activeProject?.tabs.first(where: { $0.id == tabId }),
-                       tab.needsAttention {
-                        self.attentionManager?.promoteToFront(tab.uuid)
-                    }
-                    self.configStore.isStackMode = true
-                    if let uuid = self.attentionManager?.currentTabUUID,
-                       let (_, tab) = self.controller.workspace.findTab(byUUID: uuid) {
-                        self.controller.selectTab(tab)
-                    }
-                }
-                self.titleBarManager?.updateSplitIconVisibility()
-                self.titleBarManager?.updateWindowTitle()
-                DispatchQueue.main.async {
-                    self.titleBarManager?.updateOverlayConstraints()
-                }
-            }
         }
 
         // Appearance sync
@@ -141,11 +108,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .environment(controller)
             .environment(attentionManager!)
             .environment(configStore)
+            .environment(appState)
         window.contentView = NSHostingView(rootView: rootView)
         window.makeKeyAndOrderFront(nil)
         self.mainWindow = window
 
-        let tbm = TitleBarManager(window: window, controller: controller, attentionManager: attentionManager, config: configStore)
+        let tbm = TitleBarManager(window: window, controller: controller, attentionManager: attentionManager, config: configStore, appState: appState)
         tbm.measureTitlebarHeight()
         tbm.syncAppearance()
         self.titleBarManager = tbm

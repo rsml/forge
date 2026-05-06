@@ -20,14 +20,14 @@ final class TitleBarManager: NSObject {
     var isFullScreen = false
     var branchTrailingToOverlay: NSLayoutConstraint?
     var branchTrailingToSplitH: NSLayoutConstraint?
-    var sidebarVisible: Bool
+    let appState: AppState
 
-    init(window: NSWindow, controller: WorkspaceController, attentionManager: AttentionManager, config: ForgeConfigStore) {
+    init(window: NSWindow, controller: WorkspaceController, attentionManager: AttentionManager, config: ForgeConfigStore, appState: AppState) {
         self.window = window
         self.controller = controller
         self.attentionManager = attentionManager
         self.config = config
-        self.sidebarVisible = ForgeConfig.load().uiState?.sidebarVisible ?? true
+        self.appState = appState
         super.init()
         registerObservers()
         startChromeStrippingTimer()
@@ -80,14 +80,6 @@ final class TitleBarManager: NSObject {
             forName: .forgeWindowTitleChanged, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.updateWindowTitle() }
-        }
-        NotificationCenter.default.addObserver(
-            forName: .forgeToggleSidebar, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.sidebarVisible.toggle()
-                self?.updateOverlayConstraints()
-            }
         }
         NotificationCenter.default.addObserver(
             forName: .forgeConfigChanged, object: nil, queue: .main
@@ -185,7 +177,7 @@ final class TitleBarManager: NSObject {
         }
 
         let position = config.config.general?.sidebarPosition ?? "left"
-        let effectivelyVisible = sidebarVisible && !controller.workspace.projects.isEmpty
+        let effectivelyVisible = appState.sidebarVisible && !controller.workspace.projects.isEmpty
         let sidebarTotal: CGFloat = effectivelyVisible ? config.sidebarWidth + 1 : 0
 
         if position == "right" {
@@ -212,6 +204,6 @@ final class TitleBarManager: NSObject {
     @objc func splitHorizontalAction() { controller.splitPane(direction: .horizontal) }
     @objc func splitVerticalAction() { controller.splitPane(direction: .vertical) }
     @objc func toggleModeAction() {
-        NotificationCenter.default.post(name: .forgeToggleMode, object: nil)
+        appState.dispatch(.toggleMode)
     }
 }

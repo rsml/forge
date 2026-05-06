@@ -4,11 +4,8 @@ import ForgeCore
 struct MainView: View {
     @Environment(ForgeConfigStore.self) private var configStore
     @Environment(WorkspaceController.self) var controller
+    @Environment(AppState.self) private var appState
     @State private var sidebarWidth: CGFloat = 160
-    @State private var sidebarVisible = ForgeConfig.load().uiState?.sidebarVisible ?? true
-    @State private var showCommandPalette = false
-    @State private var showNewProject = false
-    @State private var showNotifications = false
 
     @State private var dragStartWidth: CGFloat? = nil
 
@@ -35,7 +32,7 @@ struct MainView: View {
     }
 
     private var showSidebar: Bool {
-        sidebarVisible && !controller.workspace.projects.isEmpty
+        appState.sidebarVisible && !controller.workspace.projects.isEmpty
     }
 
     var body: some View {
@@ -69,23 +66,35 @@ struct MainView: View {
             }
         }
         .overlay {
-            if showCommandPalette {
-                ModalContainer(isPresented: $showCommandPalette, width: 500, maxHeight: 400) {
-                    CommandPalette(isPresented: $showCommandPalette)
+            if appState.activeModal == .commandPalette {
+                ModalContainer(isPresented: Binding(
+                    get: { appState.activeModal == .commandPalette },
+                    set: { if !$0 { appState.dispatch(.dismissModal) } }
+                ), width: 500, maxHeight: 400) {
+                    CommandPalette(isPresented: Binding(
+                        get: { appState.activeModal == .commandPalette },
+                        set: { if !$0 { appState.dispatch(.dismissModal) } }
+                    ))
                 }
             }
         }
         .overlay {
-            if showNewProject {
-                ModalContainer(isPresented: $showNewProject, width: 520, maxHeight: 480) {
-                    ProjectPickerView(onDismiss: { showNewProject = false })
+            if appState.activeModal == .projectPicker {
+                ModalContainer(isPresented: Binding(
+                    get: { appState.activeModal == .projectPicker },
+                    set: { if !$0 { appState.dispatch(.dismissModal) } }
+                ), width: 520, maxHeight: 480) {
+                    ProjectPickerView(onDismiss: { appState.dispatch(.dismissModal) })
                 }
             }
         }
         .overlay {
-            if showNotifications {
-                ModalContainer(isPresented: $showNotifications, width: 380, maxHeight: 440) {
-                    NotificationPanel(onDismiss: { showNotifications = false })
+            if appState.activeModal == .notifications {
+                ModalContainer(isPresented: Binding(
+                    get: { appState.activeModal == .notifications },
+                    set: { if !$0 { appState.dispatch(.dismissModal) } }
+                ), width: 380, maxHeight: 440) {
+                    NotificationPanel(onDismiss: { appState.dispatch(.dismissModal) })
                 }
             }
         }
@@ -93,25 +102,12 @@ struct MainView: View {
         .foregroundStyle(themeForeground ?? Color.primary)
         .ignoresSafeArea()
         .onAppear {
-            CommandRegistry.shared.setup(controller: controller)
+            CommandRegistry.shared.setup(controller: controller, appState: appState)
             ModifierKeyMonitor.shared.onOptionNumber = { n in
                 let sessions = controller.workspace.projects
                 guard sessions.count >= n else { return }
                 controller.selectProject(sessions[n - 1])
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .forgeCommandPalette)) { _ in
-            showCommandPalette.toggle()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .forgeToggleSidebar)) { _ in
-            withAnimation(.easeInOut(duration: 0.2)) { sidebarVisible.toggle() }
-            controller.saveUIState(sidebarVisible: sidebarVisible)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .forgeNewProject)) { _ in
-            showNewProject = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .forgeNotifications)) { _ in
-            showNotifications = true
         }
         .onChange(of: controller.workspace.projects.count) {
             autoFitSidebarWidth()
@@ -120,16 +116,16 @@ struct MainView: View {
             configStore.sidebarWidth = sidebarWidth
             NotificationCenter.default.post(name: .forgeWindowTitleChanged, object: nil)
         }
+        .onChange(of: appState.sidebarVisible) {
+            NotificationCenter.default.post(name: .forgeWindowTitleChanged, object: nil)
+        }
     }
 
     @ViewBuilder
     private var sidebarContent: some View {
         SidebarProjectList(
             position: sidebarPosition,
-            onToggleSidebar: {
-                withAnimation(.easeInOut(duration: 0.2)) { sidebarVisible.toggle() }
-                controller.saveUIState(sidebarVisible: sidebarVisible)
-            }
+            onToggleSidebar: { appState.dispatch(.toggleSidebar) }
         )
     }
 
@@ -139,17 +135,14 @@ struct MainView: View {
             if let project = controller.workspace.activeProject {
                 ProjectDetailView(
                     project: project,
-                    sidebarVisible: sidebarVisible,
-                    onToggleSidebar: {
-                        withAnimation(.easeInOut(duration: 0.2)) { sidebarVisible.toggle() }
-                        controller.saveUIState(sidebarVisible: sidebarVisible)
-                    }
+                    sidebarVisible: appState.sidebarVisible,
+                    onToggleSidebar: { appState.dispatch(.toggleSidebar) }
                 )
             } else {
                 VStack(spacing: 8) {
                     Spacer()
                     Button {
-                        NotificationCenter.default.post(name: .forgeNewProject, object: nil)
+                        appState.dispatch(.showProjectPicker)
                     } label: {
                         VStack(spacing: 2) {
                             Text("Open a New Project")

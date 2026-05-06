@@ -20,7 +20,7 @@ final class CommandRegistry {
         commands.append(command)
     }
 
-    func setup(controller: WorkspaceController) {
+    func setup(controller: WorkspaceController, appState: AppState) {
         commands = []
 
         // Navigation
@@ -50,7 +50,7 @@ final class CommandRegistry {
 
         // Project/Tab management
         register(Command(name: "new-project", description: "Open project picker", icon: "folder.badge.plus") { _ in
-            NotificationCenter.default.post(name: .forgeNewProject, object: nil)
+            appState.dispatch(.showProjectPicker)
         })
 
         register(Command(name: "new-tab", description: "Create tab in current project", icon: "plus.rectangle") { _ in
@@ -83,11 +83,11 @@ final class CommandRegistry {
 
         // Sidebar
         register(Command(name: "collapse-all", description: "Collapse all sidebar groups", icon: "rectangle.compress.vertical") { _ in
-            NotificationCenter.default.post(name: .forgeCollapseAll, object: nil)
+            appState.dispatch(.collapseAll)
         })
 
         register(Command(name: "expand-all", description: "Expand all sidebar groups", icon: "rectangle.expand.vertical") { _ in
-            NotificationCenter.default.post(name: .forgeExpandAll, object: nil)
+            appState.dispatch(.expandAll)
         })
 
         // Appearance
@@ -100,7 +100,7 @@ final class CommandRegistry {
         })
 
         register(Command(name: "toggle-sidebar", description: "Toggle sidebar visibility", icon: "sidebar.left") { _ in
-            NotificationCenter.default.post(name: .forgeToggleSidebar, object: nil)
+            appState.dispatch(.toggleSidebar)
         })
     }
 }

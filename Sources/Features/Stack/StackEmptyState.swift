@@ -2,6 +2,7 @@ import SwiftUI
 
 struct StackEmptyState: View {
     @Environment(ForgeConfigStore.self) private var configStore
+    @Environment(AppState.self) private var appState
 
     var body: some View {
         VStack(spacing: 16) {
@@ -15,7 +16,7 @@ struct StackEmptyState: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Button("Switch to List View") {
-                configStore.isStackMode = false
+                appState.dispatch(.toggleMode)
             }
             .buttonStyle(.bordered)
             .padding(.top, 8)

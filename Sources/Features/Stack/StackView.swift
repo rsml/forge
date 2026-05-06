@@ -5,6 +5,7 @@ struct StackView: View {
     @Environment(ForgeConfigStore.self) private var configStore
     @Environment(WorkspaceController.self) var controller
     @Environment(AttentionManager.self) var attention
+    @Environment(AppState.self) private var appState
     @State private var isFullScreen = false
     @State private var isDismissing = false
     @State private var pendingAction: WorkspaceController.StackDismissAction?
@@ -66,14 +67,10 @@ struct StackView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in
             isFullScreen = false
         }
-        .onReceive(NotificationCenter.default.publisher(for: .forgeStackDone)) { _ in
-            handleDismiss(.done)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .forgeStackHide)) { _ in
-            handleDismiss(.hide)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .forgeStackMoveToBack)) { _ in
-            handleDismiss(.moveToBack)
+        .onChange(of: appState.pendingStackAction) { _, action in
+            guard let action else { return }
+            handleDismiss(action)
+            appState.pendingStackAction = nil
         }
     }
 
