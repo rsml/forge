@@ -6,7 +6,7 @@ struct TerminalArea: View {
 
     var body: some View {
         // Key only on project so terminal recreates when switching projects, but NOT
-        // when switching tabs — tmux handles tab switching internally via select-tab,
+        // when switching tabs — tmux handles tab switching internally via select-window,
         // so there's no need to recreate the terminal view (which causes a blank flash).
         ForgeTerminalView(sessionName: project.name)
             .padding(.trailing, -15) // Compensate for SwiftTerm's reserved legacy scroller width

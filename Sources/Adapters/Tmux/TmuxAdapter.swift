@@ -42,15 +42,15 @@ final class TmuxAdapter: TmuxPort {
     }
 
     func newProject(name: String, path: String) async {
-        _ = await runner.run("new-project", "-d", "-s", name, "-c", path)
+        _ = await runner.run("new-session", "-d", "-s", name, "-c", path)
     }
 
     func killProject(name: String) async {
-        controlMode.send("kill-project -t \(name)")
+        controlMode.send("kill-session -t \(name)")
     }
 
     func renameProject(target: String, newName: String) async {
-        controlMode.send("rename-project -t \(target) \(newName)")
+        controlMode.send("rename-session -t \(target) \(newName)")
     }
 
     func newTab(project: String, path: String?) async {
