@@ -1,38 +1,57 @@
 import Foundation
 
-struct SessionInfo {
-    let id: String
-    let name: String
-    let windowCount: Int
-    let attached: Bool
-    let path: String?
+public struct SessionInfo {
+    public let id: String
+    public let name: String
+    public let windowCount: Int
+    public let attached: Bool
+    public let path: String?
+
+    public init(id: String, name: String, windowCount: Int, attached: Bool, path: String?) {
+        self.id = id; self.name = name; self.windowCount = windowCount
+        self.attached = attached; self.path = path
+    }
 }
 
-struct WindowInfo {
-    let id: String
-    let sessionId: String
-    let index: Int
-    let name: String
-    let active: Bool
-    let paneCount: Int
+public struct WindowInfo {
+    public let id: String
+    public let sessionId: String
+    public let index: Int
+    public let name: String
+    public let active: Bool
+    public let paneCount: Int
+
+    public init(id: String, sessionId: String, index: Int, name: String, active: Bool, paneCount: Int) {
+        self.id = id; self.sessionId = sessionId; self.index = index
+        self.name = name; self.active = active; self.paneCount = paneCount
+    }
 }
 
-struct PaneInfo {
-    let id: String
-    let windowId: String
-    let index: Int
-    let active: Bool
-    let currentCommand: String
-    let currentPath: String
-    let width: Int
-    let height: Int
-    let pid: Int
+public struct PaneInfo {
+    public let id: String
+    public let windowId: String
+    public let index: Int
+    public let active: Bool
+    public let currentCommand: String
+    public let currentPath: String
+    public let width: Int
+    public let height: Int
+    public let pid: Int
+
+    public init(id: String, windowId: String, index: Int, active: Bool,
+                currentCommand: String, currentPath: String,
+                width: Int, height: Int, pid: Int) {
+        self.id = id; self.windowId = windowId; self.index = index
+        self.active = active; self.currentCommand = currentCommand
+        self.currentPath = currentPath; self.width = width
+        self.height = height; self.pid = pid
+    }
 }
 
-enum SplitDirection { case horizontal, vertical }
+public enum SplitDirection { case horizontal, vertical }
 
 @MainActor
-protocol TmuxPort {
+public protocol TmuxPort {
     func listSessions() async -> [SessionInfo]
     func listWindows(session: String) async -> [WindowInfo]
     func listAllWindows() async -> [WindowInfo]

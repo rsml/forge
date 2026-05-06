@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 struct SessionDetailView: View {
     var session: Session

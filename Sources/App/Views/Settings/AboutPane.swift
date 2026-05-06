@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 struct AboutPane: View {
     private var version: String {

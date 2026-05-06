@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 struct CommandPalette: View {
     @Environment(WorkspaceController.self) var controller

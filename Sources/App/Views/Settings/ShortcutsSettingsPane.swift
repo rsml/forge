@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 struct ShortcutsSettingsPane: View {
     private var store: ForgeConfigStore { .shared }

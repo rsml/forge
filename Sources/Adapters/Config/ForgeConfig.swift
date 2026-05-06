@@ -13,6 +13,7 @@ struct ForgeConfig: Codable {
     var primaryFont: FontConfig?
     var secondaryFont: FontConfig?
     var terminalFont: FontConfig?
+    var stackView: StackViewSettings?
 
     struct FontConfig: Codable {
         var family: String?
@@ -69,6 +70,16 @@ struct ForgeConfig: Codable {
         var activeWindowIndex: Int?
         var sidebarVisible: Bool?
         var expandedSessionNames: [String]?
+    }
+
+    struct StackViewSettings: Codable, Equatable {
+        var toolbarPosition: String?        // "top" or "bottom"
+        var bringToForeground: String?      // "never" or "always"
+        var notify: String?                 // "always" or "never"
+        var notificationSound: String?      // system sound name or custom file path
+        var hiddenWindowUUIDs: [String]?    // persisted hidden set
+
+        public init() {}
     }
 
     static let defaultConfig = ForgeConfig(

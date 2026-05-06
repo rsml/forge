@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 enum ProjectSortMode: String, CaseIterable {
     case recent = "Recent"

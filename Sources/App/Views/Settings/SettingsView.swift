@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 struct SettingsView: View {
     var body: some View {

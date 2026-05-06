@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 struct NotificationCenterRow: View {
     var position: String = "left"
@@ -37,7 +38,7 @@ struct NotificationCenterRow: View {
             Spacer(minLength: 0)
 
             Button {
-                store.isStackMode.toggle()
+                NotificationCenter.default.post(name: .forgeToggleMode, object: nil)
             } label: {
                 Image(systemName: iconName)
                     .font(.system(size: 11, weight: .medium))
@@ -71,7 +72,7 @@ struct NotificationCenterRow: View {
             isFullScreen = false
         }
         .onReceive(NotificationCenter.default.publisher(for: .forgeToggleMode)) { _ in
-            store.isStackMode.toggle()
+            // Handled by AppDelegate, which has access to AttentionManager.
         }
     }
 }

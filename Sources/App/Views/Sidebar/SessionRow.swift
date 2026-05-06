@@ -1,4 +1,5 @@
 import SwiftUI
+import ForgeDomain
 
 struct SessionRow: View {
     var session: Session
@@ -17,9 +18,9 @@ struct SessionRow: View {
     var onRenameCommit: () -> Void
     var onRenameCancel: () -> Void = {}
     var onSelect: () -> Void
-    var onSelectWindow: (Window) -> Void
+    var onSelectWindow: (ForgeDomain.Window) -> Void
     var renamingWindowId: String?
-    var onStartWindowRename: (Window) -> Void = { _ in }
+    var onStartWindowRename: (ForgeDomain.Window) -> Void = { _ in }
     var onRenameWindowCommit: () -> Void = {}
     var onRenameWindowCancel: () -> Void = {}
     var projectIndex: Int = 0
@@ -177,7 +178,7 @@ struct InlineRenameField: View {
 
 /// A tab row inside a project's expanded sidebar view.
 struct SidebarTabRow: View {
-    var window: Window
+    var window: ForgeDomain.Window
     var isActive: Bool
     var isHovered: Bool
     var isRenaming: Bool = false

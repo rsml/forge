@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import ForgeDomain
 
 struct Command {
     let name: String

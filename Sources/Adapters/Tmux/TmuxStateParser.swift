@@ -1,4 +1,5 @@
 import Foundation
+import ForgeDomain
 
 /// Parses tmux format string output into domain info structs
 enum TmuxStateParser {
