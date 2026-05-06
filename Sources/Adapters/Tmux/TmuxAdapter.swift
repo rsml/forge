@@ -54,8 +54,8 @@ final class TmuxAdapter: TmuxPort {
     }
 
     func newWindow(session: String, path: String?) async {
-        var cmd = "new-window -t \(session)"
-        if let path { cmd += " -c \(path)" }
+        var cmd = "new-window -t '\(session):'"
+        if let path { cmd += " -c '\(path)'" }
         controlMode.send(cmd)
     }
 

@@ -123,7 +123,7 @@ final class WorkspaceController {
     }
 
     func addWindow(in session: Session) {
-        Task { await tmux.newWindow(session: session.name, path: session.path) }
+        Task { await tmux.newWindow(session: session.id, path: session.path) }
     }
 
     func removeWindow(_ window: Window) {

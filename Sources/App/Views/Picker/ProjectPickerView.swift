@@ -33,42 +33,41 @@ struct ProjectPickerView: View {
 
             Divider()
 
-            HStack {
-                Menu {
-                    ForEach(ProjectSortMode.allCases, id: \.self) { mode in
-                        Button {
-                            sortMode = mode
-                        } label: {
-                            if mode == sortMode {
-                                Label(mode.rawValue, systemImage: "checkmark")
-                            } else {
-                                Text(mode.rawValue)
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(sortMode.rawValue.uppercased())
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 8, weight: .semibold))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
+            HStack(spacing: 4) {
+                Text(sortMode.rawValue.uppercased())
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.tertiary)
                 Spacer()
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 6)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                let menu = NSMenu()
+                for mode in ProjectSortMode.allCases {
+                    let item = NSMenuItem(title: mode.rawValue, action: #selector(SortMenuTarget.select(_:)), keyEquivalent: "")
+                    item.state = mode == sortMode ? .on : .off
+                    item.representedObject = mode.rawValue
+                    item.target = SortMenuTarget.shared
+                    SortMenuTarget.shared.onSelect = { selected in
+                        if let match = ProjectSortMode.allCases.first(where: { $0.rawValue == selected }) {
+                            sortMode = match
+                        }
+                    }
+                    menu.addItem(item)
+                }
+                menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+            }
 
             ScrollView {
                 let sorted = sortedPaths
                 if !sorted.isEmpty {
                     VStack(spacing: 0) {
                         ForEach(sorted, id: \.self) { path in
-                            ProjectRow(path: path, openCount: openCount(for: path))
+                            ProjectRow(path: path)
                                 .padding(.vertical, 8)
                                 .padding(.horizontal, 16)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -181,10 +180,6 @@ struct ProjectPickerView: View {
         }
     }
 
-    private func openCount(for path: String) -> Int {
-        ForgeConfigStore.shared.config.projectOpenCounts?[path] ?? 0
-    }
-
     /// The path that would be opened — either selected row, valid typed path, or nil
     private var resolvedPath: String? {
         if let selectedPath { return selectedPath }
@@ -290,7 +285,6 @@ struct ProjectPickerView: View {
 
 struct ProjectRow: View {
     let path: String
-    var openCount: Int = 0
 
     private var name: String {
         guard !path.isEmpty else { return "(unknown)" }
@@ -315,14 +309,19 @@ struct ProjectRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            if openCount > 0 {
-                Spacer()
-                Text("\(openCount)")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
-            }
         }
         .textSelection(.disabled)
+    }
+}
+
+@MainActor
+private final class SortMenuTarget: NSObject {
+    static let shared = SortMenuTarget()
+    var onSelect: ((String) -> Void)?
+
+    @objc func select(_ sender: NSMenuItem) {
+        if let value = sender.representedObject as? String {
+            onSelect?(value)
+        }
     }
 }

@@ -66,11 +66,17 @@ struct WindowTabBar: View {
                                     controller.selectWindow(window)
                                 }
                                 .contextMenu {
-                                    Button("Rename...") {
+                                    Button("New Tab") {
+                                        controller.addWindow(in: session)
+                                    }
+                                    .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
+                                    Button("New Browser Tab") {}
+                                    Divider()
+                                    Button("Rename") {
                                         renamingWindowId = window.id
                                         renameText = window.name
                                     }
-                                    Divider()
+                                    .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
                                     if attention.isHidden(window.uuid) {
                                         Button("Unhide from Stack View") {
                                             attention.unhide(window.uuid)
@@ -80,10 +86,10 @@ struct WindowTabBar: View {
                                             attention.hide(window.uuid)
                                         }
                                     }
-                                    Divider()
                                     Button("Close Tab", role: .destructive) {
                                         controller.removeWindow(window, in: session)
                                     }
+                                    .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)
                                 }
                             }
                         }
@@ -115,6 +121,7 @@ struct WindowTabBar: View {
                         Button("New Tab") {
                             controller.addWindow(in: session)
                         }
+                        .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
                         Button("New Browser Tab") {}
                     }
 

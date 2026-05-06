@@ -122,11 +122,12 @@ struct SessionRow: View {
                             onSelectWindow(window)
                         }
                         .contextMenu {
-                            Button("Rename...") { onStartWindowRename(window) }
-                            Divider()
+                            Button("Rename") { onStartWindowRename(window) }
+                                .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
                             Button("Close Tab", role: .destructive) {
                                 onSelectWindow(window)
                             }
+                            .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)
                         }
                     }
                 }
