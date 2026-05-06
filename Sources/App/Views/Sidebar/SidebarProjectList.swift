@@ -104,13 +104,6 @@ struct SidebarProjectList: View {
                             renamingProjectId = nil
                         },
                         onRenameCancel: { renamingProjectId = nil },
-                        onSelect: {
-                            controller.selectProject(project)
-                        },
-                        onSelectTab: { tab in
-                            controller.selectProject(project)
-                            controller.selectTab(tab)
-                        },
                         renamingTabId: renamingTabId,
                         onStartTabRename: { tab in
                             renamingProjectId = nil

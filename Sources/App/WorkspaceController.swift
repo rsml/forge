@@ -13,6 +13,7 @@ final class WorkspaceController {
     let contentDetector = ContentDetector()
     private(set) var gitBranch: String?
     private let tmux: any TmuxPort
+    private let git: any GitPort
     private var refreshTask: Task<Void, Never>?
     private var refreshDebounceTask: Task<Void, Never>?
     private var isRefreshing = false
@@ -20,8 +21,9 @@ final class WorkspaceController {
     private var lastGitBranchProjectId: String?
     private var perProjectActiveTabId: [String: String] = [:]  // projectId -> tabId
 
-    init(tmux: any TmuxPort) {
+    init(tmux: any TmuxPort, git: any GitPort) {
         self.tmux = tmux
+        self.git = git
     }
 
     func connect() {
@@ -164,6 +166,7 @@ final class WorkspaceController {
     }
 
     func removeProject(_ project: Project) {
+        ForgeLog.log("[app] Removing project: \(project.name)")
         if let index = workspace.projects.firstIndex(where: { $0.id == project.id }) {
             let nextIndex = index > 0 ? index - 1 : min(1, workspace.projects.count - 1)
             if nextIndex != index {
@@ -174,15 +177,18 @@ final class WorkspaceController {
     }
 
     func addTab(in project: Project) {
+        ForgeLog.log("[app] Adding tab in project: \(project.name)")
         Task { await tmux.newTab(project: project.id, path: project.path) }
     }
 
     func removeTab(_ tab: Tab) {
+        ForgeLog.log("[app] Removing tab: \(tab.name) (\(tab.id))")
         Task { await tmux.killTab(id: tab.id) }
     }
 
     /// Removes a tab, selecting the tab to its left (or the next tab if it was first).
     func removeTab(_ tab: Tab, in project: Project) {
+        ForgeLog.log("[app] Removing tab: \(tab.name) from \(project.name)")
         if let index = project.tabs.firstIndex(where: { $0.id == tab.id }) {
             let nextIndex = index > 0 ? index - 1 : min(index + 1, project.tabs.count - 1)
             if nextIndex != index, nextIndex < project.tabs.count {
@@ -193,10 +199,12 @@ final class WorkspaceController {
     }
 
     func renameProject(_ project: Project, to name: String) {
+        ForgeLog.log("[app] Renaming project: \(project.name) → \(name)")
         Task { await tmux.renameProject(target: project.name, newName: name) }
     }
 
     func renameTab(_ tab: Tab, to name: String) {
+        ForgeLog.log("[app] Renaming tab: \(tab.name) → \(name)")
         Task { await tmux.renameTab(id: tab.id, newName: name) }
     }
 
@@ -210,58 +218,23 @@ final class WorkspaceController {
         else { return }
 
         let activePane = tab.panes.first(where: { $0.active }) ?? tab.panes.first
-        let hasMultiplePanes = tab.panes.count > 1
-        let hasMultipleWindows = project.tabs.count > 1
+        let config = ForgeConfigStore.shared.config.general
+        let decision = CloseConfirmation.evaluate(
+            project: project, tab: tab, activePane: activePane,
+            warnOnCloseProject: config?.warnOnCloseProject ?? true,
+            warnOnCloseTab: config?.warnOnCloseTab ?? false
+        )
 
-        // Check if a non-shell process is running
-        let isRunning = activePane?.status == .running
-
-        if isRunning {
-            let processName = tab.name
-            let alert = NSAlert()
-            if hasMultiplePanes {
-                alert.messageText = "Close this pane?"
-                alert.informativeText = "\"\(processName)\" is running in this pane."
-                alert.addButton(withTitle: "Close Pane")
-            } else if hasMultipleWindows {
-                alert.messageText = "Close this tab?"
-                alert.informativeText = "\"\(processName)\" is running in this tab."
-                alert.addButton(withTitle: "Close Tab")
-            } else {
-                alert.messageText = "Close project \"\(project.name)\"?"
-                alert.informativeText = "\"\(processName)\" is running."
-                alert.addButton(withTitle: "Close Project")
-            }
-            alert.addButton(withTitle: "Cancel")
-            alert.alertStyle = .warning
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
-        } else {
-            // Settings-based warnings when no process is running
-            let config = ForgeConfigStore.shared.config.general
-            if !hasMultiplePanes && !hasMultipleWindows && (config?.warnOnCloseProject ?? true) {
-                let alert = NSAlert()
-                alert.messageText = "Close project \"\(project.name)\"?"
-                alert.informativeText = "This will close all tabs and remove the project from Forge."
-                alert.addButton(withTitle: "Close Project")
-                alert.addButton(withTitle: "Cancel")
-                alert.alertStyle = .warning
-                guard alert.runModal() == .alertFirstButtonReturn else { return }
-            } else if !hasMultiplePanes && hasMultipleWindows && (config?.warnOnCloseTab ?? false) {
-                let alert = NSAlert()
-                alert.messageText = "Close tab \"\(tab.name)\"?"
-                alert.informativeText = "This tab will be closed."
-                alert.addButton(withTitle: "Close Tab")
-                alert.addButton(withTitle: "Cancel")
-                alert.alertStyle = .warning
-                guard alert.runModal() == .alertFirstButtonReturn else { return }
-            }
+        if let alert = decision.alert {
+            guard CloseConfirmation.present(alert) else { return }
         }
 
-        if hasMultiplePanes, let pane = activePane {
-            Task { await tmux.killPane(id: pane.id) }
-        } else if hasMultipleWindows {
+        switch decision.target {
+        case .pane(let id):
+            Task { await tmux.killPane(id: id) }
+        case .tab(let tab, let project):
             removeTab(tab, in: project)
-        } else {
+        case .project(let project):
             removeProject(project)
         }
     }
@@ -353,25 +326,7 @@ final class WorkspaceController {
             gitBranch = nil
             return
         }
-        let result: String? = await withCheckedContinuation { cont in
-            let process = Process()
-            let pipe = Pipe()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            process.arguments = ["-C", path, "rev-parse", "--abbrev-ref", "HEAD"]
-            process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
-            do {
-                try process.run()
-                process.waitUntilExit()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let branch = String(data: data, encoding: .utf8)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                cont.resume(returning: (branch?.isEmpty == false) ? branch : nil)
-            } catch {
-                cont.resume(returning: nil)
-            }
-        }
-        gitBranch = result
+        gitBranch = await git.currentBranch(at: path)
     }
 
     private func ensureServer() async {
@@ -387,55 +342,31 @@ final class WorkspaceController {
         }
     }
 
-    private func handleEvent(_ event: String) {
-        ForgeLog.log("[control] \(event)")
+    private func handleEvent(_ rawEvent: String) {
+        ForgeLog.log("[control] \(rawEvent)")
 
-        if event.hasPrefix("%bell") {
-            // %bell <window_id> — mark panes in that tab as having bell, no refresh needed
-            let parts = event.split(separator: " ")
-            if parts.count >= 2 {
-                let tabId = String(parts[1])
-                var found = false
-                for project in workspace.projects {
-                    if let tab = project.tabs.first(where: { $0.id == tabId }) {
-                        for pane in tab.panes {
-                            pane.hasBell = true
-                        }
-                        found = true
-                        attentionManager?.handleEvent(.bell(tabUUID: tab.uuid))
-                        break
-                    }
-                }
-                if !found {
-                    ForgeLog.log("[control] Bell event for unknown tab: \(tabId)")
-                }
+        let event = TmuxEventParser.parse(rawEvent)
+        switch event {
+        case .bell(let tabId):
+            if let (_, tab) = workspace.findTab(byTmuxId: tabId) {
+                for pane in tab.panes { pane.hasBell = true }
+                attentionManager?.handleEvent(.bell(tabUUID: tab.uuid))
+            } else {
+                ForgeLog.log("[control] Bell event for unknown tab: \(tabId)")
             }
-            return
-        }
 
-        if event.hasPrefix("%tab-close") || event.hasPrefix("%unlinked-tab-close") {
-            let parts = event.split(separator: " ")
-            if parts.count >= 2 {
-                let tabId = String(parts[1])
-                if let (_, tab) = workspace.findTab(byTmuxId: tabId) {
-                    attentionManager?.removeTab(tab.uuid)
-                }
+        case .tabClose(let tabId):
+            if let (_, tab) = workspace.findTab(byTmuxId: tabId) {
+                attentionManager?.removeTab(tab.uuid)
             }
-        }
-
-        // Structural events that require a state refresh
-        let structuralPrefixes = [
-            "%tab-add", "%tab-close", "%unlinked-tab-close",
-            "%layout-change",
-            "%project-changed", "%project-renamed",
-            "%tab-renamed",
-        ]
-        let isStructural = structuralPrefixes.contains { event.hasPrefix($0) }
-
-        if isStructural {
             scheduleRefresh()
+
+        case .structural:
+            scheduleRefresh()
+
+        case .ignored:
+            break
         }
-        // Informational events (%begin, %end, %error, %pane-mode-changed, etc.) — no action needed
     }
 
     private func scheduleRefresh() {
@@ -467,79 +398,13 @@ final class WorkspaceController {
     }
 
     private func mergeProjectState(_ infos: [ProjectInfo]) {
-        let infoById = Dictionary(uniqueKeysWithValues: infos.map { ($0.id, $0) })
-
-        // Update existing sessions in-place (preserves local order)
-        for project in workspace.projects {
-            if let info = infoById[project.id] {
-                project.name = info.name
-                project.tabCount = info.tabCount
-                project.attached = info.attached
-                project.path = info.path
-            }
-        }
-
-        // Remove sessions that no longer exist in tmux
-        let liveIds = Set(infos.map(\.id))
-        let oldActiveId = workspace.activeProjectId
-        let oldIndex = oldActiveId.flatMap { id in workspace.projects.firstIndex(where: { $0.id == id }) }
-        let removedActive = oldActiveId.map { !liveIds.contains($0) } ?? false
-
-        workspace.projects.removeAll { !liveIds.contains($0.id) }
-
-        // Append new sessions (not yet in local array)
-        let existingIds = Set(workspace.projects.map(\.id))
-        for info in infos where !existingIds.contains(info.id) {
-            workspace.projects.append(Project(id: info.id, name: info.name,
-                                              tabCount: info.tabCount,
-                                              attached: info.attached, path: info.path))
-        }
-
-        // If the active project was removed, select its neighbor
-        if removedActive, !workspace.projects.isEmpty {
-            let fallbackIndex: Int
-            if let oldIndex {
-                fallbackIndex = oldIndex > 0 ? oldIndex - 1 : 0
-            } else {
-                fallbackIndex = 0
-            }
-            let target = workspace.projects[min(fallbackIndex, workspace.projects.count - 1)]
-            workspace.activeProjectId = target.id
-            if let tab = target.tabs.first(where: { $0.active }) ?? target.tabs.first {
-                workspace.activeTabId = tab.id
-            }
-        } else if workspace.activeProjectId == nil, let first = workspace.projects.first {
-            workspace.activeProjectId = first.id
-        }
+        StateMerger.mergeProjects(workspace, with: infos)
     }
 
     private func mergeTabState(project: Project, _ infos: [TabInfo]) {
-        let infoById = Dictionary(uniqueKeysWithValues: infos.map { ($0.id, $0) })
-
-        // Update existing windows in-place (preserves local order from drag reorder)
-        for tab in project.tabs {
-            if let info = infoById[tab.id] {
-                tab.index = info.index
-                tab.name = info.name
-                tab.active = info.active
-            }
-        }
-
-        // Remove windows that no longer exist in tmux
-        let liveIds = Set(infos.map(\.id))
-        project.tabs.removeAll { !liveIds.contains($0.id) }
-
-        // Append new windows
-        let existingIds = Set(project.tabs.map(\.id))
-        for info in infos where !existingIds.contains(info.id) {
-            project.tabs.append(Tab(id: info.id, projectId: info.projectId,
-                                         index: info.index, name: info.name, active: info.active))
-        }
-
-        if let active = infos.first(where: { $0.active }) {
-            if project.id == workspace.activeProjectId {
-                workspace.activeTabId = active.id
-            }
+        if let activeTabId = StateMerger.mergeTabs(project: project, with: infos,
+                                                    activeProjectId: workspace.activeProjectId) {
+            workspace.activeTabId = activeTabId
         }
     }
 
@@ -596,41 +461,13 @@ final class WorkspaceController {
     }
 
     private func mergePaneState(tab: Tab, _ infos: [PaneInfo]) {
-        var updated: [Pane] = []
-        for info in infos {
-            if let existing = tab.panes.first(where: { $0.id == info.id }) {
-                existing.index = info.index
-                existing.active = info.active
-                // Detect command completion: running → idle transition
-                let wasRunning = PaneStatus.from(command: existing.currentCommand) == .running
-                let nowIdle = PaneStatus.from(command: info.currentCommand) == .idle
-                if wasRunning && nowIdle {
-                    attentionManager?.handleEvent(.commandCompleted(tabUUID: tab.uuid))
-                }
-                // Clear bell when pane resumes: idle → running transition
-                let wasIdle = PaneStatus.from(command: existing.currentCommand) == .idle
-                let nowRunning = PaneStatus.from(command: info.currentCommand) == .running
-                if wasIdle && nowRunning {
-                    existing.hasBell = false
-                }
-                existing.previousCommand = existing.currentCommand
-                existing.currentCommand = info.currentCommand
-                existing.currentPath = info.currentPath
-                existing.width = info.width
-                existing.height = info.height
-                existing.pid = info.pid
-                existing.status = existing.hasBell ? .needsAttention : PaneStatus.from(command: info.currentCommand)
-                updated.append(existing)
-            } else {
-                updated.append(Pane(id: info.id, tabId: info.tabId, index: info.index,
-                                   active: info.active, currentCommand: info.currentCommand,
-                                   currentPath: info.currentPath, width: info.width,
-                                   height: info.height, pid: info.pid))
+        let (activePaneId, events) = StateMerger.mergePanes(tab: tab, with: infos)
+        if let activePaneId { workspace.activePaneId = activePaneId }
+        for event in events {
+            switch event {
+            case .commandCompleted(let tabUUID):
+                attentionManager?.handleEvent(.commandCompleted(tabUUID: tabUUID))
             }
-        }
-        tab.panes = updated
-        if let active = infos.first(where: { $0.active }) {
-            workspace.activePaneId = active.id
         }
     }
 }

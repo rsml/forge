@@ -1,6 +1,23 @@
 import SwiftUI
 import ForgeDomain
 
+extension ForgeConfig.FontConfig {
+    func resolved(defaultSize: Int = 13) -> Font {
+        let family = self.family ?? ".AppleSystemUIFont"
+        let size = CGFloat(self.size ?? defaultSize)
+        return .custom(family, size: size)
+    }
+}
+
+extension ForgeConfigStore {
+    var primaryFont: Font {
+        (config.primaryFont ?? ForgeConfig.FontConfig()).resolved(defaultSize: 13)
+    }
+    var secondaryFont: Font {
+        (config.secondaryFont ?? ForgeConfig.FontConfig()).resolved(defaultSize: 11)
+    }
+}
+
 @Observable @MainActor
 final class ForgeConfigStore {
     static let shared = ForgeConfigStore()

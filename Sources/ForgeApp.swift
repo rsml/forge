@@ -301,7 +301,7 @@ extension NSColor {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let controller = WorkspaceController(tmux: TmuxAdapter())
+    let controller = WorkspaceController(tmux: TmuxAdapter(), git: GitAdapter())
     private(set) var attentionManager: AttentionManager!
     private let debugServer = DebugServer()
     private var mainWindow: NSWindow?

@@ -42,15 +42,9 @@ final class TmuxControlMode: @unchecked Sendable {
 
     func send(_ command: String) {
         lock.lock()
-        // Reconnect immediately if the connection is dead
-        if process == nil || !(process?.isRunning ?? false) {
+        guard let proc = process, proc.isRunning, let stdin else {
             lock.unlock()
-            launchProcess()
-            lock.lock()
-        }
-        guard let stdin else {
-            lock.unlock()
-            ForgeLog.log("[control] No stdin for command: \(command)")
+            ForgeLog.log("[control] Dropped command (disconnected): \(command)")
             return
         }
         lock.unlock()

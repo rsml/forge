@@ -142,12 +142,7 @@ struct WindowTab: View {
     var notificationsDisabled: Bool = false
     @State private var isHovered = false
 
-    private var secondaryFont: Font {
-        let config = ForgeConfigStore.shared.config.secondaryFont
-        let family = config?.family ?? ".AppleSystemUIFont"
-        let size = CGFloat(config?.size ?? 11)
-        return .custom(family, size: size)
-    }
+    private var secondaryFont: Font { ForgeConfigStore.shared.secondaryFont }
 
     var body: some View {
         let modifiers = ModifierKeyMonitor.shared

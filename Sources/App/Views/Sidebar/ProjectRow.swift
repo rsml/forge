@@ -5,20 +5,12 @@ struct SidebarProjectRow: View {
     var project: Project
     var isActive: Bool
 
-    private var primaryFont: Font {
-        let config = ForgeConfigStore.shared.config.primaryFont
-        let family = config?.family ?? ".AppleSystemUIFont"
-        let size = CGFloat(config?.size ?? 13)
-        return .custom(family, size: size)
-    }
     var activeTabId: String?
     @Binding var isExpanded: Bool
     var isRenaming: Bool
     @Binding var renameText: String
     var onRenameCommit: () -> Void
     var onRenameCancel: () -> Void = {}
-    var onSelect: () -> Void
-    var onSelectTab: (ForgeDomain.Tab) -> Void
     var renamingTabId: String?
     var onStartTabRename: (ForgeDomain.Tab) -> Void = { _ in }
     var onRenameTabCommit: () -> Void = {}
@@ -68,7 +60,7 @@ struct SidebarProjectRow: View {
                 if isRenaming {
                     InlineRenameField(text: $renameText, font: .system(.body, weight: .medium), onCancel: onRenameCancel, onCommit: onRenameCommit)
                 } else {
-                    TruncatingText(project.name, font: primaryFont.weight(isActive ? .medium : .regular))
+                    TruncatingText(project.name, font: ForgeConfigStore.shared.primaryFont.weight(isActive ? .medium : .regular))
                         .foregroundStyle(isActive ? .primary : .secondary)
                     Spacer()
 
@@ -89,7 +81,7 @@ struct SidebarProjectRow: View {
                 isHeaderHovered = hovering
             }
             .onTapGesture {
-                onSelect()
+                controller.selectProject(project)
             }
 
             // Expanded tab list
@@ -111,7 +103,8 @@ struct SidebarProjectRow: View {
                         hoveredTabId = hovering ? tab.id : nil
                     }
                     .onTapGesture {
-                        onSelectTab(tab)
+                        controller.selectProject(project)
+                        controller.selectTab(tab)
                     }
                     .contextMenu {
                         Button("Rename") { onStartTabRename(tab) }
@@ -126,7 +119,7 @@ struct SidebarProjectRow: View {
                             }
                         }
                         Button("Close Tab", role: .destructive) {
-                            onSelectTab(tab)
+                            controller.removeTab(tab, in: project)
                         }
                         .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)
                     }
@@ -194,13 +187,6 @@ struct SidebarTabRow: View {
     var onRenameCommit: () -> Void = {}
     var onRenameCancel: () -> Void = {}
 
-    private var secondaryFont: Font {
-        let config = ForgeConfigStore.shared.config.secondaryFont
-        let family = config?.family ?? ".AppleSystemUIFont"
-        let size = CGFloat(config?.size ?? 11)
-        return .custom(family, size: size)
-    }
-
     var body: some View {
         let modifiers = ModifierKeyMonitor.shared
 
@@ -223,7 +209,7 @@ struct SidebarTabRow: View {
             if isRenaming {
                 InlineRenameField(text: $renameText, font: .caption, onCancel: onRenameCancel, onCommit: onRenameCommit)
             } else {
-                TruncatingText(tab.name, font: secondaryFont)
+                TruncatingText(tab.name, font: ForgeConfigStore.shared.secondaryFont)
                     .foregroundStyle(isActive ? .primary : .secondary)
 
                 Spacer()

@@ -46,16 +46,16 @@ final class TmuxAdapter: TmuxPort {
     }
 
     func killProject(name: String) async {
-        controlMode.send("kill-session -t \(name)")
+        controlMode.send("kill-session -t \(shellQuote(name))")
     }
 
     func renameProject(target: String, newName: String) async {
-        controlMode.send("rename-session -t \(target) \(newName)")
+        controlMode.send("rename-session -t \(shellQuote(target)) \(shellQuote(newName))")
     }
 
     func newTab(project: String, path: String?) async {
-        var cmd = "new-window -t '\(project):'"
-        if let path { cmd += " -c '\(path)'" }
+        var cmd = "new-window -t \(shellQuote("\(project):"))"
+        if let path { cmd += " -c \(shellQuote(path))" }
         controlMode.send(cmd)
     }
 
@@ -68,7 +68,7 @@ final class TmuxAdapter: TmuxPort {
     }
 
     func renameTab(id: String, newName: String) async {
-        controlMode.send("rename-window -t \(id) \(newName)")
+        controlMode.send("rename-window -t \(id) \(shellQuote(newName))")
     }
 
     func killPane(id: String) async {
@@ -80,7 +80,7 @@ final class TmuxAdapter: TmuxPort {
     }
 
     func switchClient(project: String) async {
-        controlMode.send("switch-client -t \(project)")
+        controlMode.send("switch-client -t \(shellQuote(project))")
     }
 
     func splitWindow(id: String, direction: SplitDirection) async {
@@ -100,7 +100,7 @@ final class TmuxAdapter: TmuxPort {
     }
 
     func moveTab(id: String, toSession: String) async {
-        controlMode.send("move-window -s \(id) -t '\(toSession):'")
+        controlMode.send("move-window -s \(id) -t \(shellQuote("\(toSession):"))")
     }
 
     func sourceConfig(path: String) async {
@@ -122,5 +122,12 @@ final class TmuxAdapter: TmuxPort {
 
     func stopControlMode() {
         controlMode.stop()
+    }
+
+    // Wraps s in single quotes and escapes any embedded single quotes so the
+    // resulting token is safe to embed in a tmux control-mode command string.
+    // Example: "my 'proj'" → "'my '\\''proj'\\'''"
+    private func shellQuote(_ s: String) -> String {
+        "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }
