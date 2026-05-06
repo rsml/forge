@@ -96,8 +96,8 @@ struct ReorderableStack<Item: Identifiable, Content: View>: View {
         let size = axis == .horizontal ? containerSize.width : containerSize.height
         let pos = axis == .horizontal ? frame.minX : frame.minY
         let itemSize = axis == .horizontal ? frame.width : frame.height
-        let minOffset = -pos
-        let maxOffset = size - pos - itemSize
+        let minOffset = -pos - itemSize / 2      // center can reach 0
+        let maxOffset = size - pos - itemSize / 2 // center can reach containerSize
         return min(max(translation, minOffset), maxOffset)
     }
 
