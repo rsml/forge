@@ -9,7 +9,6 @@ struct WindowTabBar: View {
     var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller
     @Environment(AttentionManager.self) var attention
-    @State private var draggedTabId: String?
     @State private var renamingWindowId: String?
     @State private var renameText = ""
 
