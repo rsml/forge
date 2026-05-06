@@ -3,15 +3,7 @@ import ForgeDomain
 
 struct NotificationCenterRow: View {
     var position: String = "left"
-    @Environment(WorkspaceController.self) var controller
-    @Environment(AttentionManager.self) var attention
     @State private var isFullScreen = false
-
-    private var attentionCount: Int {
-        controller.workspace.sessions.reduce(0) { total, session in
-            total + session.windows.filter { $0.needsAttention && !attention.isHidden($0.uuid) }.count
-        }
-    }
 
     private var store: ForgeConfigStore { ForgeConfigStore.shared }
 
@@ -48,17 +40,6 @@ struct NotificationCenterRow: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .overlay(alignment: .topTrailing) {
-                if attentionCount > 0 {
-                    Text("\(attentionCount)")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 3)
-                        .frame(minWidth: 14, minHeight: 14)
-                        .background(Color.red, in: Capsule())
-                        .offset(x: 4, y: -2)
-                }
-            }
             .help(tooltipText)
 
             if shouldCenter {

@@ -168,12 +168,11 @@ struct WindowTab: View {
                         .foregroundStyle(Color.accentColor)
                         .frame(width: 14)
                 }
+                AttentionDot(needsAttention: window.needsAttention && !notificationsDisabled, size: 8)
                 Text(window.name)
                     .font(secondaryFont)
                     .foregroundStyle((isActive || isHovered) ? .primary : .secondary)
                     .lineLimit(1)
-
-                AttentionDot(needsAttention: window.needsAttention && !notificationsDisabled, size: 6)
             }
             .padding(.horizontal, 10)
             .frame(maxHeight: .infinity)

@@ -72,7 +72,8 @@ struct SessionRow: View {
                     Spacer()
 
                     if !isExpanded && session.windows.contains(where: { $0.needsAttention && !attention.isHidden($0.uuid) }) {
-                        AttentionDot(needsAttention: true, size: 8)
+                        AttentionDot(needsAttention: true, size: 9)
+                            .padding(.trailing, 4)
                     }
                 }
             }
@@ -227,7 +228,8 @@ struct SidebarTabRow: View {
                 Spacer()
 
                 if window.needsAttention && !notificationsDisabled {
-                    AttentionDot(needsAttention: true, size: 5)
+                    AttentionDot(needsAttention: true, size: 6)
+                        .padding(.trailing, 4)
                 }
             }
         }

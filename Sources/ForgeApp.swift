@@ -413,6 +413,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         self.attentionManager?.promoteToFront(window.uuid)
                     }
                     ForgeConfigStore.shared.isStackMode = true
+                    // Select the queue front so TerminalArea shows the right window
+                    if let uuid = self.attentionManager?.currentWindowUUID,
+                       let (_, window) = self.controller.workspace.findWindow(byUUID: uuid) {
+                        self.controller.selectWindow(window)
+                    }
                 }
                 self.updateSplitIconVisibility()
                 self.updateWindowTitle()

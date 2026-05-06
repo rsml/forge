@@ -9,11 +9,12 @@ struct StackToolbar: View {
     var body: some View {
         HStack(spacing: 0) {
             labels
+                .padding(.leading, 4)
             Spacer()
             actionButtons
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.vertical, 2)
         .background {
             if let theme = ForgeConfigStore.shared.resolvedTheme {
                 theme.background
