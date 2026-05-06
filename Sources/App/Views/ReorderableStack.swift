@@ -154,10 +154,23 @@ struct ReorderableStack<Item: Identifiable, Content: View>: View {
                         DragGesture(minimumDistance: 3, coordinateSpace: .named(coordinateSpaceID))
                             .onChanged { value in
                                 if draggedIndex == nil {
-                                    draggedIndex = index
+                                    // Resolve index from @State itemFrames (always current),
+                                    // not captured ForEach index which is stale after reorder.
+                                    let startPos = axis == .horizontal ? value.startLocation.x : value.startLocation.y
+                                    var foundIndex = index
+                                    for (idx, frame) in itemFrames {
+                                        let lo = axis == .horizontal ? frame.minX : frame.minY
+                                        let hi = axis == .horizontal ? frame.maxX : frame.maxY
+                                        if startPos >= lo && startPos <= hi {
+                                            foundIndex = idx
+                                            break
+                                        }
+                                    }
+                                    draggedIndex = foundIndex
                                     dragFrameSnapshot = itemFrames
                                 }
-                                guard let frame = dragFrameSnapshot[index] else { return }
+                                guard let dragIdx = draggedIndex,
+                                      let frame = dragFrameSnapshot[dragIdx] else { return }
 
                                 let translation = axis == .horizontal
                                     ? value.translation.width
@@ -174,12 +187,12 @@ struct ReorderableStack<Item: Identifiable, Content: View>: View {
                                     let containerExtent = axis == .horizontal ? containerSize.width : containerSize.height
                                     if unclampedCenter < -20 {
                                         let exitEdge: Edge = axis == .horizontal ? .leading : .top
-                                        onDragExit(index, exitEdge)
+                                        onDragExit(dragIdx, exitEdge)
                                         cancelDrag()
                                         return
                                     } else if unclampedCenter > containerExtent + 20 {
                                         let exitEdge: Edge = axis == .horizontal ? .trailing : .bottom
-                                        onDragExit(index, exitEdge)
+                                        onDragExit(dragIdx, exitEdge)
                                         cancelDrag()
                                         return
                                     }
