@@ -34,6 +34,7 @@ final class MacNotificationAdapter: NotificationPort, @unchecked Sendable {
 
         // Also send system notification if we have a bundle
         if hasBundle {
+            _ = await requestPermission()
             await sendViaUNUserNotification(title: title, body: body, sound: sound)
         }
     }
