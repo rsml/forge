@@ -208,6 +208,9 @@ struct ForgeMenuCommands: Commands {
                 Divider()
                 Button("Done") {
                     guard let uuid = controller.attentionManager?.currentWindowUUID else { return }
+                    if let (_, window) = controller.workspace.findWindow(byUUID: uuid) {
+                        for pane in window.panes { pane.hasBell = false }
+                    }
                     controller.attentionManager?.markDone(uuid)
                 }
                 .keyboardShortcut(KeyboardShortcuts.stackDone.key, modifiers: KeyboardShortcuts.stackDone.modifiers)

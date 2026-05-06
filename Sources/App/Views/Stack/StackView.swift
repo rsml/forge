@@ -31,9 +31,20 @@ struct StackView: View {
                     TerminalArea(session: session)
                     StackToolbar(session: session, window: window)
                 }
+            } else if let staleUUID = attention.currentWindowUUID {
+                // UUID in queue but window no longer exists — self-heal
+                let _ = { attention.removeWindow(staleUUID) }()
+                StackEmptyState()
             } else {
                 // Nothing in queue
                 StackEmptyState()
+            }
+        }
+        .onChange(of: attention.currentWindowUUID) { _, newUUID in
+            // When the queue front changes, tell tmux to show the new window
+            if let uuid = newUUID,
+               let (_, window) = controller.workspace.findWindow(byUUID: uuid) {
+                controller.selectWindow(window)
             }
         }
         .toolbar(.hidden, for: .automatic)

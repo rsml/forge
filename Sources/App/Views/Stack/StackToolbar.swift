@@ -45,7 +45,6 @@ struct StackToolbar: View {
         } else {
             Text(session.name)
                 .font(.system(size: 12, weight: .medium))
-            Spacer()
             Text(window.name)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
@@ -55,7 +54,10 @@ struct StackToolbar: View {
     @ViewBuilder
     private var actionButtons: some View {
         HStack(spacing: 8) {
-            Button { attention.markDone(window.uuid) } label: {
+            Button {
+                for pane in window.panes { pane.hasBell = false }
+                attention.markDone(window.uuid)
+            } label: {
                 Image(systemName: "checkmark")
             }
             .help("Done")
