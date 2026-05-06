@@ -292,16 +292,34 @@ final class WorkspaceController {
         guard from >= 0, from < session.windows.count else { return }
         let window = session.windows[from]
 
+        // Collect swap targets before optimistic update changes the array
+        let finalIndex = to > from ? to - 1 : to
+        var targets: [String] = []
+        if from < finalIndex {
+            for i in (from + 1)...finalIndex {
+                targets.append(session.windows[i].id)
+            }
+        } else if from > finalIndex {
+            for i in stride(from: from - 1, through: finalIndex, by: -1) {
+                targets.append(session.windows[i].id)
+            }
+        }
+
         // Optimistic update
         session.windows.move(fromOffsets: IndexSet(integer: from), toOffset: to)
 
-        // Persist — adapter handles the how
-        let finalIndex = to > from ? to - 1 : to
-        Task { await tmux.reorderWindow(id: window.id, fromIndex: from, toIndex: finalIndex) }
+        guard !targets.isEmpty else { return }
+        Task { await tmux.reorderWindow(id: window.id, swapWith: targets) }
     }
 
     func swapWindow(offset: Int) {
-        guard let windowId = workspace.activeWindowId else { return }
+        guard let session = workspace.activeSession,
+              let windowId = workspace.activeWindowId,
+              let fromIndex = session.windows.firstIndex(where: { $0.id == windowId })
+        else { return }
+        let toIndex = fromIndex + offset
+        guard toIndex >= 0, toIndex < session.windows.count else { return }
+        session.windows.swapAt(fromIndex, toIndex)
         Task { await tmux.swapWindow(id: windowId, offset: offset) }
     }
 
@@ -473,19 +491,28 @@ final class WorkspaceController {
     }
 
     private func mergeWindowState(session: Session, _ infos: [WindowInfo]) {
-        var updated: [Window] = []
-        for info in infos {
-            if let existing = session.windows.first(where: { $0.id == info.id }) {
-                existing.index = info.index
-                existing.name = info.name
-                existing.active = info.active
-                updated.append(existing)
-            } else {
-                updated.append(Window(id: info.id, sessionId: info.sessionId,
-                                     index: info.index, name: info.name, active: info.active))
+        let infoById = Dictionary(uniqueKeysWithValues: infos.map { ($0.id, $0) })
+
+        // Update existing windows in-place (preserves local order from drag reorder)
+        for window in session.windows {
+            if let info = infoById[window.id] {
+                window.index = info.index
+                window.name = info.name
+                window.active = info.active
             }
         }
-        session.windows = updated
+
+        // Remove windows that no longer exist in tmux
+        let liveIds = Set(infos.map(\.id))
+        session.windows.removeAll { !liveIds.contains($0.id) }
+
+        // Append new windows
+        let existingIds = Set(session.windows.map(\.id))
+        for info in infos where !existingIds.contains(info.id) {
+            session.windows.append(Window(id: info.id, sessionId: info.sessionId,
+                                         index: info.index, name: info.name, active: info.active))
+        }
+
         if let active = infos.first(where: { $0.active }) {
             if session.id == workspace.activeSessionId {
                 workspace.activeWindowId = active.id
