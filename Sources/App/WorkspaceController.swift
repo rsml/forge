@@ -127,11 +127,6 @@ final class WorkspaceController {
 
     func selectWindow(_ window: Window) {
         workspace.activeWindowId = window.id
-        // Clear attention state for all panes in this window
-        for pane in window.panes {
-            pane.hasBell = false
-            pane.hasContentMatch = false
-        }
         Task { await tmux.selectWindow(id: window.id) }
         saveUIState()
     }
@@ -537,11 +532,17 @@ final class WorkspaceController {
             if let existing = window.panes.first(where: { $0.id == info.id }) {
                 existing.index = info.index
                 existing.active = info.active
-                // Detect command completion: non-shell → shell transition
+                // Detect command completion: running → idle transition
                 let wasRunning = PaneStatus.from(command: existing.currentCommand) == .running
                 let nowIdle = PaneStatus.from(command: info.currentCommand) == .idle
                 if wasRunning && nowIdle {
                     attentionManager?.handleEvent(.commandCompleted(windowUUID: window.uuid))
+                }
+                // Clear bell when pane resumes: idle → running transition
+                let wasIdle = PaneStatus.from(command: existing.currentCommand) == .idle
+                let nowRunning = PaneStatus.from(command: info.currentCommand) == .running
+                if wasIdle && nowRunning {
+                    existing.hasBell = false
                 }
                 existing.previousCommand = existing.currentCommand
                 existing.currentCommand = info.currentCommand

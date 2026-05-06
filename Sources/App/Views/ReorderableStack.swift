@@ -200,9 +200,9 @@ struct ReorderableStack<Item: Identifiable, Content: View>: View {
                                 // Clear state before mutation to prevent visual jumps
                                 cancelDrag()
 
-                                // computeInsertionIndex returns values compatible with
-                                // Array.move(fromOffsets:toOffset:) — no conversion needed
-                                if let from, let to, from != to {
+                                // Array.move(fromOffsets:toOffset:) treats to == from and
+                                // to == from+1 as no-ops; skip both to avoid false snap-backs
+                                if let from, let to, from != to, to != from + 1 {
                                     onReorder(from, to)
                                 }
                             }

@@ -6,21 +6,11 @@ struct StackToolbar: View {
     let window: ForgeDomain.Window
     @Environment(AttentionManager.self) var attention
 
-    private var sidebarPosition: String {
-        ForgeConfigStore.shared.config.general?.sidebarPosition ?? "left"
-    }
-
     var body: some View {
-        HStack(spacing: 12) {
-            if sidebarPosition == "left" {
-                actionButtons
-                Spacer()
-                labels
-            } else {
-                labels
-                Spacer()
-                actionButtons
-            }
+        HStack(spacing: 0) {
+            labels
+            Spacer()
+            actionButtons
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -34,15 +24,8 @@ struct StackToolbar: View {
         }
     }
 
-    @ViewBuilder
     private var labels: some View {
-        if sidebarPosition == "left" {
-            Text(session.name)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            Text(window.name)
-                .font(.system(size: 12, weight: .medium))
-        } else {
+        HStack(spacing: 6) {
             Text(session.name)
                 .font(.system(size: 12, weight: .medium))
             Text(window.name)
@@ -51,27 +34,29 @@ struct StackToolbar: View {
         }
     }
 
-    @ViewBuilder
     private var actionButtons: some View {
-        HStack(spacing: 8) {
-            Button {
-                for pane in window.panes { pane.hasBell = false }
+        HStack(spacing: 0) {
+            IconButton(systemName: "checkmark") {
+                for pane in window.panes {
+                    pane.hasBell = false
+                    pane.hasContentMatch = false
+                }
                 attention.markDone(window.uuid)
-            } label: {
-                Image(systemName: "checkmark")
             }
-            .help("Done")
+            .frame(width: 40, height: 28)
+            .help(KeyboardShortcuts.stackDone.tooltip)
 
-            Button { attention.hide(window.uuid) } label: {
-                Image(systemName: "eye.slash")
+            IconButton(systemName: "bell.slash") {
+                attention.hide(window.uuid)
             }
-            .help("Hide")
+            .frame(width: 40, height: 28)
+            .help("Disable Notifications")
 
-            Button { attention.moveToBack(window.uuid) } label: {
-                Image(systemName: "arrow.right.to.line")
+            IconButton(systemName: "arrow.right.to.line") {
+                attention.moveToBack(window.uuid)
             }
-            .help("Move to Back")
+            .frame(width: 40, height: 28)
+            .help(KeyboardShortcuts.stackMoveToBack.tooltip)
         }
-        .buttonStyle(.borderless)
     }
 }

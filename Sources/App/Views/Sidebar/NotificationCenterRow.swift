@@ -4,11 +4,12 @@ import ForgeDomain
 struct NotificationCenterRow: View {
     var position: String = "left"
     @Environment(WorkspaceController.self) var controller
+    @Environment(AttentionManager.self) var attention
     @State private var isFullScreen = false
 
     private var attentionCount: Int {
         controller.workspace.sessions.reduce(0) { total, session in
-            total + session.windows.filter(\.needsAttention).count
+            total + session.windows.filter { $0.needsAttention && !attention.isHidden($0.uuid) }.count
         }
     }
 

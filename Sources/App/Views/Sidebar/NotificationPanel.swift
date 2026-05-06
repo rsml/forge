@@ -4,11 +4,14 @@ import ForgeDomain
 struct NotificationPanel: View {
     var onDismiss: (() -> Void)? = nil
     @Environment(WorkspaceController.self) var controller
+    @Environment(AttentionManager.self) var attention
     @Environment(\.dismiss) var dismiss
 
     private var attentionItems: [(session: Session, window: ForgeDomain.Window)] {
         controller.workspace.sessions.flatMap { session in
-            session.windows.filter { $0.needsAttention }.map { (session: session, window: $0) }
+            session.windows
+                .filter { $0.needsAttention && !attention.isHidden($0.uuid) }
+                .map { (session: session, window: $0) }
         }
     }
 
@@ -43,7 +46,7 @@ struct NotificationPanel: View {
                     ForEach(attentionItems, id: \.window.id) { item in
                         Button {
                             controller.selectSession(item.session)
-                            // selectWindow automatically clears hasBell for this window's panes
+                            // Navigate to the window that needs attention
                             controller.selectWindow(item.window)
                             close()
                         } label: {
@@ -94,6 +97,7 @@ struct NotificationPanel: View {
             for window in session.windows {
                 for pane in window.panes {
                     pane.hasBell = false
+                    pane.hasContentMatch = false
                 }
             }
         }

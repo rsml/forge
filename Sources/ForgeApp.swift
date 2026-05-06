@@ -209,13 +209,16 @@ struct ForgeMenuCommands: Commands {
                 Button("Done") {
                     guard let uuid = controller.attentionManager?.currentWindowUUID else { return }
                     if let (_, window) = controller.workspace.findWindow(byUUID: uuid) {
-                        for pane in window.panes { pane.hasBell = false }
+                        for pane in window.panes {
+                            pane.hasBell = false
+                            pane.hasContentMatch = false
+                        }
                     }
                     controller.attentionManager?.markDone(uuid)
                 }
                 .keyboardShortcut(KeyboardShortcuts.stackDone.key, modifiers: KeyboardShortcuts.stackDone.modifiers)
 
-                Button("Hide") {
+                Button("Disable Notifications") {
                     guard let uuid = controller.attentionManager?.currentWindowUUID else { return }
                     controller.attentionManager?.hide(uuid)
                 }
@@ -622,10 +625,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // In stack mode, list button sits at 78px (after traffic lights), path follows it.
         // In list mode, list button is hidden and path uses pathLabelLeadingConstraint directly.
         NSLayoutConstraint.activate([
-            listBtn.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 74),
+            listBtn.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 70),
             listBtn.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
-            listBtn.widthAnchor.constraint(equalToConstant: 20),
-            listBtn.heightAnchor.constraint(equalToConstant: 20),
+            listBtn.widthAnchor.constraint(equalToConstant: 28),
+            listBtn.heightAnchor.constraint(equalToConstant: 28),
         ])
 
         let pathLeading = pathLabel.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 78)
@@ -686,7 +689,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if isStack {
             overlayLeadingConstraint?.constant = 0
             overlayTrailingConstraint?.constant = 0
-            pathLabelLeadingConstraint?.constant = 98  // 74 (button leading) + 20 (button) + 4 (gap)
+            pathLabelLeadingConstraint?.constant = 106  // 70 (button leading) + 28 (button) + 8 (gap)
             return
         }
 

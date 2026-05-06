@@ -26,6 +26,7 @@ struct SessionRow: View {
     var onTabDraggedOut: ((ForgeDomain.Window, Edge) -> Void)?
     var projectIndex: Int = 0
 
+    @Environment(AttentionManager.self) var attention
     @State private var isHeaderHovered = false
     @State private var isChevronHovered = false
     @State private var hoveredWindowId: String?
@@ -63,14 +64,16 @@ struct SessionRow: View {
                         }
                 }
 
-                AttentionDot(needsAttention: session.needsAttention, size: 8)
-
                 if isRenaming {
                     InlineRenameField(text: $renameText, font: .system(.body, weight: .medium), onCancel: onRenameCancel, onCommit: onRenameCommit)
                 } else {
                     TruncatingText(session.name, font: primaryFont.weight(isActive ? .medium : .regular))
                         .foregroundStyle(isActive ? .primary : .secondary)
                     Spacer()
+
+                    if !isExpanded && session.windows.contains(where: { $0.needsAttention && !attention.isHidden($0.uuid) }) {
+                        AttentionDot(needsAttention: true, size: 8)
+                    }
                 }
             }
             .frame(minHeight: 28)
@@ -95,6 +98,7 @@ struct SessionRow: View {
                         isActive: isActive && window.id == activeWindowId,
                         isHovered: hoveredWindowId == window.id,
                         isRenaming: renamingWindowId == window.id,
+                        notificationsDisabled: attention.isHidden(window.uuid),
                         tabIndex: session.windows.firstIndex(where: { $0.id == window.id }).map { $0 + 1 } ?? 0,
                         renameText: $renameText,
                         onRenameCommit: onRenameWindowCommit,
@@ -110,6 +114,15 @@ struct SessionRow: View {
                     .contextMenu {
                         Button("Rename") { onStartWindowRename(window) }
                             .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
+                        if attention.isHidden(window.uuid) {
+                            Button("Enable Notifications") {
+                                attention.unhide(window.uuid)
+                            }
+                        } else {
+                            Button("Disable Notifications") {
+                                attention.hide(window.uuid)
+                            }
+                        }
                         Button("Close Tab", role: .destructive) {
                             onSelectWindow(window)
                         }
@@ -173,6 +186,7 @@ struct SidebarTabRow: View {
     var isActive: Bool
     var isHovered: Bool
     var isRenaming: Bool = false
+    var notificationsDisabled: Bool = false
     var tabIndex: Int = 0
     @Binding var renameText: String
     var onRenameCommit: () -> Void = {}
@@ -210,12 +224,11 @@ struct SidebarTabRow: View {
                 TruncatingText(window.name, font: secondaryFont)
                     .foregroundStyle(isActive ? .primary : .secondary)
 
-                if window.needsAttention {
-                    AttentionDot(needsAttention: true, size: 5)
-                        .padding(.leading, 4)
-                }
-
                 Spacer()
+
+                if window.needsAttention && !notificationsDisabled {
+                    AttentionDot(needsAttention: true, size: 5)
+                }
             }
         }
         .padding(.horizontal, 4)

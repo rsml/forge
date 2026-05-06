@@ -45,7 +45,8 @@ struct WindowTabBar: View {
                                 window: window,
                                 isActive: window.id == controller.workspace.activeWindowId,
                                 tabIndex: session.windows.firstIndex(where: { $0.id == window.id }).map { $0 + 1 } ?? 0,
-                                indicatorOnTop: tabBarOnBottom
+                                indicatorOnTop: tabBarOnBottom,
+                                notificationsDisabled: attention.isHidden(window.uuid)
                             )
                             .onTapGesture {
                                 controller.selectWindow(window)
@@ -63,11 +64,11 @@ struct WindowTabBar: View {
                                 }
                                 .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
                                 if attention.isHidden(window.uuid) {
-                                    Button("Unhide from Stack View") {
+                                    Button("Enable Notifications") {
                                         attention.unhide(window.uuid)
                                     }
                                 } else {
-                                    Button("Hide from Stack View") {
+                                    Button("Disable Notifications") {
                                         attention.hide(window.uuid)
                                     }
                                 }
@@ -138,6 +139,7 @@ struct WindowTab: View {
     let isActive: Bool
     var tabIndex: Int = 0
     var indicatorOnTop: Bool = false
+    var notificationsDisabled: Bool = false
     @State private var isHovered = false
 
     private var secondaryFont: Font {
@@ -171,7 +173,7 @@ struct WindowTab: View {
                     .foregroundStyle((isActive || isHovered) ? .primary : .secondary)
                     .lineLimit(1)
 
-                AttentionDot(needsAttention: window.needsAttention, size: 6)
+                AttentionDot(needsAttention: window.needsAttention && !notificationsDisabled, size: 6)
             }
             .padding(.horizontal, 10)
             .frame(maxHeight: .infinity)
