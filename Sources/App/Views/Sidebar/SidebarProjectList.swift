@@ -9,7 +9,6 @@ struct SidebarProjectList: View {
     @State private var renamingSessionId: String?
     @State private var renamingWindowId: String?
     @State private var renameText = ""
-    @State private var draggedSessionId: String?
 
     var body: some View {
         let tabBarPos = ForgeConfigStore.shared.config.general?.tabBarPosition ??
@@ -79,8 +78,8 @@ struct SidebarProjectList: View {
     @ViewBuilder
     private var projectList: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 2) {
-                ForEach(Array(controller.workspace.sessions.enumerated()), id: \.element.id) { index, session in
+            VStack(alignment: .leading, spacing: 2) {
+                ReorderableStack(controller.workspace.sessions, axis: .vertical, spacing: 2) { session, isDragging in
                     SessionRow(
                         session: session,
                         isActive: session.id == controller.workspace.activeSessionId,
@@ -127,21 +126,8 @@ struct SidebarProjectList: View {
                             renamingWindowId = nil
                         },
                         onRenameWindowCancel: { renamingWindowId = nil },
-                        projectIndex: index + 1
+                        projectIndex: controller.workspace.sessions.firstIndex(where: { $0.id == session.id }).map { $0 + 1 } ?? 0
                     )
-                    .opacity(draggedSessionId == session.id ? 0.0 : 1.0)
-                    .onDrag {
-                        draggedSessionId = session.id
-                        return NSItemProvider(object: session.id as NSString)
-                    }
-                    .onDrop(of: [.text], delegate: ReorderDropDelegate(
-                        item: session,
-                        items: controller.workspace.sessions,
-                        draggedItemId: $draggedSessionId,
-                        onMove: { from, to in
-                            controller.workspace.sessions.move(fromOffsets: from, toOffset: to)
-                        }
-                    ))
                     .contextMenu {
                         Button("Rename...") {
                             renamingWindowId = nil
@@ -153,24 +139,9 @@ struct SidebarProjectList: View {
                         Divider()
                         Button("Close Project", role: .destructive) { controller.removeSession(session) }
                     }
+                } onReorder: { from, to in
+                    controller.workspace.sessions.move(fromOffsets: IndexSet(integer: from), toOffset: to)
                 }
-
-                // Trailing drop zone — allows dropping to the very end
-                Color.clear
-                    .frame(height: 20)
-                    .onDrop(of: [.text], isTargeted: nil) { providers in
-                        guard let draggedId = draggedSessionId,
-                              let from = controller.workspace.sessions.firstIndex(where: { $0.id == draggedId })
-                        else { return false }
-                        let to = controller.workspace.sessions.count
-                        if from != to - 1 {
-                            withAnimation {
-                                controller.workspace.sessions.move(fromOffsets: IndexSet(integer: from), toOffset: to)
-                            }
-                        }
-                        draggedSessionId = nil
-                        return true
-                    }
             }
             .padding(.horizontal, 0)
             .padding(.top, 4)
