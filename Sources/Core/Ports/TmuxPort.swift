@@ -58,7 +58,8 @@ public protocol TmuxPort {
     func listPanes(tab: String) async -> [PaneInfo]
     func listAllPanes() async -> [PaneInfo]
 
-    func newProject(name: String, path: String) async
+    @discardableResult
+    func newProject(name: String, path: String) async -> Bool
     func killProject(name: String) async
     func renameProject(target: String, newName: String) async
 
@@ -84,6 +85,10 @@ public protocol TmuxPort {
     /// Capture the last N visible lines of a pane's terminal content.
     func capturePaneContent(id: String, lastN: Int) async -> String?
 
-    func startControlMode(onEvent: @escaping @Sendable (String) -> Void)
+    func startControlMode(
+        onEvent: @escaping @Sendable (String) -> Void,
+        onDisconnect: (@Sendable () -> Void)?,
+        onReconnect: (@Sendable () -> Void)?
+    )
     func stopControlMode()
 }

@@ -10,8 +10,11 @@ final class TmuxControlMode: @unchecked Sendable {
     private let socketName: String
     private let configPath: String?
     private var onEvent: (@Sendable (String) -> Void)?
+    private var onDisconnect: (@Sendable () -> Void)?
+    private var onReconnect: (@Sendable () -> Void)?
     private var shouldReconnect = false
     private var consecutiveFailures = 0
+    private var wasDisconnected = false
     private let maxRetries = 5
     private let lock = NSLock()
 
@@ -21,11 +24,18 @@ final class TmuxControlMode: @unchecked Sendable {
         self.configPath = configPath
     }
 
-    func start(onEvent: @escaping @Sendable (String) -> Void) {
+    func start(
+        onEvent: @escaping @Sendable (String) -> Void,
+        onDisconnect: (@Sendable () -> Void)? = nil,
+        onReconnect: (@Sendable () -> Void)? = nil
+    ) {
         lock.lock()
         self.onEvent = onEvent
+        self.onDisconnect = onDisconnect
+        self.onReconnect = onReconnect
         self.shouldReconnect = true
         self.consecutiveFailures = 0
+        self.wasDisconnected = false
         lock.unlock()
         launchProcess()
     }
@@ -114,7 +124,15 @@ final class TmuxControlMode: @unchecked Sendable {
 
                 let data = handle.availableData
                 if data.isEmpty { break }
-                receivedData = true
+                if !receivedData {
+                    receivedData = true
+                    self.lock.lock()
+                    let wasDisc = self.wasDisconnected
+                    if wasDisc { self.wasDisconnected = false }
+                    let reconnectCallback = wasDisc ? self.onReconnect : nil
+                    self.lock.unlock()
+                    reconnectCallback?()
+                }
                 if let text = String(data: data, encoding: .utf8) {
                     self.handleOutput(text)
                 }
@@ -130,15 +148,18 @@ final class TmuxControlMode: @unchecked Sendable {
         stdin = nil
 
         if wasConnected {
-            // Successful connection that later dropped — reset failure counter
             consecutiveFailures = 0
+            wasDisconnected = true
         } else {
             consecutiveFailures += 1
         }
 
         let failures = consecutiveFailures
         let shouldReconnect = self.shouldReconnect && failures < maxRetries
+        let disconnectCallback = wasConnected ? onDisconnect : nil
         lock.unlock()
+
+        disconnectCallback?()
 
         guard shouldReconnect else {
             if failures >= maxRetries {

@@ -42,8 +42,8 @@ final class TmuxAdapter: TmuxPort {
         return TmuxStateParser.parsePanes(output)
     }
 
-    func newProject(name: String, path: String) async {
-        _ = await runner.run("new-session", "-d", "-s", name, "-c", path)
+    func newProject(name: String, path: String) async -> Bool {
+        await runner.run("new-session", "-d", "-s", name, "-c", path) != nil
     }
 
     func killProject(name: String) async {
@@ -117,8 +117,12 @@ final class TmuxAdapter: TmuxPort {
         await runner.run("capture-pane", "-p", "-t", id, "-S", "-\(lastN)")
     }
 
-    func startControlMode(onEvent: @escaping @Sendable (String) -> Void) {
-        controlMode.start(onEvent: onEvent)
+    func startControlMode(
+        onEvent: @escaping @Sendable (String) -> Void,
+        onDisconnect: (@Sendable () -> Void)?,
+        onReconnect: (@Sendable () -> Void)?
+    ) {
+        controlMode.start(onEvent: onEvent, onDisconnect: onDisconnect, onReconnect: onReconnect)
     }
 
     func stopControlMode() {

@@ -27,3 +27,4 @@ What follows from this decision — both good and bad?
 - [0001: Notifications for cross-view communication](0001-notifications-for-cross-view-comms.md) — **superseded by 0003**
 - [0002: AttentionManager lives in Features/Attention](0002-attention-manager-in-app-layer.md) — **resolved**
 - [0003: Unified command dispatch via AppCommand + AppState](0003-unified-command-dispatch.md)
+- [0004: Eventual consistency for tmux commands](0004-eventual-consistency-for-tmux-commands.md)

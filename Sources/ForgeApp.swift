@@ -37,11 +37,11 @@ extension NSColor {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let configStore = ForgeConfigStore.shared
-    lazy var controller = WorkspaceController(tmux: TmuxAdapter(), git: GitAdapter(), config: configStore)
+    let toastState = NotificationToastState()
+    lazy var controller = WorkspaceController(tmux: TmuxAdapter(), git: GitAdapter(), config: configStore, toastState: toastState)
     let appState = AppState(sidebarVisible: ForgeConfig.load().uiState?.sidebarVisible ?? true)
     let commandRegistry = CommandRegistry()
     let modifierKeyMonitor = ModifierKeyMonitor()
-    let toastState = NotificationToastState()
     private(set) var attentionManager: AttentionManager!
     private let debugServer = DebugServer()
     private var mainWindow: NSWindow?

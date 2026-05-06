@@ -103,8 +103,9 @@ Sources/
 - `DispatchQueue` only in adapter internals where required by underlying APIs.
 
 ### Error Handling
-- Adapter calls that mutate state must propagate failure. Fire-and-forget `Task {}` is only acceptable for read-only side effects (logging, analytics).
-- When a mutating adapter call fails, surface feedback to the user (toast, log, or revert optimistic update).
+- **Request-response adapter calls** (e.g., `TmuxCommandRunner.run()`): propagate failure to the caller. Show a toast on failure.
+- **Fire-and-forget channels** (e.g., tmux control mode): the refresh cycle is the consistency mechanism. Don't fake synchronous error handling — the next state merge will correct any divergence.
+- **Optimistic UI updates**: permitted only for drag interactions (reorder, swap) where latency matters. All other mutations wait for the refresh cycle to confirm the change.
 
 ### Testing Strategy
 - **Core**: TDD with Swift Testing (`@Test`, `#expect`). Pure logic, no side effects.

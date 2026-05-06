@@ -11,6 +11,7 @@ final class WorkspaceController {
     let workspace = Workspace()
     var attentionManager: AttentionManager?
     let config: ForgeConfigStore
+    let toastState: NotificationToastState
     let syncEngine: TmuxSyncEngine
     let tmux: any TmuxPort
     private let git: any GitPort
@@ -19,10 +20,11 @@ final class WorkspaceController {
 
     var gitBranch: String? { syncEngine.gitBranch }
 
-    init(tmux: any TmuxPort, git: any GitPort, config: ForgeConfigStore) {
+    init(tmux: any TmuxPort, git: any GitPort, config: ForgeConfigStore, toastState: NotificationToastState) {
         self.tmux = tmux
         self.git = git
         self.config = config
+        self.toastState = toastState
         self.syncEngine = TmuxSyncEngine(workspace: workspace, tmux: tmux, git: git, config: config)
         self.uiState = UIStatePersistence(config: config)
     }
@@ -49,11 +51,28 @@ final class WorkspaceController {
             let allUUIDs = Set(workspace.projects.flatMap { $0.tabs.map(\.uuid) })
             attentionManager?.pruneStaleHiddenEntries(validUUIDs: allUUIDs)
 
-            tmux.startControlMode { [weak self] event in
-                Task { @MainActor in
-                    self?.handleEvent(event)
+            tmux.startControlMode(
+                onEvent: { [weak self] event in
+                    Task { @MainActor in
+                        self?.handleEvent(event)
+                    }
+                },
+                onDisconnect: { [weak self] in
+                    Task { @MainActor in
+                        self?.toastState.show(
+                            title: "Connection lost",
+                            message: "Reconnecting to tmux...",
+                            icon: "exclamationmark.triangle.fill",
+                            duration: 300
+                        )
+                    }
+                },
+                onReconnect: { [weak self] in
+                    Task { @MainActor in
+                        self?.toastState.dismiss()
+                    }
                 }
-            }
+            )
 
             syncEngine.start()
             workspace.connected = true

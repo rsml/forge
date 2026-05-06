@@ -53,7 +53,15 @@ extension WorkspaceController {
     }
 
     func addProject(name: String, path: String) async {
-        await tmux.newProject(name: name, path: path)
+        let success = await tmux.newProject(name: name, path: path)
+        guard success else {
+            toastState.show(
+                title: "Failed to create project",
+                message: "Could not create tmux session \"\(name)\"",
+                icon: "exclamationmark.triangle.fill"
+            )
+            return
+        }
         await syncEngine.refresh()
         if let project = workspace.projects.first(where: { $0.name == name }) {
             selectProject(project)
@@ -146,17 +154,6 @@ extension WorkspaceController {
                     if config.general == nil { config.general = ForgeConfig.GeneralSettings() }
                     config.general!.warnOnMoveTab = false
                 }
-            }
-        }
-
-        if let idx = source.tabs.firstIndex(where: { $0.id == tab.id }) {
-            source.tabs.remove(at: idx)
-        }
-        target.tabs.append(tab)
-
-        if source.id == workspace.activeProjectId, workspace.activeTabId == tab.id {
-            if let next = source.tabs.first {
-                selectTab(next)
             }
         }
 
