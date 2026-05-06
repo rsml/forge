@@ -11,6 +11,7 @@ final class AttentionManager: AttentionPort {
     private let config: ForgeConfigStore
 
     var currentWindowUUID: UUID? { queue.peek() }
+    var nextWindowUUID: UUID? { queue.peekSecond() }
     var queueCount: Int { queue.count }
 
     init(notifier: any NotificationPort, config: ForgeConfigStore) {

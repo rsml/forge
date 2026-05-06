@@ -207,26 +207,17 @@ struct ForgeMenuCommands: Commands {
             if ForgeConfigStore.shared.isStackMode {
                 Divider()
                 Button("Done") {
-                    guard let uuid = controller.attentionManager?.currentWindowUUID else { return }
-                    if let (_, window) = controller.workspace.findWindow(byUUID: uuid) {
-                        for pane in window.panes {
-                            pane.hasBell = false
-                            pane.hasContentMatch = false
-                        }
-                    }
-                    controller.attentionManager?.markDone(uuid)
+                    NotificationCenter.default.post(name: .forgeStackDone, object: nil)
                 }
                 .keyboardShortcut(KeyboardShortcuts.stackDone.key, modifiers: KeyboardShortcuts.stackDone.modifiers)
 
                 Button("Disable Notifications") {
-                    guard let uuid = controller.attentionManager?.currentWindowUUID else { return }
-                    controller.attentionManager?.hide(uuid)
+                    NotificationCenter.default.post(name: .forgeStackHide, object: nil)
                 }
                 .keyboardShortcut(KeyboardShortcuts.stackHide.key, modifiers: KeyboardShortcuts.stackHide.modifiers)
 
                 Button("Move to Back") {
-                    guard let uuid = controller.attentionManager?.currentWindowUUID else { return }
-                    controller.attentionManager?.moveToBack(uuid)
+                    NotificationCenter.default.post(name: .forgeStackMoveToBack, object: nil)
                 }
                 .keyboardShortcut(KeyboardShortcuts.stackMoveToBack.key, modifiers: KeyboardShortcuts.stackMoveToBack.modifiers)
             }
@@ -290,6 +281,9 @@ extension Notification.Name {
     static let forgeRenameProject = Notification.Name("forgeRenameProject")
     static let forgeToggleMode = Notification.Name("forgeToggleMode")
     static let forgeWindowTitleChanged = Notification.Name("forgeWindowTitleChanged")
+    static let forgeStackDone = Notification.Name("forgeStackDone")
+    static let forgeStackHide = Notification.Name("forgeStackHide")
+    static let forgeStackMoveToBack = Notification.Name("forgeStackMoveToBack")
 }
 
 // MARK: - NSColor Helpers
@@ -598,7 +592,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         splitH.bezelStyle = .accessoryBarAction
         splitH.contentTintColor = .secondaryLabelColor
         splitH.imageScaling = .scaleProportionallyDown
-        splitH.toolTip = KeyboardShortcuts.splitHorizontal.tooltip
+        splitH.setForgeTooltip(KeyboardShortcuts.splitHorizontal, hoverTint: true)
         splitH.translatesAutoresizingMaskIntoConstraints = false
 
         let splitV = NSButton(image: NSImage(systemSymbolName: "rectangle.split.1x2", accessibilityDescription: "Split Vertically")!, target: self, action: #selector(splitVerticalAction))
@@ -606,7 +600,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         splitV.bezelStyle = .accessoryBarAction
         splitV.contentTintColor = .secondaryLabelColor
         splitV.imageScaling = .scaleProportionallyDown
-        splitV.toolTip = KeyboardShortcuts.splitVertical.tooltip
+        splitV.setForgeTooltip(KeyboardShortcuts.splitVertical, hoverTint: true)
         splitV.translatesAutoresizingMaskIntoConstraints = false
 
         splitHButton = splitH
@@ -618,7 +612,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         listBtn.bezelStyle = .accessoryBarAction
         listBtn.contentTintColor = .secondaryLabelColor
         listBtn.imageScaling = .scaleProportionallyDown
-        listBtn.toolTip = KeyboardShortcuts.toggleMode.tooltip
+        listBtn.setForgeTooltip("Switch to List Mode", hint: KeyboardShortcuts.toggleMode.hint, hoverTint: true)
         listBtn.translatesAutoresizingMaskIntoConstraints = false
         listModeButton = listBtn
 
@@ -634,7 +628,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // In stack mode, list button sits at 78px (after traffic lights), path follows it.
         // In list mode, list button is hidden and path uses pathLabelLeadingConstraint directly.
         NSLayoutConstraint.activate([
-            listBtn.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 70),
+            listBtn.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 82),
             listBtn.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
             listBtn.widthAnchor.constraint(equalToConstant: 28),
             listBtn.heightAnchor.constraint(equalToConstant: 28),
@@ -698,7 +692,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if isStack {
             overlayLeadingConstraint?.constant = 0
             overlayTrailingConstraint?.constant = 0
-            pathLabelLeadingConstraint?.constant = 106  // 70 (button leading) + 28 (button) + 8 (gap)
+            pathLabelLeadingConstraint?.constant = 118  // 82 (button leading) + 28 (button) + 8 (gap)
             return
         }
 

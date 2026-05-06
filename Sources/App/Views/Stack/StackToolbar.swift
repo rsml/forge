@@ -4,7 +4,7 @@ import ForgeDomain
 struct StackToolbar: View {
     let session: Session
     let window: ForgeDomain.Window
-    @Environment(AttentionManager.self) var attention
+    var onDismiss: ((WorkspaceController.StackDismissAction) -> Void)?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -38,26 +38,24 @@ struct StackToolbar: View {
     private var actionButtons: some View {
         HStack(spacing: 0) {
             IconButton(systemName: "checkmark") {
-                for pane in window.panes {
-                    pane.hasBell = false
-                    pane.hasContentMatch = false
-                }
-                attention.markDone(window.uuid)
+                onDismiss?(.done)
             }
             .frame(width: 40, height: 28)
             .tooltip(KeyboardShortcuts.stackDone)
 
             IconButton(systemName: "bell.slash") {
-                attention.hide(window.uuid)
+                onDismiss?(.hide)
             }
             .frame(width: 40, height: 28)
-            .tooltip("Disable Notifications")
+            .tooltip("Disable Notifications", shortcut: KeyboardShortcuts.stackHide)
 
             IconButton(systemName: "arrow.right.to.line") {
-                attention.moveToBack(window.uuid)
+                onDismiss?(.moveToBack)
             }
             .frame(width: 40, height: 28)
             .tooltip(KeyboardShortcuts.stackMoveToBack)
         }
+        .opacity(onDismiss == nil ? 0.5 : 1.0)
+        .allowsHitTesting(onDismiss != nil)
     }
 }

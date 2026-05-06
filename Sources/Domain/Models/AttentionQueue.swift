@@ -45,6 +45,12 @@ public struct AttentionQueue {
         items.first
     }
 
+    /// Returns the second item without removing it, or `nil` if fewer than two items.
+    public func peekSecond() -> UUID? {
+        guard items.count >= 2 else { return nil }
+        return items[1]
+    }
+
     /// Returns `true` if the queue contains `id`.
     public func contains(_ id: UUID) -> Bool {
         items.contains(id)

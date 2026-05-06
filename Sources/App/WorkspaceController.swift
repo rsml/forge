@@ -105,6 +105,29 @@ final class WorkspaceController {
 
     // MARK: - Actions
 
+    enum StackDismissAction {
+        case done, hide, moveToBack
+    }
+
+    func stackDismiss(_ action: StackDismissAction) {
+        guard let attention = attentionManager,
+              let uuid = attention.currentWindowUUID else { return }
+        switch action {
+        case .done:
+            if let (_, window) = workspace.findWindow(byUUID: uuid) {
+                for pane in window.panes {
+                    pane.hasBell = false
+                    pane.hasContentMatch = false
+                }
+            }
+            attention.markDone(uuid)
+        case .hide:
+            attention.hide(uuid)
+        case .moveToBack:
+            attention.moveToBack(uuid)
+        }
+    }
+
     func selectSession(_ session: Session) {
         // Save current window for the session we're leaving
         if let currentSessionId = workspace.activeSessionId {

@@ -11,11 +11,8 @@ struct NotificationCenterRow: View {
         store.isStackMode ? "list.bullet" : "rectangle.stack"
     }
 
-    private var tooltipText: String {
-        let shortcut = KeyboardShortcuts.toggleMode.hint
-        return store.isStackMode
-            ? "Toggle List Mode (\(shortcut))"
-            : "Toggle Stack Mode (\(shortcut))"
+    private var modeLabel: String {
+        store.isStackMode ? "Switch to List Mode" : "Switch to Stack Mode"
     }
 
     /// Center the icon unless: NOT fullscreen AND sidebar is left-aligned.
@@ -40,7 +37,7 @@ struct NotificationCenterRow: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .tooltip(tooltipText)
+            .tooltip(modeLabel, shortcut: KeyboardShortcuts.toggleMode)
 
             if shouldCenter {
                 Spacer(minLength: 0)

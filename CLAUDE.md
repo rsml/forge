@@ -1,6 +1,6 @@
 # Forge
 
-Native macOS tmux frontend built with SwiftUI (macOS 14+, Swift 6.0). Uses SwiftTerm for terminal rendering.
+Native macOS tmux frontend built with SwiftUI (macOS 14+, Swift 6.0). Uses SwiftTerm for terminal rendering. Architecture follows Domain-Driven Design with Ports & Adapters (hexagonal architecture) — domain logic is isolated in `Domain/`, external concerns live in `Adapters/`, and boundaries are defined by port protocols.
 
 ## Build & Test
 
@@ -55,6 +55,19 @@ tail -20 /tmp/forge.log
 ```
 
 Log categories: `[app]`, `[control]`, `[tmux]`, `[attention]`, `[debug]`
+
+## Naming Conventions
+
+- **No "Forge" prefix** in function, method, or type names — the module boundary provides namespace. Exception: notification names (`.forgeCommandPalette`) and config types (`ForgeConfig`) that cross module boundaries.
+- **Project** = a tmux session. Always top-level, never nested. Displayed in the sidebar. Maps to `Session` in the domain model.
+- **Tab** = a tmux window inside a project. Always nested inside a project. Displayed in the tab bar and as sub-items in the sidebar. Maps to `Window` in the domain model.
+- Use "Project" and "Tab" consistently in all user-facing text (tooltips, labels, menu items, command palette). Never use "Session" or "Window" in UI — those are domain model names only.
+
+## UI Conventions
+
+- **Tooltips**: All icon buttons use the custom tooltip system (`Tooltip.swift`), never native `.toolTip` or `.help()`. Format: label on first line, keyboard shortcut on second line (no parens). Use `.tooltip(Shortcut)` or `.tooltip(label, shortcut:)` for SwiftUI views; `.setForgeTooltip()` for AppKit views.
+- **Icon buttons**: SwiftUI icons use `IconButton` (hover: secondary→primary). AppKit `NSButton` icons in the title bar must use `hoverTint: true` in `setForgeTooltip()` to match. When touching any icon button, verify it has both a tooltip and correct hover behavior.
+- **Truncation tooltips**: Sidebar text (project names, tab names) uses `TruncatingText` which shows a tooltip only when ellipsized.
 
 ## Verification Checklist
 

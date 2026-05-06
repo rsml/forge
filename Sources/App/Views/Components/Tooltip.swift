@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Tooltip Panel (floating NSPanel, pure AppKit rendering)
 
 @MainActor
-private final class TooltipPanel: NSPanel {
+final class TooltipPanel: NSPanel {
     static let shared = TooltipPanel()
     private weak var ownerWindow: NSWindow?
     private var generation = 0
@@ -131,6 +131,74 @@ private final class TooltipPanel: NSPanel {
     }
 }
 
+// MARK: - AppKit Tooltip Tracker (for NSView/NSButton in title bar etc.)
+
+@MainActor
+final class TooltipTracker: NSObject {
+    private let label: String
+    private let hint: String?
+    private let hoverTint: Bool
+    private weak var view: NSView?
+    private var showTask: Task<Void, Never>?
+
+    init(view: NSView, label: String, hint: String? = nil, hoverTint: Bool = false) {
+        self.label = label
+        self.hint = hint
+        self.hoverTint = hoverTint
+        self.view = view
+        super.init()
+        let area = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        view.addTrackingArea(area)
+    }
+
+    @objc func mouseEntered(with event: NSEvent) {
+        if hoverTint, let btn = view as? NSButton {
+            btn.contentTintColor = .labelColor
+        }
+        showTask?.cancel()
+        showTask = Task {
+            try? await Task.sleep(for: .seconds(0.5))
+            guard !Task.isCancelled, let view, let window = view.window else { return }
+            let windowRect = view.convert(view.bounds, to: nil)
+            let screenRect = window.convertToScreen(windowRect)
+            TooltipPanel.shared.show(
+                label: label, hint: hint,
+                anchorScreenRect: screenRect,
+                ownerWindow: window
+            )
+        }
+    }
+
+    @objc func mouseExited(with event: NSEvent) {
+        if hoverTint, let btn = view as? NSButton {
+            btn.contentTintColor = .secondaryLabelColor
+        }
+        showTask?.cancel()
+        showTask = nil
+        TooltipPanel.shared.hideTooltip()
+    }
+}
+
+private nonisolated(unsafe) var tooltipTrackerKey: UInt8 = 0
+
+extension NSView {
+    @MainActor
+    func setForgeTooltip(_ label: String, hint: String? = nil, hoverTint: Bool = false) {
+        let tracker = TooltipTracker(view: self, label: label, hint: hint, hoverTint: hoverTint)
+        objc_setAssociatedObject(self, &tooltipTrackerKey, tracker, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    }
+
+    @MainActor
+    func setForgeTooltip(_ shortcut: Shortcut, hoverTint: Bool = false) {
+        setForgeTooltip(shortcut.label, hint: shortcut.hint, hoverTint: hoverTint)
+    }
+}
+
 // MARK: - Anchor (NSView bridge to get screen coordinates)
 
 private final class TooltipAnchorView: NSView {}
@@ -194,5 +262,9 @@ extension View {
 
     func tooltip(_ shortcut: Shortcut) -> some View {
         modifier(TooltipModifier(label: shortcut.label, hint: shortcut.hint, delay: 0.5))
+    }
+
+    func tooltip(_ text: String, shortcut: Shortcut) -> some View {
+        modifier(TooltipModifier(label: text, hint: shortcut.hint, delay: 0.5))
     }
 }

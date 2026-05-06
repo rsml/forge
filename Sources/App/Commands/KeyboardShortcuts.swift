@@ -123,11 +123,6 @@ struct Shortcut {
         return parts.joined()
     }
 
-    /// Label with shortcut hint, e.g. "Split Horizontally (⌘D)"
-    var tooltip: String {
-        "\(label) (\(hint))"
-    }
-
     private var keyLabel: String {
         switch key {
         case .leftArrow: return "←"
