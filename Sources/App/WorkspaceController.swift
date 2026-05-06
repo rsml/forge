@@ -119,6 +119,12 @@ final class WorkspaceController {
     }
 
     func removeSession(_ session: Session) {
+        if let index = workspace.sessions.firstIndex(where: { $0.id == session.id }) {
+            let nextIndex = index > 0 ? index - 1 : min(1, workspace.sessions.count - 1)
+            if nextIndex != index {
+                selectSession(workspace.sessions[nextIndex])
+            }
+        }
         Task { await tmux.killSession(name: session.name) }
     }
 
