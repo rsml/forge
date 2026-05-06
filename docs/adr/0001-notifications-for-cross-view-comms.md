@@ -1,6 +1,6 @@
 # 0001: Notifications for Cross-View Communication
 
-**Status:** accepted (under review — may be superseded by a unified command bus)
+**Status:** superseded by [0003](0003-unified-command-dispatch.md)
 **Date:** 2026-05-06
 
 ## Context
@@ -23,4 +23,4 @@ Use `NotificationCenter.default.post(name:)` with app-specific notification name
 - Mixes with other dispatch mechanisms (direct controller method calls, closure callbacks) — the codebase now has three ways to trigger the same class of action. This is the primary friction point.
 - No type safety on notification payloads.
 
-**Open question:** A unified command enum (`AppCommand`) dispatched through a single handler would consolidate these three mechanisms. If pursued, this ADR would be superseded.
+**Superseded:** Replaced by `AppCommand` enum + `AppState` observable dispatch in ADR-0003.

@@ -1,25 +1,21 @@
-# 0002: AttentionManager Lives in App Layer
+# 0002: AttentionManager Lives in Features/Attention
 
-**Status:** accepted (known violation — should migrate to Adapters/)
-**Date:** 2026-05-06
+**Status:** resolved
+**Date:** 2026-05-06 (updated 2026-05-06)
 
 ## Context
 
-`AttentionManager` implements `AttentionPort` (defined in `Domain/Ports/`). The hexagonal rule is: port implementations live in `Adapters/`. However, `AttentionManager` was placed in `App/` because it wires together multiple concerns: it owns an `AttentionQueue` (domain), calls `NotificationPort.send()` (adapter), reads config from `ForgeConfigStore` (adapter), and is injected into views via `@Environment`.
+`AttentionManager` implements `AttentionPort` (defined in `Core/Ports/`). The original hexagonal rule was "port implementations live in Adapters." However, AttentionManager wires together multiple concerns: it owns an `AttentionQueue` (domain), calls `NotificationPort.send()` (adapter), reads config from `ForgeConfigStore`, and is injected into views via `@Environment`.
 
 ## Decision
 
-`AttentionManager` lives in `Sources/App/` despite implementing a domain port. This was a pragmatic choice during initial development — it needed access to both the notification adapter and the config store, and placing it in App made wiring simpler.
+`AttentionManager` lives in `Sources/Features/Attention/`. Under the feature-based architecture adopted in the folder migration, feature-specific adapters live inside the feature. `MacNotificationAdapter` (which implements `NotificationPort`) also lives in `Features/Attention/`.
 
-## Consequences
+## Resolution
 
-**Good:**
-- Simple wiring in `AppDelegate` — all dependencies are right there.
-- Easy to inject into SwiftUI views via `@Environment`.
+The original concerns have been addressed:
+- **Location:** Moved from `App/` to `Features/Attention/` — correct per the feature-based architecture rules.
+- **Config coupling:** `ForgeConfigStore` is now constructor-injected, not accessed via `.shared`.
+- **Content scanning:** `AttentionManager` now owns `ContentDetector` and content scanning, registered as a post-refresh hook on `TmuxSyncEngine`. This makes it a proper vertical slice owning all attention-related concerns.
 
-**Bad:**
-- Violates the architectural rule that port implementations belong in `Adapters/`.
-- Couples `AttentionManager` to `ForgeConfigStore.shared` directly instead of injecting config.
-- Sets a precedent that port implementations can live anywhere.
-
-**Migration path:** Move to `Sources/Adapters/Attention/AttentionManager.swift`. Inject config persistence via a closure or small protocol instead of importing `ForgeConfigStore` directly. The `@Environment` injection in `AppDelegate` doesn't need to change — only the file location and import.
+No further migration needed.
