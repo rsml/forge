@@ -40,7 +40,7 @@ struct NotificationCenterRow: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(tooltipText)
+            .tooltip(tooltipText)
 
             if shouldCenter {
                 Spacer(minLength: 0)

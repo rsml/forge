@@ -38,7 +38,7 @@ struct TruncatingText: View {
             .onPreferenceChange(VisibleWidthKey.self) { visibleWidth in
                 checkTruncation(visibleWidth: visibleWidth)
             }
-            .help(isTruncated ? text : "")
+            .tooltip(isTruncated ? text : nil)
     }
 
     @State private var lastFullWidth: CGFloat = 0

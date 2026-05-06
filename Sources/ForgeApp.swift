@@ -421,6 +421,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 self.updateSplitIconVisibility()
                 self.updateWindowTitle()
+                // Recalculate after SwiftUI settles the sidebar layout
+                DispatchQueue.main.async {
+                    self.updateOverlayConstraints()
+                }
             }
         }
 

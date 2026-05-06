@@ -45,19 +45,19 @@ struct StackToolbar: View {
                 attention.markDone(window.uuid)
             }
             .frame(width: 40, height: 28)
-            .help(KeyboardShortcuts.stackDone.tooltip)
+            .tooltip(KeyboardShortcuts.stackDone)
 
             IconButton(systemName: "bell.slash") {
                 attention.hide(window.uuid)
             }
             .frame(width: 40, height: 28)
-            .help("Disable Notifications")
+            .tooltip("Disable Notifications")
 
             IconButton(systemName: "arrow.right.to.line") {
                 attention.moveToBack(window.uuid)
             }
             .frame(width: 40, height: 28)
-            .help(KeyboardShortcuts.stackMoveToBack.tooltip)
+            .tooltip(KeyboardShortcuts.stackMoveToBack)
         }
     }
 }

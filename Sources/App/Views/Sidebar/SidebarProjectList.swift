@@ -50,26 +50,26 @@ struct SidebarProjectList: View {
         HStack(spacing: 0) {
             if position == "right" {
                 IconButton(systemName: "sidebar.right") { onToggleSidebar() }
-                    .help(KeyboardShortcuts.toggleSidebar.tooltip)
+                    .tooltip(KeyboardShortcuts.toggleSidebar)
                 IconButton(systemName: "command") {
                     NotificationCenter.default.post(name: .forgeCommandPalette, object: nil)
                 }
-                .help(KeyboardShortcuts.commandPalette.tooltip)
+                .tooltip(KeyboardShortcuts.commandPalette)
                 IconButton(systemName: "plus") {
                     NotificationCenter.default.post(name: .forgeNewProject, object: nil)
                 }
-                .help(KeyboardShortcuts.newProject.tooltip)
+                .tooltip(KeyboardShortcuts.newProject)
             } else {
                 IconButton(systemName: "plus") {
                     NotificationCenter.default.post(name: .forgeNewProject, object: nil)
                 }
-                .help(KeyboardShortcuts.newProject.tooltip)
+                .tooltip(KeyboardShortcuts.newProject)
                 IconButton(systemName: "command") {
                     NotificationCenter.default.post(name: .forgeCommandPalette, object: nil)
                 }
-                .help(KeyboardShortcuts.commandPalette.tooltip)
+                .tooltip(KeyboardShortcuts.commandPalette)
                 IconButton(systemName: "sidebar.left") { onToggleSidebar() }
-                    .help(KeyboardShortcuts.toggleSidebar.tooltip)
+                    .tooltip(KeyboardShortcuts.toggleSidebar)
             }
         }
         .frame(height: ForgeConfigStore.shared.titlebarHeight)

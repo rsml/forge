@@ -93,6 +93,15 @@ final class TmuxAdapter: TmuxPort {
         controlMode.send("swap-window -s \(id) -t \(target)")
     }
 
+    func reorderWindow(id: String, fromIndex: Int, toIndex: Int) async {
+        let direction = toIndex > fromIndex ? 1 : -1
+        let swaps = abs(toIndex - fromIndex)
+        for _ in 0..<swaps {
+            let target = direction > 0 ? "+1" : "-1"
+            controlMode.send("swap-window -s \(id) -t \(target)")
+        }
+    }
+
     func moveWindow(id: String, toSession: String) async {
         controlMode.send("move-window -s \(id) -t '\(toSession):'")
     }

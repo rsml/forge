@@ -26,6 +26,7 @@ struct SessionRow: View {
     var onTabDraggedOut: ((ForgeDomain.Window, Edge) -> Void)?
     var projectIndex: Int = 0
 
+    @Environment(WorkspaceController.self) var controller
     @Environment(AttentionManager.self) var attention
     @State private var isHeaderHovered = false
     @State private var isChevronHovered = false
@@ -130,7 +131,7 @@ struct SessionRow: View {
                         .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)
                     }
                 } onReorder: { from, to in
-                    session.windows.move(fromOffsets: IndexSet(integer: from), toOffset: to)
+                    controller.reorderWindow(in: session, from: from, to: to)
                 } onDragExit: { index, edge in
                     guard let onTabDraggedOut, index < session.windows.count else { return }
                     onTabDraggedOut(session.windows[index], edge)

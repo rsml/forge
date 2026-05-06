@@ -26,7 +26,7 @@ struct WindowTabBar: View {
                 if !sidebarVisible && sidebarPosition != "right" {
                     IconButton(systemName: "sidebar.left") { onToggleSidebar() }
                         .frame(width: 40, height: 28)
-                        .help(KeyboardShortcuts.toggleSidebar.tooltip)
+                        .tooltip(KeyboardShortcuts.toggleSidebar)
                 }
 
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -79,7 +79,7 @@ struct WindowTabBar: View {
                             }
                         }
                     } onReorder: { from, to in
-                        session.windows.move(fromOffsets: IndexSet(integer: from), toOffset: to)
+                        controller.reorderWindow(in: session, from: from, to: to)
                     }
                     .padding(.horizontal, 4)
                 }
@@ -106,20 +106,20 @@ struct WindowTabBar: View {
                         controller.splitPane(direction: .horizontal)
                     }
                     .frame(width: 40, height: 28)
-                    .help(KeyboardShortcuts.splitHorizontal.tooltip)
+                    .tooltip(KeyboardShortcuts.splitHorizontal)
 
                     IconButton(systemName: "rectangle.split.1x2") {
                         controller.splitPane(direction: .vertical)
                     }
                     .frame(width: 40, height: 28)
-                    .help(KeyboardShortcuts.splitVertical.tooltip)
+                    .tooltip(KeyboardShortcuts.splitVertical)
                 }
 
                 // Show sidebar toggle when sidebar is hidden (right position)
                 if !sidebarVisible && sidebarPosition == "right" {
                     IconButton(systemName: "sidebar.right") { onToggleSidebar() }
                         .frame(width: 40, height: 28)
-                        .help(KeyboardShortcuts.toggleSidebar.tooltip)
+                        .tooltip(KeyboardShortcuts.toggleSidebar)
                 }
             }
         .frame(height: 28)

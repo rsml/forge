@@ -76,11 +76,12 @@ final class WorkspaceController {
         for session in workspace.sessions {
             for window in session.windows {
                 for pane in window.panes where pane.status == .running {
-                    if let content = await tmux.capturePaneContent(id: pane.id, lastN: 5) {
+                    if let content = await tmux.capturePaneContent(id: pane.id, lastN: pane.height) {
                         let isNewMatch = contentDetector.scan(
                             paneId: pane.id, content: content, patterns: patterns
                         )
                         if isNewMatch {
+                            ForgeLog.log("[attention] Content match in pane \(pane.id): \(content.suffix(80))")
                             pane.hasContentMatch = true
                             attentionManager?.handleEvent(.contentMatch(windowUUID: window.uuid))
                         }
@@ -287,6 +288,18 @@ final class WorkspaceController {
         Task { await tmux.splitWindow(id: windowId, direction: direction) }
     }
 
+    func reorderWindow(in session: Session, from: Int, to: Int) {
+        guard from >= 0, from < session.windows.count else { return }
+        let window = session.windows[from]
+
+        // Optimistic update
+        session.windows.move(fromOffsets: IndexSet(integer: from), toOffset: to)
+
+        // Persist — adapter handles the how
+        let finalIndex = to > from ? to - 1 : to
+        Task { await tmux.reorderWindow(id: window.id, fromIndex: from, toIndex: finalIndex) }
+    }
+
     func swapWindow(offset: Int) {
         guard let windowId = workspace.activeWindowId else { return }
         Task { await tmux.swapWindow(id: windowId, offset: offset) }
@@ -413,42 +426,48 @@ final class WorkspaceController {
     }
 
     private func mergeSessionState(_ infos: [SessionInfo]) {
-        var updated: [Session] = []
-        for info in infos {
-            if let existing = workspace.session(byId: info.id) {
-                existing.name = info.name
-                existing.windowCount = info.windowCount
-                existing.attached = info.attached
-                existing.path = info.path
-                updated.append(existing)
-            } else {
-                updated.append(Session(id: info.id, name: info.name, windowCount: info.windowCount,
-                                      attached: info.attached, path: info.path))
+        let infoById = Dictionary(uniqueKeysWithValues: infos.map { ($0.id, $0) })
+
+        // Update existing sessions in-place (preserves local order)
+        for session in workspace.sessions {
+            if let info = infoById[session.id] {
+                session.name = info.name
+                session.windowCount = info.windowCount
+                session.attached = info.attached
+                session.path = info.path
             }
         }
-        // Remember the index of the active session before replacing the array
+
+        // Remove sessions that no longer exist in tmux
+        let liveIds = Set(infos.map(\.id))
         let oldActiveId = workspace.activeSessionId
         let oldIndex = oldActiveId.flatMap { id in workspace.sessions.firstIndex(where: { $0.id == id }) }
+        let removedActive = oldActiveId.map { !liveIds.contains($0) } ?? false
 
-        workspace.sessions = updated
+        workspace.sessions.removeAll { !liveIds.contains($0.id) }
+
+        // Append new sessions (not yet in local array)
+        let existingIds = Set(workspace.sessions.map(\.id))
+        for info in infos where !existingIds.contains(info.id) {
+            workspace.sessions.append(Session(id: info.id, name: info.name,
+                                              windowCount: info.windowCount,
+                                              attached: info.attached, path: info.path))
+        }
 
         // If the active session was removed, select its neighbor
-        let activeStillExists = workspace.activeSessionId.flatMap { id in
-            updated.contains(where: { $0.id == id })
-        } ?? false
-        if !activeStillExists, !updated.isEmpty {
+        if removedActive, !workspace.sessions.isEmpty {
             let fallbackIndex: Int
             if let oldIndex {
                 fallbackIndex = oldIndex > 0 ? oldIndex - 1 : 0
             } else {
                 fallbackIndex = 0
             }
-            let target = updated[min(fallbackIndex, updated.count - 1)]
+            let target = workspace.sessions[min(fallbackIndex, workspace.sessions.count - 1)]
             workspace.activeSessionId = target.id
             if let window = target.windows.first(where: { $0.active }) ?? target.windows.first {
                 workspace.activeWindowId = window.id
             }
-        } else if workspace.activeSessionId == nil, let first = updated.first {
+        } else if workspace.activeSessionId == nil, let first = workspace.sessions.first {
             workspace.activeSessionId = first.id
         }
     }

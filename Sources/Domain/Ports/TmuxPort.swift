@@ -73,6 +73,7 @@ public protocol TmuxPort {
 
     func splitWindow(id: String, direction: SplitDirection) async
     func swapWindow(id: String, offset: Int) async
+    func reorderWindow(id: String, fromIndex: Int, toIndex: Int) async
     func moveWindow(id: String, toSession: String) async
 
     func sourceConfig(path: String) async

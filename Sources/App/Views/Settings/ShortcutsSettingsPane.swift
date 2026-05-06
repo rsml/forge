@@ -73,7 +73,7 @@ struct ShortcutsSettingsPane: View {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .foregroundStyle(.yellow)
                                     .font(.system(size: 12))
-                                    .help("Conflicts with another shortcut")
+                                    .tooltip("Conflicts with another shortcut")
                             }
 
                             ShortcutRecorder(
