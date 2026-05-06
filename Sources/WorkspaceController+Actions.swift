@@ -139,14 +139,18 @@ extension WorkspaceController {
     }
 
     func moveTab(_ tab: Tab, from source: Project, to target: Project) {
-        if config.config.general?.warnOnMoveTab ?? true {
+        let warnOnMove = config.config.general?.warnOnMoveTab ?? true
+        if let alertInfo = MoveTabConfirmation.evaluate(
+            tabName: tab.name, sourceProjectName: source.name,
+            targetProjectName: target.name, warnOnMoveTab: warnOnMove
+        ) {
             let alert = NSAlert()
-            alert.messageText = "Move tab to \"\(target.name)\"?"
-            alert.informativeText = "\"\(tab.name)\" will be moved from \"\(source.name)\"."
-            alert.addButton(withTitle: "Move Tab")
+            alert.messageText = alertInfo.message
+            alert.informativeText = alertInfo.info
+            alert.addButton(withTitle: alertInfo.action)
             alert.addButton(withTitle: "Cancel")
             alert.showsSuppressionButton = true
-            alert.suppressionButton?.title = "Don't ask again"
+            alert.suppressionButton?.title = alertInfo.suppressionLabel
             alert.alertStyle = .informational
             guard alert.runModal() == .alertFirstButtonReturn else { return }
             if alert.suppressionButton?.state == .on {
@@ -174,17 +178,8 @@ extension WorkspaceController {
         guard from >= 0, from < project.tabs.count else { return }
         let tab = project.tabs[from]
 
-        let finalIndex = to > from ? to - 1 : to
-        var targets: [String] = []
-        if from < finalIndex {
-            for i in (from + 1)...finalIndex {
-                targets.append(project.tabs[i].id)
-            }
-        } else if from > finalIndex {
-            for i in stride(from: from - 1, through: finalIndex, by: -1) {
-                targets.append(project.tabs[i].id)
-            }
-        }
+        let ids = project.tabs.map(\.id)
+        let targets = TabReordering.swapTargets(fromIndex: from, toIndex: to, ids: ids)
 
         project.tabs.move(fromOffsets: IndexSet(integer: from), toOffset: to)
 

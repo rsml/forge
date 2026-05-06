@@ -124,7 +124,7 @@ struct WindowTabBar: View {
                 }
             }
         .frame(height: 28)
-        .background(configStore.resolvedTheme?.background ?? Color(nsColor: .controlBackgroundColor))
+        .background(configStore.resolvedTheme?.background.color ?? Color(nsColor: .controlBackgroundColor))
         .onChange(of: appState.renamingTabId) { _, newId in
             guard let newId, let tab = project.tabs.first(where: { $0.id == newId }) else { return }
             renameText = tab.name

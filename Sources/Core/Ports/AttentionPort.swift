@@ -32,4 +32,13 @@ public protocol AttentionPort: AnyObject {
 
     /// Returns `true` if the tab has been hidden from the queue.
     func isHidden(_ tabUUID: UUID) -> Bool
+
+    /// Remove stale hidden entries that no longer correspond to live tabs.
+    func pruneStaleHiddenEntries(validUUIDs: Set<UUID>)
+
+    /// Move the tab to the front of the queue.
+    func promoteToFront(_ tabUUID: UUID)
+
+    /// Scan all running panes for content pattern matches and fire attention events.
+    func scanForContentMatches(workspace: Workspace, tmux: any TmuxPort) async
 }

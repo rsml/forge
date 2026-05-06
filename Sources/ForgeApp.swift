@@ -65,7 +65,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.attentionManager = attentionManager
 
         createMainWindow()
-        appState.bind(controller: controller, titleBarManager: titleBarManager, attentionManager: attentionManager, config: configStore)
+        appState.bind(
+            controller: controller,
+            attentionManager: attentionManager,
+            config: configStore,
+            onModeChanged: { [weak self] in
+                self?.titleBarManager?.updateSplitIconVisibility()
+                self?.titleBarManager?.updateWindowTitle()
+                DispatchQueue.main.async {
+                    self?.titleBarManager?.updateOverlayConstraints()
+                }
+            }
+        )
         controller.connect()
 
         // Restore expanded project IDs after connect

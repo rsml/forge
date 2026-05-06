@@ -50,14 +50,24 @@ public struct PaneInfo {
 
 public enum SplitDirection { case horizontal, vertical }
 
+// MARK: - Focused Protocols
+
+/// Read-only queries against tmux state.
 @MainActor
-public protocol TmuxPort {
+public protocol TmuxQueryPort {
     func listProjects() async -> [ProjectInfo]
     func listTabs(project: String) async -> [TabInfo]
     func listAllTabs() async -> [TabInfo]
     func listPanes(tab: String) async -> [PaneInfo]
     func listAllPanes() async -> [PaneInfo]
 
+    /// Capture the last N visible lines of a pane's terminal content.
+    func capturePaneContent(id: String, lastN: Int) async -> String?
+}
+
+/// Mutation operations that change tmux state.
+@MainActor
+public protocol TmuxCommandPort {
     @discardableResult
     func newProject(name: String, path: String) async -> Bool
     func killProject(name: String) async
@@ -77,13 +87,14 @@ public protocol TmuxPort {
     func reorderTab(id: String, swapWith: [String]) async
     func moveTab(id: String, toSession: String) async
 
-    var configPath: String? { get }
-
     func sourceConfig(path: String) async
     func clearHistory(pane: String) async
+}
 
-    /// Capture the last N visible lines of a pane's terminal content.
-    func capturePaneContent(id: String, lastN: Int) async -> String?
+/// Control mode lifecycle (starting/stopping the persistent tmux connection).
+@MainActor
+public protocol TmuxControlPort {
+    var configPath: String? { get }
 
     func startControlMode(
         onEvent: @escaping @Sendable (String) -> Void,
@@ -92,3 +103,6 @@ public protocol TmuxPort {
     )
     func stopControlMode()
 }
+
+/// Convenience composition of all three tmux port protocols.
+public typealias TmuxPort = TmuxQueryPort & TmuxCommandPort & TmuxControlPort

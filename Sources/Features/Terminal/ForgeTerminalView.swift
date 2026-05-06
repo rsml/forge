@@ -18,19 +18,13 @@ struct ForgeTerminalView: NSViewRepresentable {
             }
         }
 
-        let configFontFamily = configStore.config.terminalFont?.family ??
-                               configStore.config.terminal?.fontFamily ??
-                               configStore.config.appearance?.fontFamily
-        let configFontSize = configStore.config.terminalFont?.size ??
-                             configStore.config.terminal?.fontSize ??
-                             configStore.config.appearance?.fontSize ?? 13
-        terminal.font = resolveTerminalFont(family: configFontFamily, size: CGFloat(configFontSize))
+        terminal.font = resolvedFont
 
         // Apply theme colors
-        if let theme = resolveTheme() {
-            terminal.nativeForegroundColor = NSColor(theme.foreground)
-            terminal.nativeBackgroundColor = NSColor(theme.background)
-            let palette = theme.ansiColors.prefix(16).map { Self.swiftUIColorToTermColor($0) }
+        if let theme = configStore.resolvedTheme {
+            terminal.nativeForegroundColor = NSColor(theme.foreground.color)
+            terminal.nativeBackgroundColor = NSColor(theme.background.color)
+            let palette = theme.ansiColors.prefix(16).map { Self.themeColorToTermColor($0) }
             if palette.count == 16 {
                 terminal.installColors(palette)
             }
@@ -39,16 +33,10 @@ struct ForgeTerminalView: NSViewRepresentable {
             terminal.nativeBackgroundColor = NSColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0)
         }
 
-        let tmuxPath = findTmux()
-        let configArg: String
-        if let configPath = Bundle.main.executableURL?.deletingLastPathComponent()
-            .appendingPathComponent("forge-tmux.conf").path,
-            FileManager.default.fileExists(atPath: configPath) {
-            configArg = "-f \(configPath) "
-        } else {
-            configArg = ""
-        }
-        let socketArg = "-L forge"
+        let runner = TmuxCommandRunner()
+        let tmuxPath = runner.tmuxPath
+        let configArg = runner.configPath.map { "-f \($0) " } ?? ""
+        let socketArg = "-L \(runner.socketName)"
 
         // Hide tmux status bar — Forge provides the tab UI
         let shell = "/bin/zsh"
@@ -78,98 +66,39 @@ struct ForgeTerminalView: NSViewRepresentable {
         }
 
         // Reactive font update
-        let configFontFamily = configStore.config.terminalFont?.family ??
-                               configStore.config.terminal?.fontFamily ??
-                               configStore.config.appearance?.fontFamily
-        let configFontSize = configStore.config.terminalFont?.size ??
-                             configStore.config.terminal?.fontSize ??
-                             configStore.config.appearance?.fontSize ?? 13
-        let newFont = resolveTerminalFont(family: configFontFamily, size: CGFloat(configFontSize))
+        let newFont = resolvedFont
         if nsView.font != newFont {
             nsView.font = newFont
         }
 
         // Reactive theme update
-        if let theme = resolveTheme() {
-            let newFg = NSColor(theme.foreground)
-            let newBg = NSColor(theme.background)
+        if let theme = configStore.resolvedTheme {
+            let newFg = NSColor(theme.foreground.color)
+            let newBg = NSColor(theme.background.color)
             if nsView.nativeForegroundColor != newFg { nsView.nativeForegroundColor = newFg }
             if nsView.nativeBackgroundColor != newBg { nsView.nativeBackgroundColor = newBg }
         }
     }
 
-    private func resolveTheme() -> ThemeDefinition? {
-        guard let themeId = configStore.config.theme?.source else { return nil }
-        return ThemeParser.loadTheme(id: themeId)
+    // MARK: - Private
+
+    private var resolvedFont: NSFont {
+        let family = configStore.config.terminalFont?.family ??
+                     configStore.config.terminal?.fontFamily ??
+                     configStore.config.appearance?.fontFamily
+        let size = configStore.config.terminalFont?.size ??
+                   configStore.config.terminal?.fontSize ??
+                   configStore.config.appearance?.fontSize ?? 13
+        return FontResolver.resolveTerminalFont(family: family, size: CGFloat(size))
     }
 
-    /// Converts a SwiftUI Color to SwiftTerm's Color (UInt16 components, 0-65535).
-    private static func swiftUIColorToTermColor(_ color: SwiftUI.Color) -> SwiftTerm.Color {
-        let nsColor = NSColor(color).usingColorSpace(.deviceRGB) ?? NSColor(color)
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        nsColor.getRed(&r, green: &g, blue: &b, alpha: &a)
-        return SwiftTerm.Color(red: UInt16(r * 65535), green: UInt16(g * 65535), blue: UInt16(b * 65535))
-    }
-
-    /// Resolves the best available monospaced font with Nerd Font glyph coverage.
-    ///
-    /// Priority:
-    /// 1. Font declared in ~/.config/ghostty/config (`font-family = ...`)
-    /// 2. Common Nerd Font families installed on the system
-    /// 3. System monospaced font (final fallback, no Nerd Font glyphs)
-    private func resolveTerminalFont(family: String? = nil, size: CGFloat) -> NSFont {
-        if let family, let font = NSFont(name: family, size: size) {
-            return font
-        }
-        let fallbacks = [
-            "Dank Mono",
-            "MesloLGS NF",
-            "MesloLGM Nerd Font",
-            "JetBrainsMono Nerd Font",
-            "JetBrains Mono NL",
-            "FiraCode Nerd Font",
-            "Hack Nerd Font",
-            "SauceCodePro Nerd Font",
-            "DejaVuSansMono Nerd Font",
-        ]
-        let candidates = (ghosttyFontFamily().map { [$0] } ?? []) + fallbacks
-
-        for family in candidates {
-            if let font = NSFont(name: family, size: size) {
-                return font
-            }
-        }
-
-        return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
-    }
-
-    /// Parses `font-family = <name>` from the Ghostty config file, if present.
-    private func ghosttyFontFamily() -> String? {
-        let configPath = (NSHomeDirectory() as NSString)
-            .appendingPathComponent(".config/ghostty/config")
-        guard let contents = try? String(contentsOfFile: configPath, encoding: .utf8) else {
-            return nil
-        }
-        for line in contents.split(separator: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard trimmed.hasPrefix("font-family"), trimmed.contains("=") else { continue }
-            let parts = trimmed.split(separator: "=", maxSplits: 1)
-            guard parts.count == 2 else { continue }
-            let value = parts[1].trimmingCharacters(in: .whitespaces)
-            if !value.isEmpty { return value }
-        }
-        return nil
-    }
-
-    private func findTmux() -> String {
-        if let bundledPath = Bundle.main.executableURL?.deletingLastPathComponent()
-            .appendingPathComponent("tmux").path,
-            FileManager.default.fileExists(atPath: bundledPath) {
-            return bundledPath
-        }
-        return ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
-            .first { FileManager.default.fileExists(atPath: $0) }
-            ?? "/opt/homebrew/bin/tmux"
+    /// Converts a ThemeColor to SwiftTerm's Color (UInt16 components, 0-65535).
+    private static func themeColorToTermColor(_ color: ThemeColor) -> SwiftTerm.Color {
+        SwiftTerm.Color(
+            red: UInt16(color.red * 65535),
+            green: UInt16(color.green * 65535),
+            blue: UInt16(color.blue * 65535)
+        )
     }
 
     private func buildEnvironment() -> [String] {

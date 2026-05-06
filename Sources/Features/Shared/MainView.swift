@@ -22,7 +22,7 @@ struct MainView: View {
     private var sidebarBackground: some View {
         ZStack {
             if let theme = configStore.resolvedTheme {
-                theme.background
+                theme.background.color
                 Color.white.opacity(0.06)  // slightly lighter than terminal
             } else {
                 Color(nsColor: .windowBackgroundColor)
@@ -31,7 +31,7 @@ struct MainView: View {
     }
 
     private var themeForeground: Color? {
-        configStore.resolvedTheme?.foreground
+        configStore.resolvedTheme?.foreground.color
     }
 
     private var showSidebar: Bool {

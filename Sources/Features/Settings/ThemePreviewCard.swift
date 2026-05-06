@@ -9,16 +9,16 @@ struct ThemePreviewCard: View {
         VStack(spacing: 4) {
             ZStack {
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(theme.background)
+                    .fill(theme.background.color)
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 0) {
                         Text("~ ")
                             .foregroundStyle(colorAt(2))
                         Text("$ ")
-                            .foregroundStyle(theme.foreground)
+                            .foregroundStyle(theme.foreground.color)
                         Text("ls -la")
-                            .foregroundStyle(theme.foreground)
+                            .foregroundStyle(theme.foreground.color)
                     }
 
                     HStack(spacing: 0) {
@@ -26,7 +26,7 @@ struct ThemePreviewCard: View {
                             .foregroundStyle(colorAt(4))
                         Text("  ")
                         Text("README")
-                            .foregroundStyle(theme.foreground)
+                            .foregroundStyle(theme.foreground.color)
                     }
 
                     Text("error: not found")
@@ -54,6 +54,6 @@ struct ThemePreviewCard: View {
     }
 
     private func colorAt(_ index: Int) -> Color {
-        index < theme.ansiColors.count ? theme.ansiColors[index] : theme.foreground
+        index < theme.ansiColors.count ? theme.ansiColors[index].color : theme.foreground.color
     }
 }

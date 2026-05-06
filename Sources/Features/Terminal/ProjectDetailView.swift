@@ -20,7 +20,7 @@ struct ProjectDetailView: View {
             if !isFullScreen {
                 ZStack {
                     if let theme = configStore.resolvedTheme {
-                        theme.background
+                        theme.background.color
                         Color.white.opacity(0.06)
                     } else {
                         Color(nsColor: .windowBackgroundColor)

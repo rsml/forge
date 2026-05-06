@@ -1,4 +1,4 @@
-import SwiftUI
+import Foundation
 
 struct ThemeParser {
     private static let searchPaths = [
@@ -35,10 +35,10 @@ struct ThemeParser {
 
     static func parseThemeFile(path: String, id: String) -> ThemeDefinition? {
         guard let content = try? String(contentsOfFile: path, encoding: .utf8) else { return nil }
-        var bg = Color(red: 0.1, green: 0.1, blue: 0.1)
-        var fg = Color(red: 0.8, green: 0.8, blue: 0.8)
-        var cursor: Color?
-        var palette: [Int: Color] = [:]
+        var bg = ThemeColor(red: 0.1, green: 0.1, blue: 0.1)
+        var fg = ThemeColor(red: 0.8, green: 0.8, blue: 0.8)
+        var cursor: ThemeColor?
+        var palette: [Int: ThemeColor] = [:]
 
         for line in content.split(separator: "\n", omittingEmptySubsequences: true) {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -74,13 +74,13 @@ struct ThemeParser {
         return ThemeDefinition(id: id, name: name, background: bg, foreground: fg, cursor: cursor, ansiColors: ansiColors)
     }
 
-    private static func parseColor(_ hex: String) -> Color? {
+    private static func parseColor(_ hex: String) -> ThemeColor? {
         var h = hex.trimmingCharacters(in: .whitespaces)
         if h.hasPrefix("#") { h = String(h.dropFirst()) }
         guard h.count == 6, let value = UInt64(h, radix: 16) else { return nil }
         let r = Double((value >> 16) & 0xFF) / 255.0
         let g = Double((value >> 8) & 0xFF) / 255.0
         let b = Double(value & 0xFF) / 255.0
-        return Color(red: r, green: g, blue: b)
+        return ThemeColor(red: r, green: g, blue: b)
     }
 }

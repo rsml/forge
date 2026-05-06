@@ -25,19 +25,24 @@ final class AppState {
     var pendingStackAction: WorkspaceController.StackDismissAction? = nil
 
     private weak var controller: WorkspaceController?
-    private weak var titleBarManager: TitleBarManager?
-    private weak var attentionManager: AttentionManager?
+    private weak var attentionManager: (any AttentionPort)?
     private weak var config: ForgeConfigStore?
+    private var onModeChanged: (() -> Void)?
 
     init(sidebarVisible: Bool = true) {
         self.sidebarVisible = sidebarVisible
     }
 
-    func bind(controller: WorkspaceController, titleBarManager: TitleBarManager?, attentionManager: AttentionManager?, config: ForgeConfigStore) {
+    func bind(
+        controller: WorkspaceController,
+        attentionManager: (any AttentionPort)?,
+        config: ForgeConfigStore,
+        onModeChanged: (() -> Void)? = nil
+    ) {
         self.controller = controller
-        self.titleBarManager = titleBarManager
         self.attentionManager = attentionManager
         self.config = config
+        self.onModeChanged = onModeChanged
     }
 
     func dispatch(_ command: AppCommand) {
@@ -98,11 +103,7 @@ final class AppState {
                     controller.selectTab(tab)
                 }
             }
-            titleBarManager?.updateSplitIconVisibility()
-            titleBarManager?.updateWindowTitle()
-            DispatchQueue.main.async { [weak self] in
-                self?.titleBarManager?.updateOverlayConstraints()
-            }
+            onModeChanged?()
 
         // Tab movement
         case .moveTabLeft:  controller.swapTab(offset: -1)

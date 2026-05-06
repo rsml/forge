@@ -1,9 +1,10 @@
 import Foundation
 import ForgeCore
 
-/// Concrete implementation of TmuxPort using the tmux CLI + control mode
+/// Concrete implementation of TmuxQueryPort, TmuxCommandPort, and TmuxControlPort
+/// using the tmux CLI + control mode.
 @MainActor
-final class TmuxAdapter: TmuxPort {
+final class TmuxAdapter: TmuxQueryPort, TmuxCommandPort, TmuxControlPort {
     private let runner = TmuxCommandRunner()
     var configPath: String? { runner.configPath }
     private lazy var controlMode = TmuxControlMode(

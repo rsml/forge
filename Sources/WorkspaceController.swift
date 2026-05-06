@@ -9,7 +9,7 @@ import ForgeCore
 @MainActor
 final class WorkspaceController {
     let workspace = Workspace()
-    var attentionManager: AttentionManager?
+    var attentionManager: (any AttentionPort)?
     let config: ForgeConfigStore
     let toastState: NotificationToastState
     let syncEngine: TmuxSyncEngine

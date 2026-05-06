@@ -18,7 +18,7 @@ struct StackView: View {
         VStack(spacing: 0) {
             if !isFullScreen {
                 ZStack {
-                    configStore.resolvedTheme?.background ?? Color(nsColor: .windowBackgroundColor)
+                    configStore.resolvedTheme?.background.color ?? Color(nsColor: .windowBackgroundColor)
                     Color.white.opacity(0.06)
                 }
                 .frame(height: configStore.titlebarHeight)
@@ -96,7 +96,7 @@ struct StackView: View {
     /// Dark card backing for the background layer — avoids duplicate tmux sessions
     /// while giving the visual impression of a card behind the foreground.
     private var terminalPlaceholder: some View {
-        (configStore.resolvedTheme?.background ?? Color(red: 0.1, green: 0.1, blue: 0.1))
+        (configStore.resolvedTheme?.background.color ?? Color(red: 0.1, green: 0.1, blue: 0.1))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 

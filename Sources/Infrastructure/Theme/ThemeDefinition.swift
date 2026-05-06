@@ -1,14 +1,20 @@
-import SwiftUI
+import Foundation
+
+struct ThemeColor: Sendable {
+    let red: Double
+    let green: Double
+    let blue: Double
+}
 
 struct ThemeDefinition: Identifiable {
     let id: String
     let name: String
-    let background: Color
-    let foreground: Color
-    let cursor: Color?
-    let ansiColors: [Color]  // 0-15
+    let background: ThemeColor
+    let foreground: ThemeColor
+    let cursor: ThemeColor?
+    let ansiColors: [ThemeColor]  // 0-15
 
-    var previewColors: [Color] {
+    var previewColors: [ThemeColor] {
         let samples = [foreground, background]
             + ansiColors.prefix(8).map { $0 }
         return Array(samples.prefix(10))

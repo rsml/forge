@@ -20,7 +20,7 @@ extension ForgeConfigStore {
 
 @Observable @MainActor
 final class ForgeConfigStore {
-    static let shared = ForgeConfigStore()
+    static let shared = ForgeConfigStore(themeLoader: { ThemeParser.loadTheme(id: $0) })
     private(set) var config: ForgeConfig
 
     /// Measured from the actual NSWindow; updated by AppDelegate.
@@ -32,7 +32,12 @@ final class ForgeConfigStore {
     /// Stack mode vs list mode for the sidebar project view.
     var isStackMode: Bool = false
 
-    private init() { config = ForgeConfig.load() }
+    private let themeLoader: (String) -> ThemeDefinition?
+
+    init(themeLoader: @escaping (String) -> ThemeDefinition?) {
+        self.themeLoader = themeLoader
+        config = ForgeConfig.load()
+    }
 
     func update(_ mutate: (inout ForgeConfig) -> Void) {
         mutate(&config)
@@ -46,13 +51,13 @@ final class ForgeConfigStore {
     private var _resolvedTheme: ThemeDefinition??  // nil = not loaded, .some(nil) = no theme
     var resolvedTheme: ThemeDefinition? {
         if let cached = _resolvedTheme { return cached }
-        let result = Self.loadTheme(id: config.theme?.source)
+        let result = resolveThemeFromConfig()
         _resolvedTheme = .some(result)
         return result
     }
 
-    private static func loadTheme(id: String?) -> ThemeDefinition? {
-        guard let themeId = id else { return nil }
-        return ThemeParser.loadTheme(id: themeId)
+    private func resolveThemeFromConfig() -> ThemeDefinition? {
+        guard let themeId = config.theme?.source else { return nil }
+        return themeLoader(themeId)
     }
 }
