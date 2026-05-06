@@ -153,11 +153,10 @@ struct GeneralSettingsPane: View {
     }
 
     private func checkAuthorizationStatus() {
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            DispatchQueue.main.async {
-                let enabled = store.config.general?.notificationsEnabled ?? false
-                authorizationDenied = enabled && settings.authorizationStatus == .denied
-            }
+        Task {
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            let enabled = store.config.general?.notificationsEnabled ?? false
+            authorizationDenied = enabled && settings.authorizationStatus == .denied
         }
     }
 
