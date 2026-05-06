@@ -7,6 +7,8 @@ struct GeneralSettingsPane: View {
     @State private var authorizationDenied = false
     @State private var showFilePicker = false
 
+    private var hasBundle: Bool { Bundle.main.bundleIdentifier != nil }
+
     private static let systemSounds = [
         "Default", "Basso", "Blow", "Bottle", "Frog", "Funk",
         "Glass", "Hero", "Morse", "Ping", "Pop", "Purr",
@@ -80,19 +82,26 @@ struct GeneralSettingsPane: View {
             get: { store.config.general?.notificationsEnabled ?? false },
             set: { newValue in
                 if newValue {
-                    Task {
-                        let granted = try? await UNUserNotificationCenter.current()
-                            .requestAuthorization(options: [.alert, .sound])
-                        await MainActor.run {
-                            store.update { config in
-                                if config.general == nil { config.general = ForgeConfig.GeneralSettings() }
-                                config.general!.notificationsEnabled = true
+                    if hasBundle {
+                        Task {
+                            let granted = try? await UNUserNotificationCenter.current()
+                                .requestAuthorization(options: [.alert, .sound])
+                            await MainActor.run {
+                                store.update { config in
+                                    if config.general == nil { config.general = ForgeConfig.GeneralSettings() }
+                                    config.general!.notificationsEnabled = true
+                                }
+                                if granted != true {
+                                    checkAuthorizationStatus()
+                                } else {
+                                    authorizationDenied = false
+                                }
                             }
-                            if granted != true {
-                                checkAuthorizationStatus()
-                            } else {
-                                authorizationDenied = false
-                            }
+                        }
+                    } else {
+                        store.update { config in
+                            if config.general == nil { config.general = ForgeConfig.GeneralSettings() }
+                            config.general!.notificationsEnabled = true
                         }
                     }
                 } else {
@@ -153,6 +162,7 @@ struct GeneralSettingsPane: View {
     }
 
     private func checkAuthorizationStatus() {
+        guard hasBundle else { return }
         Task {
             let settings = await UNUserNotificationCenter.current().notificationSettings()
             let enabled = store.config.general?.notificationsEnabled ?? false
