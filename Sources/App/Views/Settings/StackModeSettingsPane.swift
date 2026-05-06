@@ -75,6 +75,8 @@ struct StackModeSettingsPane: View {
                         if config.stackView == nil { config.stackView = ForgeConfig.StackViewSettings() }
                         config.stackView!.notificationSound = newValue == "Default" ? nil : newValue
                     }
+                    // Preview the selected sound
+                    previewSound(newValue == "Default" ? nil : newValue)
                 }
             }
         )) {
@@ -97,7 +99,13 @@ struct StackModeSettingsPane: View {
                 if config.stackView == nil { config.stackView = ForgeConfig.StackViewSettings() }
                 config.stackView!.notificationSound = url.path
             }
+            // Preview the custom sound
+            previewSound(url.path)
         }
+    }
+
+    private func previewSound(_ sound: String?) {
+        MacNotificationAdapter().playSound(sound)
     }
 
     private func stackBinding<T>(_ keyPath: WritableKeyPath<ForgeConfig.StackViewSettings, T?>, default defaultValue: T) -> Binding<T> {

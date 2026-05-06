@@ -88,6 +88,7 @@ struct MainView: View {
                 }
             }
         }
+        .modifier(NotificationToastOverlay(state: NotificationToastState.shared))
         .foregroundStyle(themeForeground ?? Color.primary)
         .ignoresSafeArea()
         .onAppear {

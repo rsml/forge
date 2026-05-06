@@ -5,8 +5,8 @@ import ForgeDomain
 
 /// Concrete implementation of `NotificationPort` that delivers macOS notifications.
 ///
-/// Uses `NSWorkspace` notifications when running as a bare executable (no bundle ID),
-/// and `UNUserNotificationCenter` when running as a proper .app bundle.
+/// Always shows an in-app toast banner. Additionally uses `UNUserNotificationCenter`
+/// when running as a proper .app bundle (for background notifications).
 final class MacNotificationAdapter: NotificationPort, @unchecked Sendable {
 
     private var hasBundle: Bool {
@@ -14,7 +14,7 @@ final class MacNotificationAdapter: NotificationPort, @unchecked Sendable {
     }
 
     func requestPermission() async -> Bool {
-        guard hasBundle else { return true }  // no permission needed without UNUserNotificationCenter
+        guard hasBundle else { return true }
         do {
             return try await UNUserNotificationCenter.current()
                 .requestAuthorization(options: [.alert, .sound])
@@ -24,14 +24,40 @@ final class MacNotificationAdapter: NotificationPort, @unchecked Sendable {
     }
 
     func send(title: String, body: String, sound: String?) async {
+        // Always show in-app toast
+        await MainActor.run {
+            NotificationToastState.shared.show(title: title, message: body)
+        }
+
+        // Play sound
+        await MainActor.run { playSound(sound) }
+
+        // Also send system notification if we have a bundle
         if hasBundle {
             await sendViaUNUserNotification(title: title, body: body, sound: sound)
-        } else {
-            await sendViaDistributedNotification(title: title, body: body, sound: sound)
         }
     }
 
-    // MARK: - UNUserNotificationCenter path (requires .app bundle)
+    // MARK: - Sound
+
+    @MainActor
+    func playSound(_ sound: String?) {
+        let name = resolveSoundName(sound)
+        if let nsSound = NSSound(named: NSSound.Name(name)) {
+            nsSound.play()
+        } else if let sound, sound.hasSuffix(".aiff") || sound.hasSuffix(".wav") {
+            // Try loading custom file by path
+            if let nsSound = NSSound(contentsOfFile: sound, byReference: true) {
+                nsSound.play()
+            } else {
+                NSSound.beep()
+            }
+        } else {
+            NSSound.beep()
+        }
+    }
+
+    // MARK: - UNUserNotificationCenter (requires .app bundle)
 
     private func sendViaUNUserNotification(title: String, body: String, sound: String?) async {
         let content = UNMutableNotificationContent()
@@ -52,34 +78,8 @@ final class MacNotificationAdapter: NotificationPort, @unchecked Sendable {
         return UNNotificationSound(named: UNNotificationSoundName(rawValue: sound))
     }
 
-    // MARK: - Fallback path for bare SPM executables (no bundle)
-
-    @MainActor
-    private func sendViaDistributedNotification(title: String, body: String, sound: String?) {
-        // Play sound
-        playSound(sound)
-
-        // Post a system notification via NSApp — shows as a banner if the app has focus
-        let notification = NSUserNotification()
-        notification.title = title
-        notification.informativeText = body
-        notification.soundName = resolveSoundName(sound)
-        NSUserNotificationCenter.default.deliver(notification)
-    }
-
-    @MainActor
-    private func playSound(_ sound: String?) {
-        let name = resolveSoundName(sound)
-        if let nsSound = NSSound(named: NSSound.Name(name)) {
-            nsSound.play()
-        } else {
-            NSSound.beep()
-        }
-    }
-
     private func resolveSoundName(_ sound: String?) -> String {
-        guard let sound, !sound.isEmpty, sound != "default" else { return "Ping" }
-        // Strip file extension if present
+        guard let sound, !sound.isEmpty, sound != "default", sound != "Default" else { return "Ping" }
         if sound.hasSuffix(".aiff") || sound.hasSuffix(".wav") {
             return (sound as NSString).deletingPathExtension
         }
