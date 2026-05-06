@@ -28,7 +28,6 @@ struct SessionRow: View {
     @State private var isHeaderHovered = false
     @State private var isChevronHovered = false
     @State private var hoveredWindowId: String?
-    @State private var draggedWindowId: String?
 
     var body: some View {
         let modifiers = ModifierKeyMonitor.shared
@@ -89,47 +88,34 @@ struct SessionRow: View {
 
             // Expanded window list
             if isExpanded {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(session.windows.enumerated()), id: \.element.id) { index, window in
-                        SidebarTabRow(
-                            window: window,
-                            isActive: isActive && window.id == activeWindowId,
-                            isHovered: hoveredWindowId == window.id,
-                            isRenaming: renamingWindowId == window.id,
-                            tabIndex: index + 1,
-                            renameText: $renameText,
-                            onRenameCommit: onRenameWindowCommit,
-                            onRenameCancel: onRenameWindowCancel
-                        )
-                        .opacity(draggedWindowId == window.id ? 0.0 : 1.0)
-                        .onDrag {
-                            draggedWindowId = window.id
-                            return NSItemProvider(object: window.id as NSString)
-                        }
-                        .onDrop(of: [.text], delegate: ReorderDropDelegate(
-                            item: window,
-                            items: session.windows,
-                            draggedItemId: $draggedWindowId,
-                            onMove: { from, to in
-                                session.windows.move(fromOffsets: from, toOffset: to)
-                            }
-                        ))
-                        .contentShape(Rectangle())
-                        .onHover { hovering in
-                            hoveredWindowId = hovering ? window.id : nil
-                        }
-                        .onTapGesture {
+                ReorderableStack(session.windows, axis: .vertical, spacing: 0) { window, isDragging in
+                    SidebarTabRow(
+                        window: window,
+                        isActive: isActive && window.id == activeWindowId,
+                        isHovered: hoveredWindowId == window.id,
+                        isRenaming: renamingWindowId == window.id,
+                        tabIndex: session.windows.firstIndex(where: { $0.id == window.id }).map { $0 + 1 } ?? 0,
+                        renameText: $renameText,
+                        onRenameCommit: onRenameWindowCommit,
+                        onRenameCancel: onRenameWindowCancel
+                    )
+                    .contentShape(Rectangle())
+                    .onHover { hovering in
+                        hoveredWindowId = hovering ? window.id : nil
+                    }
+                    .onTapGesture {
+                        onSelectWindow(window)
+                    }
+                    .contextMenu {
+                        Button("Rename") { onStartWindowRename(window) }
+                            .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
+                        Button("Close Tab", role: .destructive) {
                             onSelectWindow(window)
                         }
-                        .contextMenu {
-                            Button("Rename") { onStartWindowRename(window) }
-                                .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
-                            Button("Close Tab", role: .destructive) {
-                                onSelectWindow(window)
-                            }
-                            .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)
-                        }
+                        .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)
                     }
+                } onReorder: { from, to in
+                    session.windows.move(fromOffsets: IndexSet(integer: from), toOffset: to)
                 }
                 .padding(.leading, 0)
                 .transition(.opacity.combined(with: .move(edge: .top)))
