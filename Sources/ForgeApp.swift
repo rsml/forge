@@ -302,6 +302,7 @@ extension NSColor {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let controller = WorkspaceController(tmux: TmuxAdapter())
+    private(set) var attentionManager: AttentionManager!
     private let debugServer = DebugServer()
     private var mainWindow: NSWindow?
     private var appearanceObservation: NSKeyValueObservation?
@@ -330,6 +331,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
            let icon = NSImage(contentsOf: iconPath) {
             NSApp.applicationIconImage = icon
         }
+
+        let notifier = MacNotificationAdapter()
+        attentionManager = AttentionManager(notifier: notifier, config: ForgeConfigStore.shared)
+        controller.attentionManager = attentionManager
 
         createMainWindow()
         controller.connect()
@@ -381,6 +386,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         NotificationCenter.default.addObserver(
+            forName: .forgeToggleMode, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if ForgeConfigStore.shared.isStackMode {
+                    // Stack → List: restore the window that was showing in stack as the active selection
+                    if let uuid = self.attentionManager?.currentWindowUUID,
+                       let (session, window) = self.controller.workspace.findWindow(byUUID: uuid) {
+                        self.controller.workspace.activeSessionId = session.id
+                        self.controller.workspace.activeWindowId = window.id
+                    }
+                    ForgeConfigStore.shared.isStackMode = false
+                } else {
+                    // List → Stack: promote current window to front of queue if it needs attention
+                    if let windowId = self.controller.workspace.activeWindowId,
+                       let window = self.controller.workspace.activeSession?.windows.first(where: { $0.id == windowId }),
+                       window.needsAttention {
+                        self.attentionManager?.promoteToFront(window.uuid)
+                    }
+                    ForgeConfigStore.shared.isStackMode = true
+                }
+            }
+        }
+
+        NotificationCenter.default.addObserver(
             forName: .forgeToggleSidebar, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -425,6 +455,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let rootView = MainView()
             .environment(controller)
+            .environment(attentionManager!)
         window.contentView = NSHostingView(rootView: rootView)
         window.makeKeyAndOrderFront(nil)
         self.mainWindow = window
@@ -499,7 +530,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let pathLabel = overlay.subviews.first { $0.identifier?.rawValue == "titlePath" } as? NSTextField
         let branchLabel = overlay.subviews.first { $0.identifier?.rawValue == "titleBranch" } as? NSTextField
 
-        let session = controller.workspace.activeSession
+        // In stack mode, show the path/branch of the window currently at the front of the queue.
+        let session: Session?
+        if ForgeConfigStore.shared.isStackMode,
+           let uuid = attentionManager?.currentWindowUUID,
+           let (stackSession, _) = controller.workspace.findWindow(byUUID: uuid) {
+            session = stackSession
+        } else {
+            session = controller.workspace.activeSession
+        }
         if let path = session?.path {
             pathLabel?.stringValue = path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
         } else {
