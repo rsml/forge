@@ -30,68 +30,55 @@ struct WindowTabBar: View {
                 }
 
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 1) {
-                        ForEach(Array(session.windows.enumerated()), id: \.element.id) { index, window in
-                            if renamingWindowId == window.id {
-                                InlineRenameField(text: $renameText, font: .system(.caption, weight: .regular), onCancel: { renamingWindowId = nil }) {
-                                    if !renameText.isEmpty {
-                                        controller.renameWindow(window, to: renameText)
-                                    }
-                                    renamingWindowId = nil
+                    ReorderableStack(session.windows, axis: .horizontal, spacing: 1) { window, isDragging in
+                        if renamingWindowId == window.id {
+                            InlineRenameField(text: $renameText, font: .system(.caption, weight: .regular), onCancel: { renamingWindowId = nil }) {
+                                if !renameText.isEmpty {
+                                    controller.renameWindow(window, to: renameText)
                                 }
-                                .fixedSize()
-                                .frame(height: 28)
-                            } else {
-                                WindowTab(
-                                    window: window,
-                                    isActive: window.id == controller.workspace.activeWindowId,
-                                    tabIndex: index + 1,
-                                    indicatorOnTop: tabBarOnBottom
-                                )
-                                .opacity(draggedTabId == window.id ? 0.0 : 1.0)
-                                .onDrag {
-                                    draggedTabId = window.id
-                                    return NSItemProvider(object: window.id as NSString)
+                                renamingWindowId = nil
+                            }
+                            .fixedSize()
+                            .frame(height: 28)
+                        } else {
+                            WindowTab(
+                                window: window,
+                                isActive: window.id == controller.workspace.activeWindowId,
+                                tabIndex: session.windows.firstIndex(where: { $0.id == window.id }).map { $0 + 1 } ?? 0,
+                                indicatorOnTop: tabBarOnBottom
+                            )
+                            .onTapGesture {
+                                controller.selectWindow(window)
+                            }
+                            .contextMenu {
+                                Button("New Tab") {
+                                    controller.addWindow(in: session)
                                 }
-                                .onDrop(of: [.text], delegate: ReorderDropDelegate(
-                                    item: window,
-                                    items: session.windows,
-                                    draggedItemId: $draggedTabId,
-                                    onMove: { from, to in
-                                        session.windows.move(fromOffsets: from, toOffset: to)
-                                    }
-                                ))
-                                .onTapGesture {
-                                    controller.selectWindow(window)
+                                .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
+                                Button("New Browser Tab") {}
+                                Divider()
+                                Button("Rename") {
+                                    renamingWindowId = window.id
+                                    renameText = window.name
                                 }
-                                .contextMenu {
-                                    Button("New Tab") {
-                                        controller.addWindow(in: session)
+                                .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
+                                if attention.isHidden(window.uuid) {
+                                    Button("Unhide from Stack View") {
+                                        attention.unhide(window.uuid)
                                     }
-                                    .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
-                                    Button("New Browser Tab") {}
-                                    Divider()
-                                    Button("Rename") {
-                                        renamingWindowId = window.id
-                                        renameText = window.name
+                                } else {
+                                    Button("Hide from Stack View") {
+                                        attention.hide(window.uuid)
                                     }
-                                    .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
-                                    if attention.isHidden(window.uuid) {
-                                        Button("Unhide from Stack View") {
-                                            attention.unhide(window.uuid)
-                                        }
-                                    } else {
-                                        Button("Hide from Stack View") {
-                                            attention.hide(window.uuid)
-                                        }
-                                    }
-                                    Button("Close Tab", role: .destructive) {
-                                        controller.removeWindow(window, in: session)
-                                    }
-                                    .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)
                                 }
+                                Button("Close Tab", role: .destructive) {
+                                    controller.removeWindow(window, in: session)
+                                }
+                                .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)
                             }
                         }
+                    } onReorder: { from, to in
+                        session.windows.move(fromOffsets: IndexSet(integer: from), toOffset: to)
                     }
                     .padding(.horizontal, 4)
                 }
@@ -102,19 +89,6 @@ struct WindowTabBar: View {
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) {
                         controller.addWindow(in: session)
-                    }
-                    .onDrop(of: [.text], isTargeted: nil) { providers in
-                        guard let draggedId = draggedTabId,
-                              let from = session.windows.firstIndex(where: { $0.id == draggedId })
-                        else { return false }
-                        let to = session.windows.count
-                        if from != to - 1 {
-                            withAnimation {
-                                session.windows.move(fromOffsets: IndexSet(integer: from), toOffset: to)
-                            }
-                        }
-                        draggedTabId = nil
-                        return true
                     }
                     .contextMenu {
                         Button("New Tab") {
