@@ -68,16 +68,17 @@ struct StackView: View {
     @ViewBuilder
     private var backgroundLayer: some View {
         if let nextUUID = attention.nextWindowUUID,
-           let (nextSession, nextWindow) = controller.workspace.findTab(byUUID: nextUUID) {
+           let (nextProject, nextTab) = controller.workspace.findTab(byUUID: nextUUID) {
             VStack(spacing: 0) {
                 if toolbarPosition == "top" {
-                    StackToolbar(project: nextSession, tab: nextWindow)
-                    Color(red: 0.1, green: 0.1, blue: 0.1)
+                    StackToolbar(project: nextProject, tab: nextTab)
+                    TerminalArea(project: nextProject)
                 } else {
-                    Color(red: 0.1, green: 0.1, blue: 0.1)
-                    StackToolbar(project: nextSession, tab: nextWindow)
+                    TerminalArea(project: nextProject)
+                    StackToolbar(project: nextProject, tab: nextTab)
                 }
             }
+            .allowsHitTesting(false)
         } else {
             StackEmptyState()
         }
