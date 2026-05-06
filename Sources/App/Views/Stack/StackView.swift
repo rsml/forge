@@ -118,7 +118,7 @@ struct StackView: View {
     private func handleDismiss(_ action: WorkspaceController.StackDismissAction) {
         guard !isDismissing else { return }
         pendingAction = action
-        withAnimation(.spring(duration: 0.25, bounce: 0.15)) {
+        withAnimation(.spring(duration: 0.25, bounce: 0)) {
             isDismissing = true
         } completion: {
             controller.stackDismiss(action)
