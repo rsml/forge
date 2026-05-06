@@ -25,14 +25,16 @@ struct StackView: View {
             if let uuid = attention.currentTabUUID,
                let (project, tab) = controller.workspace.findTab(byUUID: uuid) {
                 ZStack {
-                    // Background layer: next item preview or empty state
+                    // Background layer: next item card or empty state
                     backgroundLayer
+                        .scaleEffect(isDismissing ? 1.0 : 0.96)
+                        .overlay { Color.black.opacity(isDismissing ? 0.0 : 0.3) }
 
                     // Foreground layer: current terminal + toolbar with animation
                     foregroundLayer(project: project, tab: tab)
-                        .scaleEffect(isDismissing ? 0.85 : 1.0)
+                        .scaleEffect(isDismissing ? 0.92 : 1.0)
                         .offset(y: isDismissing ? -800 : 0)
-                        .opacity(isDismissing ? 0.5 : 1.0)
+                        .shadow(color: .black.opacity(0.4), radius: 12, y: 3)
                 }
             } else if let staleUUID = attention.currentTabUUID {
                 let _ = { attention.removeTab(staleUUID) }()
@@ -72,9 +74,9 @@ struct StackView: View {
             VStack(spacing: 0) {
                 if toolbarPosition == "top" {
                     StackToolbar(project: nextProject, tab: nextTab)
-                    TerminalArea(project: nextProject)
+                    terminalPlaceholder
                 } else {
-                    TerminalArea(project: nextProject)
+                    terminalPlaceholder
                     StackToolbar(project: nextProject, tab: nextTab)
                 }
             }
@@ -82,6 +84,13 @@ struct StackView: View {
         } else {
             StackEmptyState()
         }
+    }
+
+    /// Dark card backing for the background layer — avoids duplicate tmux sessions
+    /// while giving the visual impression of a card behind the foreground.
+    private var terminalPlaceholder: some View {
+        (ForgeConfigStore.shared.resolvedTheme?.background ?? Color(red: 0.1, green: 0.1, blue: 0.1))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -100,7 +109,7 @@ struct StackView: View {
     private func handleDismiss(_ action: WorkspaceController.StackDismissAction) {
         guard !isDismissing else { return }
         pendingAction = action
-        withAnimation(.easeIn(duration: 0.35)) {
+        withAnimation(.spring(duration: 0.25, bounce: 0.15)) {
             isDismissing = true
         } completion: {
             controller.stackDismiss(action)
