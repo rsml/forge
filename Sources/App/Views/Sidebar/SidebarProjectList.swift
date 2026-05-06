@@ -1,7 +1,7 @@
 import SwiftUI
 import ForgeDomain
 
-struct SidebarView: View {
+struct SidebarProjectList: View {
     var position: String = "left"
     var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller

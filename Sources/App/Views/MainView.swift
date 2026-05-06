@@ -123,7 +123,7 @@ struct MainView: View {
 
     @ViewBuilder
     private var sidebarContent: some View {
-        SidebarView(
+        SidebarProjectList(
             position: sidebarPosition,
             onToggleSidebar: {
                 withAnimation(.easeInOut(duration: 0.2)) { sidebarVisible.toggle() }
