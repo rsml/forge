@@ -2,6 +2,7 @@ import SwiftUI
 import ForgeCore
 
 struct ProjectDetailView: View {
+    @Environment(ForgeConfigStore.self) private var configStore
     var project: Project
     var sidebarVisible: Bool = true
     var onToggleSidebar: () -> Void = {}
@@ -9,23 +10,23 @@ struct ProjectDetailView: View {
     @State private var isFullScreen = false
 
     private var tabBarPosition: String {
-        ForgeConfigStore.shared.config.general?.tabBarPosition ??
-        ForgeConfigStore.shared.config.terminal?.tabBarPosition ??
-        ForgeConfigStore.shared.config.appearance?.tabBarPosition ?? "top"
+        configStore.config.general?.tabBarPosition ??
+        configStore.config.terminal?.tabBarPosition ??
+        configStore.config.appearance?.tabBarPosition ?? "top"
     }
 
     var body: some View {
         VStack(spacing: 0) {
             if !isFullScreen {
                 ZStack {
-                    if let theme = ForgeConfigStore.shared.resolvedTheme {
+                    if let theme = configStore.resolvedTheme {
                         theme.background
                         Color.white.opacity(0.06)
                     } else {
                         Color(nsColor: .windowBackgroundColor)
                     }
                 }
-                .frame(height: ForgeConfigStore.shared.titlebarHeight)
+                .frame(height: configStore.titlebarHeight)
             }
             if tabBarPosition == "bottom" {
                 TerminalArea(project: project)
@@ -45,6 +46,6 @@ struct ProjectDetailView: View {
     }
 
     private var sidebarPosition: String {
-        ForgeConfigStore.shared.config.general?.sidebarPosition ?? "left"
+        configStore.config.general?.sidebarPosition ?? "left"
     }
 }

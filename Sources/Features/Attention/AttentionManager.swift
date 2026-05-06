@@ -9,6 +9,7 @@ final class AttentionManager: AttentionPort {
     private(set) var hiddenSet: Set<UUID> = []
     private let notifier: any NotificationPort
     private let config: ForgeConfigStore
+    let contentDetector = ContentDetector()
 
     var currentTabUUID: UUID? { queue.peek() }
     var nextWindowUUID: UUID? { queue.peekSecond() }
@@ -73,6 +74,32 @@ final class AttentionManager: AttentionPort {
 
     func isHidden(_ tabUUID: UUID) -> Bool {
         hiddenSet.contains(tabUUID)
+    }
+
+    func scanForContentMatches(workspace: Workspace, tmux: any TmuxPort) async {
+        let patterns = ContentDetector.defaultPatterns
+            + (config.config.stackView?.contentPatterns ?? [])
+        for project in workspace.projects {
+            for tab in project.tabs {
+                for pane in tab.panes where pane.status == .running {
+                    if let content = await tmux.capturePaneContent(id: pane.id, lastN: pane.height) {
+                        let isNewMatch = contentDetector.scan(
+                            paneId: pane.id, content: content, patterns: patterns
+                        )
+                        if isNewMatch {
+                            ForgeLog.log("[attention] Content match in pane \(pane.id): \(content.suffix(80))")
+                            pane.hasContentMatch = true
+                            handleEvent(.contentMatch(tabUUID: tab.uuid))
+                        }
+                    }
+                }
+                for pane in tab.panes where pane.hasContentMatch {
+                    if !contentDetector.isActive(paneId: pane.id) {
+                        pane.hasContentMatch = false
+                    }
+                }
+            }
+        }
     }
 
     func promoteToFront(_ tabUUID: UUID) {

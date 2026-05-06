@@ -10,7 +10,7 @@ struct ForgeApp: App {
             SettingsView()
         }
         .commands {
-            ForgeMenuCommands(controller: appDelegate.controller)
+            ForgeMenuCommands(controller: appDelegate.controller, config: appDelegate.configStore)
         }
     }
 }
@@ -50,7 +50,8 @@ extension NSColor {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let controller = WorkspaceController(tmux: TmuxAdapter(), git: GitAdapter())
+    let configStore = ForgeConfigStore.shared
+    lazy var controller = WorkspaceController(tmux: TmuxAdapter(), git: GitAdapter(), config: configStore)
     private(set) var attentionManager: AttentionManager!
     private let debugServer = DebugServer()
     private var mainWindow: NSWindow?
@@ -68,7 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let notifier = MacNotificationAdapter()
-        attentionManager = AttentionManager(notifier: notifier, config: ForgeConfigStore.shared)
+        attentionManager = AttentionManager(notifier: notifier, config: configStore)
         controller.attentionManager = attentionManager
 
         createMainWindow()
@@ -84,20 +85,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                if ForgeConfigStore.shared.isStackMode {
+                if self.configStore.isStackMode {
                     if let uuid = self.attentionManager?.currentTabUUID,
                        let (project, tab) = self.controller.workspace.findTab(byUUID: uuid) {
                         self.controller.workspace.activeProjectId = project.id
                         self.controller.workspace.activeTabId = tab.id
                     }
-                    ForgeConfigStore.shared.isStackMode = false
+                    self.configStore.isStackMode = false
                 } else {
                     if let tabId = self.controller.workspace.activeTabId,
                        let tab = self.controller.workspace.activeProject?.tabs.first(where: { $0.id == tabId }),
                        tab.needsAttention {
                         self.attentionManager?.promoteToFront(tab.uuid)
                     }
-                    ForgeConfigStore.shared.isStackMode = true
+                    self.configStore.isStackMode = true
                     if let uuid = self.attentionManager?.currentTabUUID,
                        let (_, tab) = self.controller.workspace.findTab(byUUID: uuid) {
                         self.controller.selectTab(tab)
@@ -139,11 +140,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let rootView = MainView()
             .environment(controller)
             .environment(attentionManager!)
+            .environment(configStore)
         window.contentView = NSHostingView(rootView: rootView)
         window.makeKeyAndOrderFront(nil)
         self.mainWindow = window
 
-        let tbm = TitleBarManager(window: window, controller: controller, attentionManager: attentionManager)
+        let tbm = TitleBarManager(window: window, controller: controller, attentionManager: attentionManager, config: configStore)
         tbm.measureTitlebarHeight()
         tbm.syncAppearance()
         self.titleBarManager = tbm
@@ -166,7 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard ForgeConfigStore.shared.config.general?.confirmBeforeClose ?? true else {
+        guard configStore.config.general?.confirmBeforeClose ?? true else {
             return .terminateNow
         }
         let alert = NSAlert()

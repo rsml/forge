@@ -2,6 +2,7 @@ import SwiftUI
 import ForgeCore
 
 struct StackToolbar: View {
+    @Environment(ForgeConfigStore.self) private var configStore
     let project: Project
     let tab: ForgeCore.Tab
     var onDismiss: ((WorkspaceController.StackDismissAction) -> Void)?
@@ -16,7 +17,7 @@ struct StackToolbar: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 2)
         .background {
-            if let theme = ForgeConfigStore.shared.resolvedTheme {
+            if let theme = configStore.resolvedTheme {
                 theme.background
                 Color.white.opacity(0.06)
             } else {

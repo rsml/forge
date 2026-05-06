@@ -2,6 +2,7 @@ import SwiftUI
 import ForgeCore
 
 struct MainView: View {
+    @Environment(ForgeConfigStore.self) private var configStore
     @Environment(WorkspaceController.self) var controller
     @State private var sidebarWidth: CGFloat = 160
     @State private var sidebarVisible = ForgeConfig.load().uiState?.sidebarVisible ?? true
@@ -15,12 +16,12 @@ struct MainView: View {
     private static let maxSidebarWidth: CGFloat = 400
 
     private var sidebarPosition: String {
-        ForgeConfigStore.shared.config.general?.sidebarPosition ?? "left"
+        configStore.config.general?.sidebarPosition ?? "left"
     }
 
     private var sidebarBackground: some View {
         ZStack {
-            if let theme = ForgeConfigStore.shared.resolvedTheme {
+            if let theme = configStore.resolvedTheme {
                 theme.background
                 Color.white.opacity(0.06)  // slightly lighter than terminal
             } else {
@@ -30,7 +31,7 @@ struct MainView: View {
     }
 
     private var themeForeground: Color? {
-        ForgeConfigStore.shared.resolvedTheme?.foreground
+        configStore.resolvedTheme?.foreground
     }
 
     private var showSidebar: Bool {
@@ -39,7 +40,7 @@ struct MainView: View {
 
     var body: some View {
         Group {
-            if ForgeConfigStore.shared.isStackMode {
+            if configStore.isStackMode {
                 StackView()
             } else {
                 HStack(spacing: 0) {
@@ -116,7 +117,7 @@ struct MainView: View {
             autoFitSidebarWidth()
         }
         .onChange(of: sidebarWidth) {
-            ForgeConfigStore.shared.sidebarWidth = sidebarWidth
+            configStore.sidebarWidth = sidebarWidth
             NotificationCenter.default.post(name: .forgeWindowTitleChanged, object: nil)
         }
     }

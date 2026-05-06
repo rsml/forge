@@ -8,6 +8,7 @@ final class TitleBarManager: NSObject {
     let window: NSWindow
     let controller: WorkspaceController
     let attentionManager: AttentionManager
+    let config: ForgeConfigStore
 
     var titleBarOverlay: NSView?
     var overlayLeadingConstraint: NSLayoutConstraint?
@@ -21,10 +22,11 @@ final class TitleBarManager: NSObject {
     var branchTrailingToSplitH: NSLayoutConstraint?
     var sidebarVisible: Bool
 
-    init(window: NSWindow, controller: WorkspaceController, attentionManager: AttentionManager) {
+    init(window: NSWindow, controller: WorkspaceController, attentionManager: AttentionManager, config: ForgeConfigStore) {
         self.window = window
         self.controller = controller
         self.attentionManager = attentionManager
+        self.config = config
         self.sidebarVisible = ForgeConfig.load().uiState?.sidebarVisible ?? true
         super.init()
         registerObservers()
@@ -103,12 +105,12 @@ final class TitleBarManager: NSObject {
     func measureTitlebarHeight() {
         let height = window.frame.height - window.contentLayoutRect.height
         if height > 0 {
-            ForgeConfigStore.shared.titlebarHeight = height
+            config.titlebarHeight = height
         }
     }
 
     func syncAppearance() {
-        if let theme = ForgeConfigStore.shared.resolvedTheme {
+        if let theme = config.resolvedTheme {
             let bgColor = NSColor(theme.background)
             window.backgroundColor = bgColor
             window.appearance = bgColor.isLight
@@ -122,16 +124,16 @@ final class TitleBarManager: NSObject {
     }
 
     func updateSplitIconVisibility() {
-        if ForgeConfigStore.shared.isStackMode {
+        if config.isStackMode {
             splitHButton?.isHidden = true
             splitVButton?.isHidden = true
             branchTrailingToSplitH?.isActive = false
             branchTrailingToOverlay?.isActive = true
             return
         }
-        let tabPos = ForgeConfigStore.shared.config.general?.tabBarPosition ??
-                     ForgeConfigStore.shared.config.terminal?.tabBarPosition ??
-                     ForgeConfigStore.shared.config.appearance?.tabBarPosition ?? "top"
+        let tabPos = config.config.general?.tabBarPosition ??
+                     config.config.terminal?.tabBarPosition ??
+                     config.config.appearance?.tabBarPosition ?? "top"
         let show = (tabPos != "bottom" && !isFullScreen)
         splitHButton?.isHidden = !show
         splitVButton?.isHidden = !show
@@ -149,7 +151,7 @@ final class TitleBarManager: NSObject {
         let branchLabel = overlay.subviews.first { $0.identifier?.rawValue == "titleBranch" } as? NSTextField
 
         let project: Project?
-        if ForgeConfigStore.shared.isStackMode,
+        if config.isStackMode,
            let uuid = attentionManager.currentTabUUID,
            let (stackSession, _) = controller.workspace.findTab(byUUID: uuid) {
             project = stackSession
@@ -173,7 +175,7 @@ final class TitleBarManager: NSObject {
             return
         }
 
-        let isStack = ForgeConfigStore.shared.isStackMode
+        let isStack = config.isStackMode
         listModeButton?.isHidden = !isStack
         if isStack {
             overlayLeadingConstraint?.constant = 0
@@ -182,9 +184,9 @@ final class TitleBarManager: NSObject {
             return
         }
 
-        let position = ForgeConfigStore.shared.config.general?.sidebarPosition ?? "left"
+        let position = config.config.general?.sidebarPosition ?? "left"
         let effectivelyVisible = sidebarVisible && !controller.workspace.projects.isEmpty
-        let sidebarTotal: CGFloat = effectivelyVisible ? ForgeConfigStore.shared.sidebarWidth + 1 : 0
+        let sidebarTotal: CGFloat = effectivelyVisible ? config.sidebarWidth + 1 : 0
 
         if position == "right" {
             overlayLeadingConstraint?.constant = 0

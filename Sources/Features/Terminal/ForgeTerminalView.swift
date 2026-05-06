@@ -4,6 +4,7 @@ import AppKit
 
 /// SwiftTerm wrapper — stopgap until libghostty integration.
 struct ForgeTerminalView: NSViewRepresentable {
+    @Environment(ForgeConfigStore.self) private var configStore
     let sessionName: String
 
     func makeNSView(context: Context) -> LocalProcessTerminalView {
@@ -17,16 +18,16 @@ struct ForgeTerminalView: NSViewRepresentable {
             }
         }
 
-        let configFontFamily = ForgeConfigStore.shared.config.terminalFont?.family ??
-                               ForgeConfigStore.shared.config.terminal?.fontFamily ??
-                               ForgeConfigStore.shared.config.appearance?.fontFamily
-        let configFontSize = ForgeConfigStore.shared.config.terminalFont?.size ??
-                             ForgeConfigStore.shared.config.terminal?.fontSize ??
-                             ForgeConfigStore.shared.config.appearance?.fontSize ?? 13
+        let configFontFamily = configStore.config.terminalFont?.family ??
+                               configStore.config.terminal?.fontFamily ??
+                               configStore.config.appearance?.fontFamily
+        let configFontSize = configStore.config.terminalFont?.size ??
+                             configStore.config.terminal?.fontSize ??
+                             configStore.config.appearance?.fontSize ?? 13
         terminal.font = resolveTerminalFont(family: configFontFamily, size: CGFloat(configFontSize))
 
         // Apply theme colors
-        if let theme = Self.resolveTheme() {
+        if let theme = resolveTheme() {
             terminal.nativeForegroundColor = NSColor(theme.foreground)
             terminal.nativeBackgroundColor = NSColor(theme.background)
             let palette = theme.ansiColors.prefix(16).map { Self.swiftUIColorToTermColor($0) }
@@ -77,19 +78,19 @@ struct ForgeTerminalView: NSViewRepresentable {
         }
 
         // Reactive font update
-        let configFontFamily = ForgeConfigStore.shared.config.terminalFont?.family ??
-                               ForgeConfigStore.shared.config.terminal?.fontFamily ??
-                               ForgeConfigStore.shared.config.appearance?.fontFamily
-        let configFontSize = ForgeConfigStore.shared.config.terminalFont?.size ??
-                             ForgeConfigStore.shared.config.terminal?.fontSize ??
-                             ForgeConfigStore.shared.config.appearance?.fontSize ?? 13
+        let configFontFamily = configStore.config.terminalFont?.family ??
+                               configStore.config.terminal?.fontFamily ??
+                               configStore.config.appearance?.fontFamily
+        let configFontSize = configStore.config.terminalFont?.size ??
+                             configStore.config.terminal?.fontSize ??
+                             configStore.config.appearance?.fontSize ?? 13
         let newFont = resolveTerminalFont(family: configFontFamily, size: CGFloat(configFontSize))
         if nsView.font != newFont {
             nsView.font = newFont
         }
 
         // Reactive theme update
-        if let theme = Self.resolveTheme() {
+        if let theme = resolveTheme() {
             let newFg = NSColor(theme.foreground)
             let newBg = NSColor(theme.background)
             if nsView.nativeForegroundColor != newFg { nsView.nativeForegroundColor = newFg }
@@ -98,8 +99,8 @@ struct ForgeTerminalView: NSViewRepresentable {
     }
 
     /// Looks up the selected theme from config and parses it.
-    private static func resolveTheme() -> ThemeDefinition? {
-        guard let themeId = ForgeConfigStore.shared.config.theme?.source else { return nil }
+    private func resolveTheme() -> ThemeDefinition? {
+        guard let themeId = configStore.config.theme?.source else { return nil }
         let searchPaths = [
             "/Applications/Ghostty.app/Contents/Resources/ghostty/themes",
             (NSHomeDirectory() as NSString).appendingPathComponent(".config/ghostty/themes"),

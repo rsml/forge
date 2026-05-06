@@ -2,6 +2,7 @@ import SwiftUI
 import ForgeCore
 
 struct SidebarProjectList: View {
+    @Environment(ForgeConfigStore.self) private var configStore
     var position: String = "left"
     var onToggleSidebar: () -> Void = {}
     @Environment(WorkspaceController.self) var controller
@@ -11,8 +12,8 @@ struct SidebarProjectList: View {
     @State private var renameText = ""
 
     var body: some View {
-        let tabBarPos = ForgeConfigStore.shared.config.general?.tabBarPosition ??
-                        ForgeConfigStore.shared.config.terminal?.tabBarPosition ?? "top"
+        let tabBarPos = configStore.config.general?.tabBarPosition ??
+                        configStore.config.terminal?.tabBarPosition ?? "top"
         let toolbarOnBottom = tabBarPos == "bottom"
 
         VStack(spacing: 0) {
@@ -72,7 +73,7 @@ struct SidebarProjectList: View {
                     .tooltip(KeyboardShortcuts.toggleSidebar)
             }
         }
-        .frame(height: ForgeConfigStore.shared.titlebarHeight)
+        .frame(height: configStore.titlebarHeight)
     }
 
     @ViewBuilder

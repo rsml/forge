@@ -2,6 +2,7 @@ import SwiftUI
 import ForgeCore
 
 struct StackView: View {
+    @Environment(ForgeConfigStore.self) private var configStore
     @Environment(WorkspaceController.self) var controller
     @Environment(AttentionManager.self) var attention
     @State private var isFullScreen = false
@@ -9,17 +10,17 @@ struct StackView: View {
     @State private var pendingAction: WorkspaceController.StackDismissAction?
 
     private var toolbarPosition: String {
-        ForgeConfigStore.shared.config.stackView?.toolbarPosition ?? "bottom"
+        configStore.config.stackView?.toolbarPosition ?? "bottom"
     }
 
     var body: some View {
         VStack(spacing: 0) {
             if !isFullScreen {
                 ZStack {
-                    ForgeConfigStore.shared.resolvedTheme?.background ?? Color(nsColor: .windowBackgroundColor)
+                    configStore.resolvedTheme?.background ?? Color(nsColor: .windowBackgroundColor)
                     Color.white.opacity(0.06)
                 }
-                .frame(height: ForgeConfigStore.shared.titlebarHeight)
+                .frame(height: configStore.titlebarHeight)
             }
 
             if let uuid = attention.currentTabUUID,
@@ -98,7 +99,7 @@ struct StackView: View {
     /// Dark card backing for the background layer — avoids duplicate tmux sessions
     /// while giving the visual impression of a card behind the foreground.
     private var terminalPlaceholder: some View {
-        (ForgeConfigStore.shared.resolvedTheme?.background ?? Color(red: 0.1, green: 0.1, blue: 0.1))
+        (configStore.resolvedTheme?.background ?? Color(red: 0.1, green: 0.1, blue: 0.1))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 

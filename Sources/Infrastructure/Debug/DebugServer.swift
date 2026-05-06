@@ -316,7 +316,7 @@ final class DebugServer {
             return jsonResponse(["error": "No active project"])
 
         case "refresh":
-            await ctrl.refresh()
+            await ctrl.syncEngine.refresh()
             return jsonResponse(["ok": true])
 
         default:

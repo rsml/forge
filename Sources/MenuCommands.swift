@@ -3,6 +3,7 @@ import ForgeCore
 
 struct ForgeMenuCommands: Commands {
     let controller: WorkspaceController
+    let config: ForgeConfigStore
 
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
@@ -175,7 +176,7 @@ struct ForgeMenuCommands: Commands {
             }
             .keyboardShortcut(KeyboardShortcuts.selectTabLeft.key, modifiers: KeyboardShortcuts.selectTabLeft.modifiers)
 
-            if !ForgeConfigStore.shared.isStackMode {
+            if !config.isStackMode {
                 Button("Select Tab Right") {
                     guard let project = controller.workspace.activeProject,
                           let tabId = controller.workspace.activeTabId,
@@ -187,7 +188,7 @@ struct ForgeMenuCommands: Commands {
                 .keyboardShortcut(KeyboardShortcuts.selectTabRight.key, modifiers: KeyboardShortcuts.selectTabRight.modifiers)
             }
 
-            if ForgeConfigStore.shared.isStackMode {
+            if config.isStackMode {
                 Divider()
                 Button("Done") {
                     NotificationCenter.default.post(name: .forgeStackDone, object: nil)

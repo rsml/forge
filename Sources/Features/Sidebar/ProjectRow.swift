@@ -18,6 +18,7 @@ struct SidebarProjectRow: View {
     var onTabDraggedOut: ((ForgeCore.Tab, Edge) -> Void)?
     var projectIndex: Int = 0
 
+    @Environment(ForgeConfigStore.self) private var configStore
     @Environment(WorkspaceController.self) var controller
     @Environment(AttentionManager.self) var attention
     @State private var isHeaderHovered = false
@@ -60,7 +61,7 @@ struct SidebarProjectRow: View {
                 if isRenaming {
                     InlineRenameField(text: $renameText, font: .system(.body, weight: .medium), onCancel: onRenameCancel, onCommit: onRenameCommit)
                 } else {
-                    TruncatingText(project.name, font: ForgeConfigStore.shared.primaryFont.weight(isActive ? .medium : .regular))
+                    TruncatingText(project.name, font: configStore.primaryFont.weight(isActive ? .medium : .regular))
                         .foregroundStyle(isActive ? .primary : .secondary)
                     Spacer()
 
@@ -177,6 +178,7 @@ struct InlineRenameField: View {
 
 /// A tab row inside a project's expanded sidebar view.
 struct SidebarTabRow: View {
+    @Environment(ForgeConfigStore.self) private var configStore
     var tab: ForgeCore.Tab
     var isActive: Bool
     var isHovered: Bool
@@ -209,7 +211,7 @@ struct SidebarTabRow: View {
             if isRenaming {
                 InlineRenameField(text: $renameText, font: .caption, onCancel: onRenameCancel, onCommit: onRenameCommit)
             } else {
-                TruncatingText(tab.name, font: ForgeConfigStore.shared.secondaryFont)
+                TruncatingText(tab.name, font: configStore.secondaryFont)
                     .foregroundStyle(isActive ? .primary : .secondary)
 
                 Spacer()

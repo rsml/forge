@@ -8,6 +8,7 @@ enum ProjectSortMode: String, CaseIterable {
 }
 
 struct ProjectPickerView: View {
+    @Environment(ForgeConfigStore.self) private var configStore
     var onDismiss: (() -> Void)? = nil
     @Environment(WorkspaceController.self) var controller
     @Environment(\.dismiss) var dismiss
@@ -131,7 +132,7 @@ struct ProjectPickerView: View {
         }
         .onKeyPress(.escape) { close(); return .handled }
         .onAppear {
-            recentPaths = ForgeConfigStore.shared.config.recentDirectories
+            recentPaths = configStore.config.recentDirectories
             if recentPaths.isEmpty {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     browseForFolder()
@@ -170,7 +171,7 @@ struct ProjectPickerView: View {
         case .recent:
             return filtered
         case .mostUsed:
-            let counts = ForgeConfigStore.shared.config.projectOpenCounts ?? [:]
+            let counts = configStore.config.projectOpenCounts ?? [:]
             return filtered.sorted { (counts[$0] ?? 0) > (counts[$1] ?? 0) }
         case .alphabetical:
             return filtered.sorted {
@@ -270,7 +271,7 @@ struct ProjectPickerView: View {
     }
 
     private func saveToRecent(_ path: String) {
-        ForgeConfigStore.shared.update { config in
+        configStore.update { config in
             config.recentDirectories.removeAll { $0 == path }
             config.recentDirectories.insert(path, at: 0)
             if config.recentDirectories.count > 20 {

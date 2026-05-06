@@ -2,10 +2,9 @@ import SwiftUI
 import ForgeCore
 
 struct NotificationCenterRow: View {
+    @Environment(ForgeConfigStore.self) private var store
     var position: String = "left"
     @State private var isFullScreen = false
-
-    private var store: ForgeConfigStore { ForgeConfigStore.shared }
 
     private var iconName: String {
         store.isStackMode ? "list.bullet" : "rectangle.stack"

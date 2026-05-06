@@ -2,6 +2,7 @@ import SwiftUI
 import ForgeCore
 
 struct WindowTabBar: View {
+    @Environment(ForgeConfigStore.self) private var configStore
     var project: Project
     var sidebarVisible: Bool = true
     var sidebarPosition: String = "left"
@@ -13,9 +14,9 @@ struct WindowTabBar: View {
     @State private var renameText = ""
 
     private var tabBarOnBottom: Bool {
-        let pos = ForgeConfigStore.shared.config.general?.tabBarPosition ??
-                  ForgeConfigStore.shared.config.terminal?.tabBarPosition ??
-                  ForgeConfigStore.shared.config.appearance?.tabBarPosition ?? "top"
+        let pos = configStore.config.general?.tabBarPosition ??
+                  configStore.config.terminal?.tabBarPosition ??
+                  configStore.config.appearance?.tabBarPosition ?? "top"
         return pos == "bottom"
     }
 
@@ -123,7 +124,7 @@ struct WindowTabBar: View {
                 }
             }
         .frame(height: 28)
-        .background(ForgeConfigStore.shared.resolvedTheme?.background ?? Color(nsColor: .controlBackgroundColor))
+        .background(configStore.resolvedTheme?.background ?? Color(nsColor: .controlBackgroundColor))
         .onReceive(NotificationCenter.default.publisher(for: .forgeRenameTab)) { _ in
             guard let tabId = controller.workspace.activeTabId,
                   let tab = project.tabs.first(where: { $0.id == tabId }) else { return }
@@ -135,6 +136,7 @@ struct WindowTabBar: View {
 
 
 struct WindowTab: View {
+    @Environment(ForgeConfigStore.self) private var configStore
     var tab: ForgeCore.Tab
     let isActive: Bool
     var tabIndex: Int = 0
@@ -142,7 +144,7 @@ struct WindowTab: View {
     var notificationsDisabled: Bool = false
     @State private var isHovered = false
 
-    private var secondaryFont: Font { ForgeConfigStore.shared.secondaryFont }
+    private var secondaryFont: Font { configStore.secondaryFont }
 
     var body: some View {
         let modifiers = ModifierKeyMonitor.shared
