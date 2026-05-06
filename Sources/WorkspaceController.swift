@@ -38,9 +38,14 @@ final class WorkspaceController {
             if let configPath = tmux.configPath {
                 await tmux.sourceConfig(path: configPath)
             }
-            syncEngine.attentionManager = attentionManager
-            syncEngine.setPostRefreshHook { [weak self] in
+            syncEngine.setPostRefreshHook { [weak self] events in
                 guard let self else { return }
+                for event in events {
+                    switch event {
+                    case .commandCompleted(let tabUUID):
+                        self.attentionManager?.handleEvent(.commandCompleted(tabUUID: tabUUID))
+                    }
+                }
                 await self.attentionManager?.scanForContentMatches(
                     workspace: self.workspace, tmux: self.tmux
                 )

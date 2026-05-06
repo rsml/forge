@@ -98,20 +98,9 @@ struct ForgeTerminalView: NSViewRepresentable {
         }
     }
 
-    /// Looks up the selected theme from config and parses it.
     private func resolveTheme() -> ThemeDefinition? {
         guard let themeId = configStore.config.theme?.source else { return nil }
-        let searchPaths = [
-            "/Applications/Ghostty.app/Contents/Resources/ghostty/themes",
-            (NSHomeDirectory() as NSString).appendingPathComponent(".config/ghostty/themes"),
-        ]
-        for searchPath in searchPaths {
-            let path = (searchPath as NSString).appendingPathComponent(themeId)
-            if let theme = ThemeParser.parseThemeFile(path: path, id: themeId) {
-                return theme
-            }
-        }
-        return nil
+        return ThemeParser.loadTheme(id: themeId)
     }
 
     /// Converts a SwiftUI Color to SwiftTerm's Color (UInt16 components, 0-65535).

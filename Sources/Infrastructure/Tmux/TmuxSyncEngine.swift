@@ -10,8 +10,7 @@ final class TmuxSyncEngine {
     private let tmux: any TmuxPort
     private let git: any GitPort
     private let config: ForgeConfigStore
-    weak var attentionManager: AttentionManager?
-    private var onPostRefresh: (() async -> Void)?
+    private var onPostRefresh: (([StateMerger.PaneEvent]) async -> Void)?
 
     private var refreshTask: Task<Void, Never>?
     private var refreshDebounceTask: Task<Void, Never>?
@@ -27,7 +26,7 @@ final class TmuxSyncEngine {
         self.config = config
     }
 
-    func setPostRefreshHook(_ hook: @escaping () async -> Void) {
+    func setPostRefreshHook(_ hook: @escaping ([StateMerger.PaneEvent]) async -> Void) {
         onPostRefresh = hook
     }
 
@@ -72,6 +71,7 @@ final class TmuxSyncEngine {
         let windowsBySession = Dictionary(grouping: allWindows, by: \.projectId)
         let panesByWindow = Dictionary(grouping: allPanes, by: \.tabId)
 
+        var paneEvents: [StateMerger.PaneEvent] = []
         for project in workspace.projects {
             if let activeTabId = StateMerger.mergeTabs(
                 project: project, with: windowsBySession[project.id] ?? [],
@@ -80,11 +80,11 @@ final class TmuxSyncEngine {
                 workspace.activeTabId = activeTabId
             }
             for tab in project.tabs {
-                mergePaneState(tab: tab, panesByWindow[tab.id] ?? [])
+                paneEvents.append(contentsOf: mergePaneState(tab: tab, panesByWindow[tab.id] ?? []))
             }
         }
 
-        await onPostRefresh?()
+        await onPostRefresh?(paneEvents)
 
         let activeProjectId = workspace.activeProjectId
         if activeProjectId != lastGitBranchProjectId {
@@ -100,14 +100,9 @@ final class TmuxSyncEngine {
 
     // MARK: - Private
 
-    private func mergePaneState(tab: Tab, _ infos: [PaneInfo]) {
+    private func mergePaneState(tab: Tab, _ infos: [PaneInfo]) -> [StateMerger.PaneEvent] {
         let (activePaneId, events) = StateMerger.mergePanes(tab: tab, with: infos)
         if let activePaneId { workspace.activePaneId = activePaneId }
-        for event in events {
-            switch event {
-            case .commandCompleted(let tabUUID):
-                attentionManager?.handleEvent(.commandCompleted(tabUUID: tabUUID))
-            }
-        }
+        return events
     }
 }

@@ -1,14 +1,25 @@
 import SwiftUI
 
 struct ThemeParser {
+    private static let searchPaths = [
+        "/Applications/Ghostty.app/Contents/Resources/ghostty/themes",
+        (NSHomeDirectory() as NSString).appendingPathComponent(".config/ghostty/themes"),
+    ]
+
+    static func loadTheme(id: String) -> ThemeDefinition? {
+        for searchPath in searchPaths {
+            let path = (searchPath as NSString).appendingPathComponent(id)
+            if let theme = parseThemeFile(path: path, id: id) {
+                return theme
+            }
+        }
+        return nil
+    }
+
     static func loadAllThemes() -> [ThemeDefinition] {
         var themes: [ThemeDefinition] = []
-        let searchPaths = [
-            "/Applications/Ghostty.app/Contents/Resources/ghostty/themes",
-            (NSHomeDirectory() as NSString).appendingPathComponent(".config/ghostty/themes"),
-        ]
         let fm = FileManager.default
-        for searchPath in searchPaths {
+        for searchPath in Self.searchPaths {
             guard let files = try? fm.contentsOfDirectory(atPath: searchPath) else { continue }
             for file in files.sorted() {
                 let fullPath = (searchPath as NSString).appendingPathComponent(file)

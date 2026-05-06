@@ -5,7 +5,7 @@ import Foundation
 @MainActor
 public enum StateMerger {
 
-    public enum PaneEvent: Equatable {
+    public enum PaneEvent: Equatable, Sendable {
         case commandCompleted(tabUUID: UUID)
     }
 

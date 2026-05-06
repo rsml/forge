@@ -53,16 +53,6 @@ final class ForgeConfigStore {
 
     private static func loadTheme(id: String?) -> ThemeDefinition? {
         guard let themeId = id else { return nil }
-        let searchPaths = [
-            "/Applications/Ghostty.app/Contents/Resources/ghostty/themes",
-            (NSHomeDirectory() as NSString).appendingPathComponent(".config/ghostty/themes"),
-        ]
-        for searchPath in searchPaths {
-            let path = (searchPath as NSString).appendingPathComponent(themeId)
-            if let theme = ThemeParser.parseThemeFile(path: path, id: themeId) {
-                return theme
-            }
-        }
-        return nil
+        return ThemeParser.loadTheme(id: themeId)
     }
 }
