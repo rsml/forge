@@ -29,6 +29,7 @@ struct GeneralSettingsPane: View {
                 Toggle("Warn before closing Forge", isOn: generalBinding(\.confirmBeforeClose, default: true))
                 Toggle("Warn before closing a project", isOn: generalBinding(\.warnOnCloseProject, default: true))
                 Toggle("Warn before closing a tab", isOn: generalBinding(\.warnOnCloseTab, default: false))
+                Toggle("Confirm before moving a tab between projects", isOn: generalBinding(\.warnOnMoveTab, default: true))
             }
 
         }

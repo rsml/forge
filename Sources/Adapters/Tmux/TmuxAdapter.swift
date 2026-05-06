@@ -93,6 +93,10 @@ final class TmuxAdapter: TmuxPort {
         controlMode.send("swap-window -s \(id) -t \(target)")
     }
 
+    func moveWindow(id: String, toSession: String) async {
+        controlMode.send("move-window -s \(id) -t '\(toSession):'")
+    }
+
     func sourceConfig(path: String) async {
         _ = await runner.run("source-file", path)
     }
@@ -100,6 +104,10 @@ final class TmuxAdapter: TmuxPort {
     func clearHistory(pane: String) async {
         controlMode.send("clear-history -t \(pane)")
         controlMode.send("send-keys -t \(pane) C-l")
+    }
+
+    func capturePaneContent(id: String, lastN: Int) async -> String? {
+        await runner.run("capture-pane", "-p", "-t", id, "-S", "-\(lastN)")
     }
 
     func startControlMode(onEvent: @escaping @Sendable (String) -> Void) {

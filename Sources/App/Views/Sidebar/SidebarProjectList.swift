@@ -79,7 +79,7 @@ struct SidebarProjectList: View {
     private var projectList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 2) {
-                ReorderableStack(controller.workspace.sessions, axis: .vertical, spacing: 2) { session, isDragging in
+                ReorderableStack(controller.workspace.sessions, axis: .vertical, spacing: 2, hitTestHeight: 28) { session, isDragging in
                     SessionRow(
                         session: session,
                         isActive: session.id == controller.workspace.activeSessionId,
@@ -126,6 +126,13 @@ struct SidebarProjectList: View {
                             renamingWindowId = nil
                         },
                         onRenameWindowCancel: { renamingWindowId = nil },
+                        onTabDraggedOut: { window, edge in
+                            let sessions = controller.workspace.sessions
+                            guard let srcIdx = sessions.firstIndex(where: { $0.id == session.id }) else { return }
+                            let targetIdx = edge == .top ? srcIdx - 1 : srcIdx + 1
+                            guard sessions.indices.contains(targetIdx) else { return }
+                            controller.moveWindow(window, from: session, to: sessions[targetIdx])
+                        },
                         projectIndex: controller.workspace.sessions.firstIndex(where: { $0.id == session.id }).map { $0 + 1 } ?? 0
                     )
                     .contextMenu {

@@ -10,6 +10,7 @@ import ForgeDomain
 final class WorkspaceController {
     let workspace = Workspace()
     var attentionManager: AttentionManager?
+    let contentDetector = ContentDetector()
     private(set) var gitBranch: String?
     private let tmux: any TmuxPort
     private var refreshTask: Task<Void, Never>?
@@ -69,6 +70,30 @@ final class WorkspaceController {
             }
         }
 
+        // Content-based attention detection for running panes
+        let patterns = ContentDetector.defaultPatterns
+            + (ForgeConfigStore.shared.config.stackView?.contentPatterns ?? [])
+        for session in workspace.sessions {
+            for window in session.windows {
+                for pane in window.panes where pane.status == .running {
+                    if let content = await tmux.capturePaneContent(id: pane.id, lastN: 5) {
+                        let isNewMatch = contentDetector.scan(
+                            paneId: pane.id, content: content, patterns: patterns
+                        )
+                        if isNewMatch {
+                            pane.hasContentMatch = true
+                            attentionManager?.handleEvent(.contentMatch(windowUUID: window.uuid))
+                        }
+                    }
+                }
+                for pane in window.panes where pane.hasContentMatch {
+                    if !contentDetector.isActive(paneId: pane.id) {
+                        pane.hasContentMatch = false
+                    }
+                }
+            }
+        }
+
         let activeSessionId = workspace.activeSessionId
         if activeSessionId != lastGitBranchSessionId {
             lastGitBranchSessionId = activeSessionId
@@ -102,9 +127,10 @@ final class WorkspaceController {
 
     func selectWindow(_ window: Window) {
         workspace.activeWindowId = window.id
-        // Clear bell state for all panes in this window
+        // Clear attention state for all panes in this window
         for pane in window.panes {
             pane.hasBell = false
+            pane.hasContentMatch = false
         }
         Task { await tmux.selectWindow(id: window.id) }
         saveUIState()
@@ -219,6 +245,41 @@ final class WorkspaceController {
         } else {
             removeSession(session)
         }
+    }
+
+    func moveWindow(_ window: Window, from source: Session, to target: Session) {
+        if ForgeConfigStore.shared.config.general?.warnOnMoveTab ?? true {
+            let alert = NSAlert()
+            alert.messageText = "Move tab to \"\(target.name)\"?"
+            alert.informativeText = "\"\(window.name)\" will be moved from \"\(source.name)\"."
+            alert.addButton(withTitle: "Move Tab")
+            alert.addButton(withTitle: "Cancel")
+            alert.showsSuppressionButton = true
+            alert.suppressionButton?.title = "Don't ask again"
+            alert.alertStyle = .informational
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            if alert.suppressionButton?.state == .on {
+                ForgeConfigStore.shared.update { config in
+                    if config.general == nil { config.general = ForgeConfig.GeneralSettings() }
+                    config.general!.warnOnMoveTab = false
+                }
+            }
+        }
+
+        // Optimistic update
+        if let idx = source.windows.firstIndex(where: { $0.id == window.id }) {
+            source.windows.remove(at: idx)
+        }
+        target.windows.append(window)
+
+        // If the moved window was active, select the next available
+        if source.id == workspace.activeSessionId, workspace.activeWindowId == window.id {
+            if let next = source.windows.first {
+                selectWindow(next)
+            }
+        }
+
+        Task { await tmux.moveWindow(id: window.id, toSession: target.name) }
     }
 
     func clearScrollback() {

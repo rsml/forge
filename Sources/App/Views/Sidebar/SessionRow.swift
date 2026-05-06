@@ -23,6 +23,7 @@ struct SessionRow: View {
     var onStartWindowRename: (ForgeDomain.Window) -> Void = { _ in }
     var onRenameWindowCommit: () -> Void = {}
     var onRenameWindowCancel: () -> Void = {}
+    var onTabDraggedOut: ((ForgeDomain.Window, Edge) -> Void)?
     var projectIndex: Int = 0
 
     @State private var isHeaderHovered = false
@@ -116,6 +117,9 @@ struct SessionRow: View {
                     }
                 } onReorder: { from, to in
                     session.windows.move(fromOffsets: IndexSet(integer: from), toOffset: to)
+                } onDragExit: { index, edge in
+                    guard let onTabDraggedOut, index < session.windows.count else { return }
+                    onTabDraggedOut(session.windows[index], edge)
                 }
                 .padding(.leading, 0)
                 .transition(.opacity.combined(with: .move(edge: .top)))

@@ -73,9 +73,13 @@ public protocol TmuxPort {
 
     func splitWindow(id: String, direction: SplitDirection) async
     func swapWindow(id: String, offset: Int) async
+    func moveWindow(id: String, toSession: String) async
 
     func sourceConfig(path: String) async
     func clearHistory(pane: String) async
+
+    /// Capture the last N visible lines of a pane's terminal content.
+    func capturePaneContent(id: String, lastN: Int) async -> String?
 
     func startControlMode(onEvent: @escaping @Sendable (String) -> Void)
     func stopControlMode()

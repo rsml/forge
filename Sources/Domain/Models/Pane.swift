@@ -28,12 +28,13 @@ public final class Pane: Identifiable {
     public var pid: Int
     public var status: PaneStatus
     public var hasBell: Bool = false
+    public var hasContentMatch: Bool = false
     /// The command that was running before the most recent command change.
     public var previousCommand: String = ""
 
-    /// True if this pane needs user attention (bell, idle agent, error)
+    /// True if this pane needs user attention (bell, content match, idle agent, error)
     public var needsAttention: Bool {
-        hasBell || status == .needsAttention || status == .error
+        hasBell || hasContentMatch || status == .needsAttention || status == .error
     }
 
     public init(id: String, windowId: String, index: Int = 0, active: Bool = false,

@@ -41,6 +41,7 @@ struct ForgeConfig: Codable {
         var confirmBeforeClose: Bool?
         var warnOnCloseProject: Bool?
         var warnOnCloseTab: Bool?
+        var warnOnMoveTab: Bool?
         var sidebarPosition: String?    // "left" or "right"
         var tabBarPosition: String?     // "top" or "bottom"
     }
@@ -78,6 +79,7 @@ struct ForgeConfig: Codable {
         var notify: String?                 // "always" or "never"
         var notificationSound: String?      // system sound name or custom file path
         var hiddenWindowUUIDs: [String]?    // persisted hidden set
+        var contentPatterns: [String]?      // user-defined patterns merged with defaults
 
         public init() {}
     }

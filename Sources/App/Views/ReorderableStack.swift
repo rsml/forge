@@ -15,8 +15,10 @@ struct ReorderableStack<Item: Identifiable, Content: View>: View {
     let items: [Item]
     let axis: Axis
     let spacing: CGFloat
+    let hitTestHeight: CGFloat?
     @ViewBuilder let content: (Item, Bool) -> Content
     let onReorder: (Int, Int) -> Void
+    let onDragExit: ((_ itemIndex: Int, _ edge: Edge) -> Void)?
 
     @State private var draggedIndex: Int?
     @State private var insertionIndex: Int?
@@ -32,14 +34,18 @@ struct ReorderableStack<Item: Identifiable, Content: View>: View {
         _ items: [Item],
         axis: Axis = .horizontal,
         spacing: CGFloat = 1,
+        hitTestHeight: CGFloat? = nil,
         @ViewBuilder content: @escaping (Item, Bool) -> Content,
-        onReorder: @escaping (Int, Int) -> Void
+        onReorder: @escaping (Int, Int) -> Void,
+        onDragExit: ((_ itemIndex: Int, _ edge: Edge) -> Void)? = nil
     ) {
         self.items = items
         self.axis = axis
         self.spacing = spacing
+        self.hitTestHeight = hitTestHeight
         self.content = content
         self.onReorder = onReorder
+        self.onDragExit = onDragExit
     }
 
     // MARK: - Hit Testing
@@ -52,7 +58,13 @@ struct ReorderableStack<Item: Identifiable, Content: View>: View {
         guard !sortedFrames.isEmpty else { return 0 }
 
         for (index, frame) in sortedFrames {
-            let mid = axis == .horizontal ? frame.midX : frame.midY
+            let mid: CGFloat
+            if let h = hitTestHeight {
+                // Anchor hit testing to the top edge of each item (e.g. project header)
+                mid = (axis == .horizontal ? frame.minX : frame.minY) + h / 2
+            } else {
+                mid = axis == .horizontal ? frame.midX : frame.midY
+            }
             if draggedCenter < mid - 4 {
                 return index
             }
@@ -66,7 +78,12 @@ struct ReorderableStack<Item: Identifiable, Content: View>: View {
         guard let from = draggedIndex, let to = insertionIndex, from != to else { return 0 }
         guard let draggedFrame = dragFrameSnapshot[from] else { return 0 }
 
-        let draggedSize = axis == .horizontal ? draggedFrame.width : draggedFrame.height
+        let draggedSize: CGFloat
+        if let h = hitTestHeight {
+            draggedSize = h
+        } else {
+            draggedSize = axis == .horizontal ? draggedFrame.width : draggedFrame.height
+        }
         let shiftAmount = draggedSize + spacing
 
         if from < to {
@@ -145,6 +162,29 @@ struct ReorderableStack<Item: Identifiable, Content: View>: View {
                                 let translation = axis == .horizontal
                                     ? value.translation.width
                                     : value.translation.height
+
+                                // Detect drag exit before clamping
+                                if let onDragExit {
+                                    let unclampedCenter: CGFloat
+                                    if axis == .horizontal {
+                                        unclampedCenter = frame.midX + translation
+                                    } else {
+                                        unclampedCenter = frame.midY + translation
+                                    }
+                                    let containerExtent = axis == .horizontal ? containerSize.width : containerSize.height
+                                    if unclampedCenter < -20 {
+                                        let exitEdge: Edge = axis == .horizontal ? .leading : .top
+                                        onDragExit(index, exitEdge)
+                                        cancelDrag()
+                                        return
+                                    } else if unclampedCenter > containerExtent + 20 {
+                                        let exitEdge: Edge = axis == .horizontal ? .trailing : .bottom
+                                        onDragExit(index, exitEdge)
+                                        cancelDrag()
+                                        return
+                                    }
+                                }
+
                                 dragOffset = clampedOffset(translation, frame: frame)
 
                                 // Compute dragged item's current center using snapshotted frame
