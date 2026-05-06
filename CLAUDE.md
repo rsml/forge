@@ -1,7 +1,7 @@
 # Forge
 
 Native macOS tmux frontend built with SwiftUI (macOS 14+, Swift 6.0). Uses SwiftTerm for terminal rendering.
-Feature-based architecture with a shared domain kernel. See `CONTEXT.md` for domain glossary, `docs/adr/` for architectural decisions.
+Hexagonal architecture: domain logic in `Domain/`, adapters in `Adapters/`, boundaries defined by port protocols.
 
 ## Build & Run
 
@@ -15,38 +15,27 @@ tail -20 /tmp/forge.log   # log categories: [app] [control] [tmux] [attention] [
 
 ## Architecture
 
+See `CONTEXT.md` for the domain glossary. See `docs/adr/` for architectural decision records.
+
 ```
 Sources/
-  Core/              # Shared kernel (SPM: ForgeCore). Models, Ports, pure logic.
-  Features/          # Vertical slices — each feature owns its own layers.
-    Attention/       # AttentionManager, MacNotificationAdapter
-    Sidebar/         # SidebarProjectList, ProjectRow, etc.
-    Stack/           # StackView, StackToolbar
-    TabBar/          # WindowTabBar
-    Terminal/        # ForgeTerminalView, TerminalArea, ProjectDetailView
-    CommandPalette/  # CommandPalette, CommandRegistry
-    ProjectPicker/   # ProjectPickerView
-    Settings/        # All settings panes
-    TitleBar/        # TitleBarManager, overlay, chrome stripping
-    Shared/          # Cross-feature UI: MainView, Tooltip, KeyboardShortcuts, etc.
-  Infrastructure/    # Cross-feature adapters: Tmux/, Git/, Config/, Theme/, Debug/, Logging/
-  WorkspaceController.swift  # Orchestrator
-  ForgeApp.swift              # Composition root + AppDelegate
-  MenuCommands.swift          # Menu bar commands
+  Domain/          # Models (Workspace > Project > Tab > Pane), Ports (TmuxPort)
+  App/             # SwiftUI views, WorkspaceController, AttentionManager, Commands
+  Adapters/        # Tmux/ (adapter, control mode, command runner)
+                   # Debug/ (DebugServer), Logging/ (ForgeLog), Config/, Theme/
+  ForgeApp.swift   # Entry point
 ```
 
 ### Dependency Direction
-- **Core/** is the shared kernel. Features depend on it, not on each other.
-- **Features/** are vertical slices. Each feature materializes only the layers it needs (flat files for view-only, `Domain/`/`Ports/`/`Adapters/` subfolders when it has its own domain logic).
-- **Infrastructure/** holds adapters that serve multiple features. Feature-specific adapters live inside the feature.
-- Port protocols live in `Core/Ports/`. Cross-feature port implementations live in `Infrastructure/`. Feature-specific implementations live in the feature.
-- No cross-imports between features. Communication goes through Core or the orchestrator.
+- `App/` and `Adapters/` depend on `Domain/`. `Domain/` depends on nothing.
+- Port protocols live in `Domain/Ports/`. Port implementations live in `Adapters/`. Never in `App/`.
+- Views and controllers consume ports, never concrete adapters.
+- No cross-imports between adapter modules (e.g., `Tmux/` must not import `Debug/`).
 
 ### Where Does This Code Go?
-- **Core/** — Pure functions on domain models, decision logic, value types. Zero framework imports (no AppKit, no SwiftUI). If it has no framework imports, it's probably Core.
-- **Features/** — Views, feature-specific controllers, feature-specific adapters. Each feature is a self-contained vertical slice.
-- **Infrastructure/** — Adapters that serve multiple features: I/O, processes, system APIs, persistence.
-- **Tested domain logic lives in Core/** (the `ForgeCore` SPM target). When a feature's domain grows large enough to warrant its own test target, extract a new SPM target.
+- **Domain/** — Pure functions on domain models, decision logic, value types. Zero framework imports (no AppKit, no SwiftUI). If it has no framework imports, it's probably Domain.
+- **App/** — State orchestration (controllers), SwiftUI views, commands. Wires ports together but doesn't implement them.
+- **Adapters/** — Infrastructure: I/O, processes, system APIs, persistence. Every port implementation lives here.
 
 ### Blessed Patterns
 - One pattern per problem. If the codebase already solves something, use that solution — don't invent a parallel one.
@@ -83,8 +72,8 @@ Sources/
 - When a mutating adapter call fails, surface feedback to the user (toast, log, or revert optimistic update).
 
 ### Testing Strategy
-- **Core**: TDD with Swift Testing (`@Test`, `#expect`). Pure logic, no side effects.
-- **Infrastructure**: Integration tests against real tmux when needed.
+- **Domain**: TDD with Swift Testing (`@Test`, `#expect`). Pure logic, no side effects.
+- **Adapters**: Integration tests against real tmux when needed.
 - **UI**: Visual verification via debug server screenshots.
 
 ### Code Discipline
@@ -108,7 +97,7 @@ Sources/
 - **Truncation tooltips**: Sidebar text (project names, tab names) uses `TruncatingText` which shows a tooltip only when ellipsized.
 
 ### Title Bar
-- Window created programmatically in `AppDelegate.createMainWindow()` — not via SwiftUI `Window` scene. Title bar managed by `TitleBarManager` (`Features/TitleBar/`).
+- Window created programmatically in `AppDelegate.createMainWindow()` — not via SwiftUI `Window` scene.
 - `titlebarAppearsTransparent = true`, `titleVisibility = .hidden`, `titlebarSeparatorStyle = .none`.
 - `_NSTitlebarDecorationView` and `NSVisualEffectView` inside the title bar are **hidden** (not removed) — more resilient to macOS re-adding them during layout passes.
 - Stripping runs on a 100ms repeating timer for 3s at launch, plus on `didBecomeKeyNotification` and after fullscreen exit.
