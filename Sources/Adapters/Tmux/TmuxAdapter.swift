@@ -5,6 +5,7 @@ import ForgeDomain
 @MainActor
 final class TmuxAdapter: TmuxPort {
     private let runner = TmuxCommandRunner()
+    var configPath: String? { runner.configPath }
     private lazy var controlMode = TmuxControlMode(
         tmuxPath: runner.tmuxPath,
         socketName: runner.socketName,

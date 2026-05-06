@@ -30,6 +30,9 @@ final class WorkspaceController {
         Task {
             ForgeLog.log("[app] Connecting...")
             await ensureServer()
+            if let configPath = tmux.configPath {
+                await tmux.sourceConfig(path: configPath)
+            }
             await refresh()
             seedRecentDirectories()
             restoreUIState()

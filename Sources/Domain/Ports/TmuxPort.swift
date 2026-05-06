@@ -76,6 +76,8 @@ public protocol TmuxPort {
     func reorderTab(id: String, swapWith: [String]) async
     func moveTab(id: String, toSession: String) async
 
+    var configPath: String? { get }
+
     func sourceConfig(path: String) async
     func clearHistory(pane: String) async
 
