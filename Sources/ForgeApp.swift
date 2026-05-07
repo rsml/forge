@@ -16,6 +16,21 @@ struct ForgeApp: App {
     }
 }
 
+// MARK: - Bundle Resource Lookup
+
+/// Finds a resource file, checking Contents/Resources/ first (.app bundle), then next to the executable (bare SPM build).
+func bundleResource(_ filename: String) -> URL? {
+    if let url = Bundle.main.resourceURL?.appendingPathComponent(filename),
+       FileManager.default.fileExists(atPath: url.path) {
+        return url
+    }
+    if let url = Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent(filename),
+       FileManager.default.fileExists(atPath: url.path) {
+        return url
+    }
+    return nil
+}
+
 // MARK: - Notification Names
 
 extension Notification.Name {
@@ -53,8 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
 
-        if let iconPath = Bundle.main.executableURL?.deletingLastPathComponent()
-            .appendingPathComponent("AppIcon.icns"),
+        if let iconPath = bundleResource("AppIcon.icns"),
            let icon = NSImage(contentsOf: iconPath) {
             NSApp.applicationIconImage = icon
         }

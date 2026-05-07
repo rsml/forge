@@ -23,8 +23,7 @@ struct TmuxCommandRunner: Sendable {
         let userConfigPath = (NSHomeDirectory() as NSString).appendingPathComponent(".config/forge/forge-tmux.conf")
         if FileManager.default.fileExists(atPath: userConfigPath) {
             self.configPath = userConfigPath
-        } else if let configCandidate = execURL?.appendingPathComponent("forge-tmux.conf").path,
-                  FileManager.default.fileExists(atPath: configCandidate) {
+        } else if let configCandidate = bundleResource("forge-tmux.conf")?.path {
             self.configPath = configCandidate
         } else {
             self.configPath = nil

@@ -15,8 +15,7 @@ struct ForgeMenuCommands: Commands {
                 alert.messageText = "Forge \(version) (\(build))"
                 alert.informativeText = "A native macOS frontend for tmux."
                 alert.alertStyle = .informational
-                if let iconPath = Bundle.main.executableURL?.deletingLastPathComponent()
-                    .appendingPathComponent("appicon-transparent.png"),
+                if let iconPath = bundleResource("appicon-transparent.png"),
                    let icon = NSImage(contentsOf: iconPath) {
                     icon.size = NSSize(width: 128, height: 128)
                     alert.icon = icon

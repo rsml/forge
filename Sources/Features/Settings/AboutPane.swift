@@ -14,8 +14,7 @@ struct AboutPane: View {
             Spacer()
 
             Group {
-                if let iconPath = Bundle.main.executableURL?.deletingLastPathComponent()
-                    .appendingPathComponent("appicon-transparent.png"),
+                if let iconPath = bundleResource("appicon-transparent.png"),
                    let nsImage = NSImage(contentsOf: iconPath) {
                     Image(nsImage: nsImage)
                         .resizable()

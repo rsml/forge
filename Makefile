@@ -29,12 +29,11 @@ bundle:
 	@cp $(BUILD)/Forge $(BUILD)/Forge.app/Contents/MacOS/Forge
 	@cp Resources/Info.plist $(BUILD)/Forge.app/Contents/
 	@cp -f Resources/tmux $(BUILD)/Forge.app/Contents/MacOS/ 2>/dev/null || true
-	@cp -f Resources/forge-tmux.conf $(BUILD)/Forge.app/Contents/MacOS/ 2>/dev/null || true
+	@cp -f Resources/forge-tmux.conf $(BUILD)/Forge.app/Contents/Resources/ 2>/dev/null || true
 	@cp -f Resources/AppIcon.icns $(BUILD)/Forge.app/Contents/Resources/ 2>/dev/null || true
-	@cp -f Resources/AppIcon.icns $(BUILD)/Forge.app/Contents/MacOS/ 2>/dev/null || true
 	@cp -f Assets/appicon-transparent.png $(BUILD)/Forge.app/Contents/Resources/ 2>/dev/null || true
-	@cp -f Assets/appicon-transparent.png $(BUILD)/Forge.app/Contents/MacOS/ 2>/dev/null || true
 	@codesign --force --sign - $(BUILD)/Forge.app/Contents/MacOS/tmux 2>/dev/null || true
+	@codesign --force --sign - $(BUILD)/Forge.app
 
 build:
 	swift build -c release
