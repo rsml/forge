@@ -19,7 +19,7 @@ tail -20 /tmp/forge.log   # log categories: [app] [control] [tmux] [attention] [
 Sources/
   Core/                          # Shared kernel (SPM: ForgeCore). Models, Ports, pure logic.
     Models/                      # Workspace > Project > Tab > Pane, AttentionQueue, AttentionEvent
-    Ports/                       # TmuxQueryPort/TmuxCommandPort/TmuxControlPort, GitPort, AttentionPort, NotificationPort
+    Ports/                       # TmuxQueryPort/TmuxCommandPort/TmuxControlPort, AttentionPort, NotificationPort
     StateMerger.swift            # Pure state reconciliation (tmux → domain)
     ContentDetector.swift        # Pattern matching for interactive prompts
     TmuxEventParser.swift        # Parse tmux control mode events
@@ -32,8 +32,7 @@ Sources/
     Attention/                   # AttentionManager, MacNotificationAdapter, NotificationPanel, NotificationCenterRow
     Sidebar/                     # SidebarProjectList, SidebarProjectRow, SidebarTabRow, TruncatingText, IconButton, StatusDot
     Stack/                       # StackView, StackToolbar, StackEmptyState
-    TabBar/                      # WindowTabBar, WindowTab
-    Terminal/                    # ForgeTerminalView, TerminalArea, ProjectDetailView
+    Terminal/                    # ForgeTerminalView, TerminalArea, ProjectDetailView, WindowTabBar, WindowTab
     CommandPalette/              # CommandPalette, CommandRegistry
     ProjectPicker/               # ProjectPickerView, PickerProjectRow
     Settings/                    # SettingsView + 8 panes (General, ListMode, StackMode, Theme, Font, Terminal, Shortcuts, About)
@@ -42,7 +41,6 @@ Sources/
 
   Infrastructure/                # Cross-feature adapters
     Tmux/                        # TmuxAdapter, TmuxControlMode, TmuxCommandRunner, TmuxStateParser, TmuxSyncEngine
-    Git/                         # GitAdapter
     Config/                      # ForgeConfig, ForgeConfigStore, UIStatePersistence, KeyboardShortcuts
     Theme/                       # ThemeParser, ThemeDefinition, ThemeDefinition+SwiftUI, FontResolver
     Debug/                       # DebugServer, DebugServer+Responses
@@ -69,8 +67,8 @@ Sources/
 
 ### Key Components
 - **WorkspaceController** — Thin orchestrator (~139 lines). Owns Workspace model, routes tmux control mode events, delegates commands to tmux port. Does NOT own refresh logic or content scanning. Uses `(any AttentionPort)?` — not the concrete AttentionManager.
-- **TmuxSyncEngine** (`Infrastructure/Tmux/`) — Owns the refresh cycle: query tmux, merge state via StateMerger, debounce, periodic polling, git branch tracking. Post-refresh hook passes `[StateMerger.PaneEvent]` for WorkspaceController to route to AttentionManager.
-- **AttentionManager** (`Features/Attention/`) — Owns the attention queue AND content scanning. Conforms to `AttentionPort`. Called via the post-refresh hook. Also owns MacNotificationAdapter. NotificationPanel and NotificationCenterRow live here too.
+- **TmuxSyncEngine** (`Infrastructure/Tmux/`) — Owns the refresh cycle: query tmux, merge state via StateMerger, debounce, periodic polling, git branch tracking, content scanning. Post-refresh hook passes `[StateMerger.PaneEvent]` for WorkspaceController to route to AttentionManager.
+- **AttentionManager** (`Features/Attention/`) — Owns the attention queue. Conforms to `AttentionPort`. Receives events via the post-refresh hook. Also owns MacNotificationAdapter. NotificationPanel and NotificationCenterRow live here too.
 - **AppState** (`Features/Shared/`) — `@Observable` cross-feature UI state: modals, sidebar, rename state, stack actions. Dispatches `AppCommand`s. Owns `renameText` and rename lifecycle helpers (`startProjectRename`, `commitTabRename`, etc.). Uses `(any AttentionPort)?` and `onModeChanged` closure — no direct refs to feature implementations.
 - **UIStatePersistence** (`Infrastructure/Config/`) — Save/restore active project+tab selection, sidebar state, recent directories.
 - **TitleBarManager** (`Features/TitleBar/`) — All title bar visual management: overlay installation, chrome stripping, fullscreen handling, appearance sync.
@@ -81,8 +79,7 @@ Sources/
 - **TmuxCommandPort** — Mutations: session/tab/pane CRUD, split, swap, reorder, move, sourceConfig, clearHistory.
 - **TmuxControlPort** — Control mode lifecycle: startControlMode, stopControlMode, configPath.
 - **TmuxPort** — `typealias TmuxPort = TmuxQueryPort & TmuxCommandPort & TmuxControlPort`. Callers can accept focused protocols when they don't need all three.
-- **GitPort** — `currentBranch(at:)`.
-- **AttentionPort** — Queue management: handleEvent, markDone, hide, moveToBack, unhide, removeTab, pruneStaleHiddenEntries, promoteToFront, scanForContentMatches. Properties: currentTabUUID, queueCount, needsAttention, isHidden.
+- **AttentionPort** — Queue management: handleEvent, markDone, hide, moveToBack, unhide, removeTab, pruneStaleHiddenEntries, promoteToFront. Properties: currentTabUUID, queueCount, isHidden.
 - **NotificationPort** — System notification delivery.
 
 ### Blessed Patterns

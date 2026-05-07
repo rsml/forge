@@ -7,7 +7,7 @@ import ForgeCore
 final class TitleBarManager: NSObject {
     let window: NSWindow
     let controller: WorkspaceController
-    let attentionManager: AttentionManager
+    let attentionManager: any AttentionPort
     let config: ForgeConfigStore
 
     var titleBarOverlay: NSView?
@@ -22,7 +22,7 @@ final class TitleBarManager: NSObject {
     var branchTrailingToSplitH: NSLayoutConstraint?
     let appState: AppState
 
-    init(window: NSWindow, controller: WorkspaceController, attentionManager: AttentionManager, config: ForgeConfigStore, appState: AppState) {
+    init(window: NSWindow, controller: WorkspaceController, attentionManager: any AttentionPort, config: ForgeConfigStore, appState: AppState) {
         self.window = window
         self.controller = controller
         self.attentionManager = attentionManager

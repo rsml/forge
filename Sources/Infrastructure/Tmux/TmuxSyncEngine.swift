@@ -8,7 +8,6 @@ import ForgeCore
 final class TmuxSyncEngine {
     private let workspace: Workspace
     private let tmux: any TmuxPort
-    private let git: any GitPort
     private let config: ForgeConfigStore
     private var onPostRefresh: (([StateMerger.PaneEvent]) async -> Void)?
 
@@ -18,11 +17,11 @@ final class TmuxSyncEngine {
     private var needsRefreshAfterCurrent = false
     private var lastGitBranchProjectId: String?
     private(set) var gitBranch: String?
+    private let contentDetector = ContentDetector()
 
-    init(workspace: Workspace, tmux: any TmuxPort, git: any GitPort, config: ForgeConfigStore) {
+    init(workspace: Workspace, tmux: any TmuxPort, config: ForgeConfigStore) {
         self.workspace = workspace
         self.tmux = tmux
-        self.git = git
         self.config = config
     }
 
@@ -84,13 +83,16 @@ final class TmuxSyncEngine {
             }
         }
 
+        let contentEvents = await scanContentMatches()
+        paneEvents.append(contentsOf: contentEvents)
+
         await onPostRefresh?(paneEvents)
 
         let activeProjectId = workspace.activeProjectId
         if activeProjectId != lastGitBranchProjectId {
             lastGitBranchProjectId = activeProjectId
             if let path = workspace.activeProject?.path {
-                gitBranch = await git.currentBranch(at: path)
+                gitBranch = await currentBranch(at: path)
             } else {
                 gitBranch = nil
             }
@@ -100,9 +102,55 @@ final class TmuxSyncEngine {
 
     // MARK: - Private
 
+    private func scanContentMatches() async -> [StateMerger.PaneEvent] {
+        let patterns = ContentDetector.defaultPatterns
+            + (config.config.stackView?.contentPatterns ?? [])
+        var events: [StateMerger.PaneEvent] = []
+        for project in workspace.projects {
+            for tab in project.tabs {
+                for pane in tab.panes where pane.status == .running {
+                    if let content = await tmux.capturePaneContent(id: pane.id, lastN: pane.height) {
+                        if contentDetector.scan(paneId: pane.id, content: content, patterns: patterns) {
+                            ForgeLog.log("[attention] Content match in pane \(pane.id): \(content.suffix(80))")
+                            pane.hasContentMatch = true
+                            events.append(.contentMatch(tabUUID: tab.uuid))
+                        }
+                    }
+                }
+                for pane in tab.panes where pane.hasContentMatch {
+                    if !contentDetector.isActive(paneId: pane.id) {
+                        pane.hasContentMatch = false
+                    }
+                }
+            }
+        }
+        return events
+    }
+
     private func mergePaneState(tab: Tab, _ infos: [PaneInfo]) -> [StateMerger.PaneEvent] {
         let (activePaneId, events) = StateMerger.mergePanes(tab: tab, with: infos)
         if let activePaneId { workspace.activePaneId = activePaneId }
         return events
+    }
+
+    private func currentBranch(at path: String) async -> String? {
+        await withCheckedContinuation { cont in
+            let process = Process()
+            let pipe = Pipe()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            process.arguments = ["-C", path, "rev-parse", "--abbrev-ref", "HEAD"]
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+            do {
+                try process.run()
+                process.waitUntilExit()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let branch = String(data: data, encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                cont.resume(returning: (branch?.isEmpty == false) ? branch : nil)
+            } catch {
+                cont.resume(returning: nil)
+            }
+        }
     }
 }

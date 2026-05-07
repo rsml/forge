@@ -27,9 +27,6 @@ public protocol AttentionPort: AnyObject {
     /// Total number of windows in the active (non-hidden) queue.
     var queueCount: Int { get }
 
-    /// Returns `true` if the tab is anywhere in the attention queue.
-    func needsAttention(_ tabUUID: UUID) -> Bool
-
     /// Returns `true` if the tab has been hidden from the queue.
     func isHidden(_ tabUUID: UUID) -> Bool
 
@@ -38,7 +35,4 @@ public protocol AttentionPort: AnyObject {
 
     /// Move the tab to the front of the queue.
     func promoteToFront(_ tabUUID: UUID)
-
-    /// Scan all running panes for content pattern matches and fire attention events.
-    func scanForContentMatches(workspace: Workspace, tmux: any TmuxPort) async
 }

@@ -7,6 +7,7 @@ public enum StateMerger {
 
     public enum PaneEvent: Equatable, Sendable {
         case commandCompleted(tabUUID: UUID)
+        case contentMatch(tabUUID: UUID)
     }
 
     /// Reconcile live tmux sessions with the workspace's project list.

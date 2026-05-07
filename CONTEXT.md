@@ -35,7 +35,6 @@ Terms used consistently across code, docs, and conversation. If a term isn't her
 **Port** — A protocol in `Domain/Ports/` defining a capability the domain needs but doesn't implement. Adapters provide concrete implementations.
 
 - **TmuxPort** — All tmux operations: list/create/kill projects and tabs, capture pane content, control mode lifecycle.
-- **GitPort** — Git queries (currently just `currentBranch`).
 - **AttentionPort** — Attention queue management and notification dispatch.
 - **NotificationPort** — System and in-app notification delivery.
 

@@ -14,18 +14,16 @@ final class WorkspaceController {
     let toastState: NotificationToastState
     let syncEngine: TmuxSyncEngine
     let tmux: any TmuxPort
-    private let git: any GitPort
     private let uiState: UIStatePersistence
     var perProjectActiveTabId: [String: String] = [:]
 
     var gitBranch: String? { syncEngine.gitBranch }
 
-    init(tmux: any TmuxPort, git: any GitPort, config: ForgeConfigStore, toastState: NotificationToastState) {
+    init(tmux: any TmuxPort, config: ForgeConfigStore, toastState: NotificationToastState) {
         self.tmux = tmux
-        self.git = git
         self.config = config
         self.toastState = toastState
-        self.syncEngine = TmuxSyncEngine(workspace: workspace, tmux: tmux, git: git, config: config)
+        self.syncEngine = TmuxSyncEngine(workspace: workspace, tmux: tmux, config: config)
         self.uiState = UIStatePersistence(config: config)
     }
 
@@ -44,11 +42,10 @@ final class WorkspaceController {
                     switch event {
                     case .commandCompleted(let tabUUID):
                         self.attentionManager?.handleEvent(.commandCompleted(tabUUID: tabUUID))
+                    case .contentMatch(let tabUUID):
+                        self.attentionManager?.handleEvent(.contentMatch(tabUUID: tabUUID))
                     }
                 }
-                await self.attentionManager?.scanForContentMatches(
-                    workspace: self.workspace, tmux: self.tmux
-                )
             }
             await syncEngine.refresh()
             uiState.seedRecentDirectories(from: workspace)
