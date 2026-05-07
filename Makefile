@@ -14,21 +14,27 @@ Resources/AppIcon.icns: Assets/appicon.icon/icon.json Assets/appicon.icon/Assets
 
 run: tmux icon
 	swift build -c release && \
-	cp -f Resources/tmux .build/release/ 2>/dev/null || true && \
-	cp -f Resources/forge-tmux.conf .build/release/ 2>/dev/null || true && \
-	cp -f Resources/AppIcon.icns .build/release/ 2>/dev/null || true && \
-	cp -f Assets/appicon-transparent.png .build/release/ 2>/dev/null || true && \
-	codesign --force --sign - .build/release/tmux 2>/dev/null || true && \
-	open .build/release/Forge
+	$(MAKE) bundle BUILD=.build/release && \
+	open .build/release/Forge.app
 
 dev: icon
 	swift build && \
-	cp -f Resources/tmux .build/debug/ 2>/dev/null || true && \
-	cp -f Resources/forge-tmux.conf .build/debug/ 2>/dev/null || true && \
-	cp -f Resources/AppIcon.icns .build/debug/ 2>/dev/null || true && \
-	cp -f Assets/appicon-transparent.png .build/debug/ 2>/dev/null || true && \
-	codesign --force --sign - .build/debug/tmux 2>/dev/null || true && \
-	open .build/debug/Forge
+	$(MAKE) bundle BUILD=.build/debug && \
+	open .build/debug/Forge.app
+
+bundle:
+	@rm -rf $(BUILD)/Forge.app
+	@mkdir -p $(BUILD)/Forge.app/Contents/MacOS
+	@mkdir -p $(BUILD)/Forge.app/Contents/Resources
+	@cp $(BUILD)/Forge $(BUILD)/Forge.app/Contents/MacOS/Forge
+	@cp Resources/Info.plist $(BUILD)/Forge.app/Contents/
+	@cp -f Resources/tmux $(BUILD)/Forge.app/Contents/MacOS/ 2>/dev/null || true
+	@cp -f Resources/forge-tmux.conf $(BUILD)/Forge.app/Contents/MacOS/ 2>/dev/null || true
+	@cp -f Resources/AppIcon.icns $(BUILD)/Forge.app/Contents/Resources/ 2>/dev/null || true
+	@cp -f Resources/AppIcon.icns $(BUILD)/Forge.app/Contents/MacOS/ 2>/dev/null || true
+	@cp -f Assets/appicon-transparent.png $(BUILD)/Forge.app/Contents/Resources/ 2>/dev/null || true
+	@cp -f Assets/appicon-transparent.png $(BUILD)/Forge.app/Contents/MacOS/ 2>/dev/null || true
+	@codesign --force --sign - $(BUILD)/Forge.app/Contents/MacOS/tmux 2>/dev/null || true
 
 build:
 	swift build -c release
