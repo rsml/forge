@@ -31,12 +31,11 @@ struct StackView: View {
                         // Background layer: next item card — visible through foreground padding
                         backgroundLayer
                             .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .scaleEffect(isDismissing ? 1.0 : 0.96)
                             .overlay {
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(Color.black.opacity(isDismissing ? 0.0 : 0.3))
-                                    .scaleEffect(isDismissing ? 1.0 : 0.96)
                             }
+                            .scaleEffect(isDismissing ? 1.0 : 0.96)
 
                         // Foreground layer: current terminal + toolbar
                         foregroundLayer(project: project, tab: tab)
@@ -116,7 +115,7 @@ struct StackView: View {
     private func handleDismiss(_ action: WorkspaceController.StackDismissAction) {
         guard !isDismissing else { return }
         pendingAction = action
-        withAnimation(.spring(duration: 0.25, bounce: 0)) {
+        withAnimation(.easeOut(duration: 0.2)) {
             isDismissing = true
         } completion: {
             controller.stackDismiss(action)
