@@ -9,6 +9,7 @@ struct StackView: View {
     @State private var isFullScreen = false
     @State private var isDismissing = false
     @State private var pendingAction: WorkspaceController.StackDismissAction?
+    @State private var terminalSnapshot: NSImage?
 
     private var toolbarPosition: String {
         configStore.config.stackView?.toolbarPosition ?? "bottom"
@@ -28,22 +29,16 @@ struct StackView: View {
                let (project, tab) = controller.workspace.findTab(byUUID: uuid) {
                 GeometryReader { geo in
                     ZStack {
-                        // Background layer: next item card — visible through foreground padding
-                        backgroundLayer
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.black.opacity(isDismissing ? 0.0 : 0.3))
-                            }
-                            .scaleEffect(isDismissing ? 1.0 : 0.96)
+                        baseLayer(project: project, tab: tab)
+                            .overlay { Color.black.opacity(terminalSnapshot != nil ? (isDismissing ? 0.0 : 0.3) : 0.0) }
+                            .scaleEffect(terminalSnapshot != nil ? (isDismissing ? 1.0 : 0.96) : 1.0)
 
-                        // Foreground layer: current terminal + toolbar
-                        foregroundLayer(project: project, tab: tab)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .padding(4)
-                            .scaleEffect(isDismissing ? 0.92 : 1.0)
-                            .offset(y: isDismissing ? -(geo.size.height + 100) : 0)
-                            .shadow(color: .black.opacity(0.4), radius: 12, y: 3)
+                        if let snapshot = terminalSnapshot {
+                            flyoutLayer(snapshot: snapshot, project: project, tab: tab)
+                                .scaleEffect(isDismissing ? 0.92 : 1.0)
+                                .offset(y: isDismissing ? -(geo.size.height + 100) : 0)
+                                .shadow(color: .black.opacity(0.4), radius: 12, y: 3)
+                        }
                     }
                 }
             } else if let staleUUID = attention.currentTabUUID {
@@ -73,54 +68,108 @@ struct StackView: View {
         }
     }
 
-    @ViewBuilder
-    private var backgroundLayer: some View {
-        if let nextUUID = attention.nextWindowUUID,
-           let (nextProject, nextTab) = controller.workspace.findTab(byUUID: nextUUID) {
-            VStack(spacing: 0) {
-                if toolbarPosition == "top" {
-                    StackToolbar(project: nextProject, tab: nextTab)
-                    terminalPlaceholder
-                } else {
-                    terminalPlaceholder
-                    StackToolbar(project: nextProject, tab: nextTab)
-                }
-            }
-            .allowsHitTesting(false)
-        } else {
-            StackEmptyState()
-        }
-    }
-
-    /// Dark card backing for the background layer — avoids duplicate tmux sessions
-    /// while giving the visual impression of a card behind the foreground.
-    private var terminalPlaceholder: some View {
-        (configStore.resolvedTheme?.background.color ?? Color(red: 0.1, green: 0.1, blue: 0.1))
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    private func baseLayer(project: Project, tab: ForgeCore.Tab) -> some View {
+        let resolved = resolveBaseToolbar(fallbackProject: project, fallbackTab: tab)
+        let dismissHandler: ((WorkspaceController.StackDismissAction) -> Void)? =
+            terminalSnapshot == nil ? { action in self.handleDismiss(action) } : nil
+        return baseContent(
+            terminalProject: project,
+            toolbarProject: resolved.project,
+            toolbarTab: resolved.tab,
+            onDismiss: dismissHandler
+        )
     }
 
     @ViewBuilder
-    private func foregroundLayer(project: Project, tab: ForgeCore.Tab) -> some View {
+    private func baseContent(
+        terminalProject: Project,
+        toolbarProject: Project,
+        toolbarTab: ForgeCore.Tab,
+        onDismiss: ((WorkspaceController.StackDismissAction) -> Void)?
+    ) -> some View {
         VStack(spacing: 0) {
             if toolbarPosition == "top" {
-                StackToolbar(project: project, tab: tab, onDismiss: handleDismiss)
-                TerminalArea(project: project)
+                StackToolbar(project: toolbarProject, tab: toolbarTab, onDismiss: onDismiss)
+                TerminalArea(project: terminalProject)
             } else {
-                TerminalArea(project: project)
-                StackToolbar(project: project, tab: tab, onDismiss: handleDismiss)
+                TerminalArea(project: terminalProject)
+                StackToolbar(project: toolbarProject, tab: toolbarTab, onDismiss: onDismiss)
             }
         }
+    }
+
+    private func resolveBaseToolbar(
+        fallbackProject: Project, fallbackTab: ForgeCore.Tab
+    ) -> (project: Project, tab: ForgeCore.Tab) {
+        if terminalSnapshot != nil,
+           let nextUUID = attention.nextWindowUUID,
+           let next = controller.workspace.findTab(byUUID: nextUUID) {
+            return next
+        }
+        return (fallbackProject, fallbackTab)
+    }
+
+    @ViewBuilder
+    private func flyoutLayer(snapshot: NSImage, project: Project, tab: ForgeCore.Tab) -> some View {
+        VStack(spacing: 0) {
+            if toolbarPosition == "top" {
+                StackToolbar(project: project, tab: tab)
+                Image(nsImage: snapshot)
+                    .resizable()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                Image(nsImage: snapshot)
+                    .resizable()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                StackToolbar(project: project, tab: tab)
+            }
+        }
+        .allowsHitTesting(false)
     }
 
     private func handleDismiss(_ action: WorkspaceController.StackDismissAction) {
         guard !isDismissing else { return }
         pendingAction = action
+        terminalSnapshot = captureTerminalSnapshot()
+
+        if let nextUUID = attention.nextWindowUUID,
+           let (nextProject, nextTab) = controller.workspace.findTab(byUUID: nextUUID),
+           let currentUUID = attention.currentTabUUID,
+           let (currentProject, _) = controller.workspace.findTab(byUUID: currentUUID),
+           nextProject.id == currentProject.id {
+            controller.switchTerminalWindow(tabId: nextTab.id)
+        }
+
         withAnimation(.easeOut(duration: 0.2)) {
             isDismissing = true
         } completion: {
-            controller.stackDismiss(action)
+            controller.stackDismiss(pendingAction ?? action)
             isDismissing = false
+            terminalSnapshot = nil
             pendingAction = nil
         }
+    }
+
+    private func captureTerminalSnapshot() -> NSImage? {
+        guard let window = NSApp.keyWindow else { return nil }
+        guard let tv = findTerminalView(in: window.contentView) else { return nil }
+        let bounds = tv.bounds
+        guard bounds.width > 0, bounds.height > 0,
+              let rep = tv.bitmapImageRepForCachingDisplay(in: bounds) else { return nil }
+        tv.cacheDisplay(in: bounds, to: rep)
+        let image = NSImage(size: bounds.size)
+        image.addRepresentation(rep)
+        return image
+    }
+
+    private func findTerminalView(in view: NSView?) -> NSView? {
+        guard let view else { return nil }
+        if String(describing: type(of: view)).contains("LocalProcessTerminalView") {
+            return view
+        }
+        for sub in view.subviews {
+            if let found = findTerminalView(in: sub) { return found }
+        }
+        return nil
     }
 }

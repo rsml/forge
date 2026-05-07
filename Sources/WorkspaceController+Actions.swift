@@ -52,6 +52,13 @@ extension WorkspaceController {
         saveUIState()
     }
 
+    /// Switch tmux to a different window without updating workspace state.
+    /// Used by stack dismiss animation to pre-switch the terminal while the
+    /// snapshot flyout covers the transition.
+    func switchTerminalWindow(tabId: String) {
+        Task { await tmux.selectTab(id: tabId) }
+    }
+
     func addProject(name: String, path: String) async {
         let success = await tmux.newProject(name: name, path: path)
         guard success else {
