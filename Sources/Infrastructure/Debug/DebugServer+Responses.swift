@@ -154,6 +154,69 @@ extension DebugServer {
         }
     }
 
+    func titlebarResponse() -> HTTPResponse {
+        guard let window = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible }),
+              let themeFrame = window.contentView?.superview else {
+            return jsonResponse(["error": "No window"])
+        }
+
+        func findTitlebarContainer(in view: NSView) -> NSView? {
+            if String(describing: type(of: view)) == "NSTitlebarContainerView" { return view }
+            for sub in view.subviews {
+                if let found = findTitlebarContainer(in: sub) { return found }
+            }
+            return nil
+        }
+
+        guard let container = findTitlebarContainer(in: themeFrame) else {
+            return jsonResponse(["error": "NSTitlebarContainerView not found"])
+        }
+
+        func hexColor(_ cgColor: CGColor?) -> String? {
+            guard let c = cgColor, let rgb = c.converted(to: CGColorSpaceCreateDeviceRGB(), intent: .defaultIntent, options: nil) else { return nil }
+            guard let comps = rgb.components, comps.count >= 3 else { return nil }
+            let r = Int(comps[0] * 255), g = Int(comps[1] * 255), b = Int(comps[2] * 255)
+            let a = comps.count > 3 ? comps[3] : 1.0
+            return String(format: "#%02X%02X%02X (a=%.2f)", r, g, b, a)
+        }
+
+        func dumpView(_ view: NSView, depth: Int) -> [String: Any] {
+            var info: [String: Any] = [
+                "class": String(describing: type(of: view)),
+                "frame": "\(view.frame)",
+                "isHidden": view.isHidden,
+                "isOpaque": view.isOpaque,
+                "alphaValue": view.alphaValue,
+                "wantsLayer": view.wantsLayer,
+                "depth": depth
+            ]
+            if let layer = view.layer {
+                info["layer.backgroundColor"] = hexColor(layer.backgroundColor) ?? "nil"
+                info["layer.isOpaque"] = layer.isOpaque
+            }
+            if view.wantsLayer, view.layer == nil {
+                info["layer"] = "wantsLayer=true but layer is nil"
+            }
+            if let effectView = view as? NSVisualEffectView {
+                info["material"] = effectView.material.rawValue
+                info["blendingMode"] = effectView.blendingMode.rawValue
+                info["state"] = effectView.state.rawValue
+                info["isEmphasized"] = effectView.isEmphasized
+            }
+            if let bgColor = view.value(forKey: "backgroundColor") as? NSColor {
+                info["backgroundColor(KVC)"] = hexColor(bgColor.cgColor) ?? "\(bgColor)"
+            }
+            if view.responds(to: NSSelectorFromString("drawsBackground")) {
+                info["drawsBackground"] = view.value(forKey: "drawsBackground") as? Bool ?? "unknown"
+            }
+            info["subviews"] = view.subviews.map { dumpView($0, depth: depth + 1) }
+            return info
+        }
+
+        let dump = dumpView(container, depth: 0)
+        return jsonResponse(dump)
+    }
+
     func logsResponse() -> HTTPResponse {
         let path = ForgeLog.logFile
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),

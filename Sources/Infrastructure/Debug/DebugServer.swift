@@ -159,6 +159,9 @@ final class DebugServer {
         case ("POST", "/action"):
             return await actionResponse(body: body)
 
+        case ("GET", "/titlebar"):
+            return titlebarResponse()
+
         case ("GET", "/logs"):
             return logsResponse()
 

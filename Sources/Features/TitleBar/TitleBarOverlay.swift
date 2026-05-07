@@ -8,6 +8,7 @@ extension TitleBarManager {
     func stripTitleBarChrome() {
         guard let themeFrame = window.contentView?.superview else { return }
         Self.hideTitleBarChrome(in: themeFrame)
+        applyTitleBarBackground()
     }
 
     private static func hideTitleBarChrome(in view: NSView) {
@@ -32,6 +33,23 @@ extension TitleBarManager {
             if let found = findView(named: name, in: sub) { return found }
         }
         return nil
+    }
+
+    func applyTitleBarBackground() {
+        guard let themeFrame = window.contentView?.superview,
+              let titlebarView = Self.findView(named: "NSTitlebarView", in: themeFrame)
+        else { return }
+
+        let color: NSColor
+        if let theme = config.resolvedTheme {
+            color = NSColor(theme.background.color)
+                .blended(withFraction: 0.06, of: NSColor.white) ?? NSColor(theme.background.color)
+        } else {
+            color = NSColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1)
+        }
+
+        titlebarView.wantsLayer = true
+        titlebarView.layer?.backgroundColor = color.cgColor
     }
 
     // MARK: - Overlay Installation
