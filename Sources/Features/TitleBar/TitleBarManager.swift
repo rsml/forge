@@ -104,6 +104,7 @@ final class TitleBarManager: NSObject {
     func syncAppearance() {
         if let theme = config.resolvedTheme {
             let bgColor = NSColor(theme.background.color)
+                .blended(withFraction: 0.06, of: NSColor.white) ?? NSColor(theme.background.color)
             window.backgroundColor = bgColor
             window.appearance = bgColor.isLight
                 ? NSAppearance(named: .aqua)

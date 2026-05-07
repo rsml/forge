@@ -51,14 +51,14 @@ struct MainView: View {
                             sidebarDivider
                             sidebarContent
                                 .frame(width: sidebarWidth)
-                                .background(sidebarBackground)
+                                .background { sidebarBackground }
                                 .zIndex(2)
                         }
                     } else {
                         if showSidebar {
                             sidebarContent
                                 .frame(width: sidebarWidth)
-                                .background(sidebarBackground)
+                                .background { sidebarBackground }
                                 .zIndex(2)
                             sidebarDivider
                         }
