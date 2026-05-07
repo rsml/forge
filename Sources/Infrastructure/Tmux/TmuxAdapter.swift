@@ -67,6 +67,10 @@ final class TmuxAdapter: TmuxQueryPort, TmuxCommandPort, TmuxControlPort {
 
     func selectTab(id: String) async {
         controlMode.send("select-window -t \(id)")
+        // Force the window to match the current client dimensions immediately.
+        // Without this, inactive windows retain their old size and show a
+        // fill-character bar on the right edge until tmux catches up.
+        controlMode.send("resize-window -A -t \(id)")
     }
 
     func renameTab(id: String, newName: String) async {
