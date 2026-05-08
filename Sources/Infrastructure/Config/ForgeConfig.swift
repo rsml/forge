@@ -45,6 +45,8 @@ struct ForgeConfig: Codable {
         var warnOnMoveTab: Bool?
         var sidebarPosition: String?    // "left" or "right"
         var tabBarPosition: String?     // "top" or "bottom"
+        var tabHighlightColorMode: String?  // "accent" (default), "theme", "custom"
+        var tabHighlightCustomColor: String? // hex color string, e.g. "#FF0000"
         // Legacy — migrated to NotificationSettings on load
         var notificationsEnabled: Bool?
         var notificationSound: String?

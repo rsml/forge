@@ -16,6 +16,21 @@ extension ForgeConfigStore {
     var secondaryFont: Font {
         (config.secondaryFont ?? ForgeConfig.FontConfig()).resolved(defaultSize: 11)
     }
+    var tabHighlightColor: Color {
+        let mode = config.general?.tabHighlightColorMode ?? "accent"
+        switch mode {
+        case "theme":
+            let themeColor = resolvedTheme?.cursor ?? resolvedTheme?.foreground
+            return themeColor?.color ?? Color.accentColor
+        case "custom":
+            if let hex = config.general?.tabHighlightCustomColor {
+                return Color(hex: hex)
+            }
+            return Color.accentColor
+        default:
+            return Color.accentColor
+        }
+    }
 }
 
 @Observable @MainActor

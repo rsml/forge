@@ -54,7 +54,7 @@ struct NotificationsSettingsPane: View {
                 }
 
                 if (store.config.notifications?.badgeColorMode ?? "accent") == "custom" {
-                    ColorPicker("Custom color", selection: customColorBinding, supportsOpacity: false)
+                    ColorPicker("Custom color", selection: customColorBinding, supportsOpacity: true)
                 }
 
                 HStack {
@@ -210,14 +210,3 @@ struct NotificationsSettingsPane: View {
     }
 }
 
-// MARK: - Color hex conversion
-
-private extension Color {
-    var hexString: String {
-        guard let components = NSColor(self).usingColorSpace(.sRGB) else { return "#0000FF" }
-        let r = Int(components.redComponent * 255)
-        let g = Int(components.greenComponent * 255)
-        let b = Int(components.blueComponent * 255)
-        return String(format: "#%02X%02X%02X", r, g, b)
-    }
-}

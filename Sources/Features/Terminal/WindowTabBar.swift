@@ -148,7 +148,7 @@ struct WindowTab: View {
             if indicatorOnTop {
                 // Active tab indicator — flush to top
                 RoundedRectangle(cornerRadius: 1)
-                    .fill(isActive ? Color.accentColor.opacity(0.6) : Color.clear)
+                    .fill(isActive ? configStore.tabHighlightColor.opacity(0.6) : Color.clear)
                     .frame(height: 2)
                     .padding(.horizontal, 6)
             }
@@ -157,7 +157,7 @@ struct WindowTab: View {
                 if modifiers.commandPressed && tabIndex >= 1 && tabIndex <= 9 {
                     Text("\(tabIndex)")
                         .font(.system(.caption, weight: .medium))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(configStore.tabHighlightColor)
                         .frame(width: 14)
                 }
                 AttentionDot(needsAttention: tab.needsAttention && !notificationsDisabled)
@@ -173,7 +173,7 @@ struct WindowTab: View {
             if !indicatorOnTop {
                 // Active tab indicator — flush to bottom
                 RoundedRectangle(cornerRadius: 1)
-                    .fill(isActive ? Color.accentColor.opacity(0.6) : Color.clear)
+                    .fill(isActive ? configStore.tabHighlightColor.opacity(0.6) : Color.clear)
                     .frame(height: 2)
                     .padding(.horizontal, 6)
             }

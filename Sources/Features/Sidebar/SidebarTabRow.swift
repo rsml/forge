@@ -20,13 +20,13 @@ struct SidebarTabRow: View {
             if modifiers.commandPressed && tabIndex >= 1 && tabIndex <= 9 {
                 Text("\(tabIndex)")
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(configStore.tabHighlightColor)
                     .frame(width: 14, height: 12)
                     .padding(.trailing, 2)
             } else {
                 // Subtle active indicator — thin left bar
                 RoundedRectangle(cornerRadius: 1)
-                    .fill(isActive ? Color.accentColor.opacity(0.6) : Color.clear)
+                    .fill(isActive ? configStore.tabHighlightColor.opacity(0.6) : Color.clear)
                     .frame(width: 2, height: 12)
                     .padding(.trailing, 4)
             }

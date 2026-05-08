@@ -38,11 +38,31 @@ struct AttentionDot: View {
 extension Color {
     init(hex: String) {
         let cleaned = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        var rgb: UInt64 = 0
-        Scanner(string: cleaned).scanHexInt64(&rgb)
-        let r = Double((rgb >> 16) & 0xFF) / 255
-        let g = Double((rgb >> 8) & 0xFF) / 255
-        let b = Double(rgb & 0xFF) / 255
-        self.init(red: r, green: g, blue: b)
+        var value: UInt64 = 0
+        Scanner(string: cleaned).scanHexInt64(&value)
+        if cleaned.count == 8 {
+            let r = Double((value >> 24) & 0xFF) / 255
+            let g = Double((value >> 16) & 0xFF) / 255
+            let b = Double((value >> 8) & 0xFF) / 255
+            let a = Double(value & 0xFF) / 255
+            self.init(red: r, green: g, blue: b, opacity: a)
+        } else {
+            let r = Double((value >> 16) & 0xFF) / 255
+            let g = Double((value >> 8) & 0xFF) / 255
+            let b = Double(value & 0xFF) / 255
+            self.init(red: r, green: g, blue: b)
+        }
+    }
+
+    var hexString: String {
+        guard let c = NSColor(self).usingColorSpace(.sRGB) else { return "#0000FF" }
+        let r = Int(c.redComponent * 255)
+        let g = Int(c.greenComponent * 255)
+        let b = Int(c.blueComponent * 255)
+        let a = Int(c.alphaComponent * 255)
+        if a < 255 {
+            return String(format: "#%02X%02X%02X%02X", r, g, b, a)
+        }
+        return String(format: "#%02X%02X%02X", r, g, b)
     }
 }
