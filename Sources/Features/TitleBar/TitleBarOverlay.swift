@@ -50,6 +50,11 @@ extension TitleBarManager {
 
         titlebarView.wantsLayer = true
         titlebarView.layer?.backgroundColor = color.cgColor
+
+        if let bgView = Self.findView(named: "NSTitlebarBackgroundView", in: titlebarView) {
+            bgView.wantsLayer = true
+            bgView.layer?.backgroundColor = color.cgColor
+        }
     }
 
     // MARK: - Overlay Installation
@@ -62,6 +67,7 @@ extension TitleBarManager {
         titleBarOverlay?.removeFromSuperview()
 
         let overlay = NSView()
+        overlay.wantsLayer = true
         overlay.translatesAutoresizingMaskIntoConstraints = false
 
         let titleFont = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
@@ -99,16 +105,6 @@ extension TitleBarManager {
         splitHButton = splitH
         splitVButton = splitV
 
-        let listBtn = NSButton(image: NSImage(systemSymbolName: "list.bullet", accessibilityDescription: "Switch to List Mode")!, target: self, action: #selector(toggleModeAction))
-        listBtn.isBordered = false
-        listBtn.bezelStyle = .accessoryBarAction
-        listBtn.contentTintColor = .secondaryLabelColor
-        listBtn.imageScaling = .scaleProportionallyDown
-        listBtn.setForgeTooltip("Switch to List Mode", hint: KeyboardShortcuts.toggleMode.hint, hoverTint: true)
-        listBtn.translatesAutoresizingMaskIntoConstraints = false
-        listModeButton = listBtn
-
-        overlay.addSubview(listBtn)
         overlay.addSubview(pathLabel)
         overlay.addSubview(branchLabel)
         overlay.addSubview(splitH)
@@ -116,13 +112,6 @@ extension TitleBarManager {
 
         pathLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         branchLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
-
-        NSLayoutConstraint.activate([
-            listBtn.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 82),
-            listBtn.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
-            listBtn.widthAnchor.constraint(equalToConstant: 28),
-            listBtn.heightAnchor.constraint(equalToConstant: 28),
-        ])
 
         let pathLeading = pathLabel.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 78)
         pathLabelLeadingConstraint = pathLeading
@@ -163,6 +152,29 @@ extension TitleBarManager {
         ])
 
         titleBarOverlay = overlay
+
+        // Mode toggle button — added to container (not overlay) so it can appear over the sidebar area
+        modeToggleButton?.removeFromSuperview()
+        let modeBtn = NSButton(image: NSImage(systemSymbolName: "rectangle.stack", accessibilityDescription: "Switch to Stack Mode")!, target: self, action: #selector(toggleModeAction))
+        modeBtn.wantsLayer = true
+        modeBtn.isBordered = false
+        modeBtn.bezelStyle = .accessoryBarAction
+        modeBtn.contentTintColor = .secondaryLabelColor
+        modeBtn.imageScaling = .scaleProportionallyDown
+        modeBtn.setForgeTooltip("Toggle Mode", hint: KeyboardShortcuts.toggleMode.hint, hoverTint: true)
+        modeBtn.translatesAutoresizingMaskIntoConstraints = false
+        modeToggleButton = modeBtn
+
+        container.addSubview(modeBtn)
+        let modeBtnLeading = modeBtn.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 82)
+        modeButtonLeadingConstraint = modeBtnLeading
+        NSLayoutConstraint.activate([
+            modeBtnLeading,
+            modeBtn.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            modeBtn.widthAnchor.constraint(equalToConstant: 28),
+            modeBtn.heightAnchor.constraint(equalToConstant: 28),
+        ])
+
         updateOverlayConstraints()
         updateSplitIconVisibility()
     }

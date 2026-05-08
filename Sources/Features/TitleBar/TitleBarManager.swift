@@ -16,7 +16,8 @@ final class TitleBarManager: NSObject {
     var pathLabelLeadingConstraint: NSLayoutConstraint?
     var splitHButton: NSButton?
     var splitVButton: NSButton?
-    var listModeButton: NSButton?
+    var modeToggleButton: NSButton?
+    var modeButtonLeadingConstraint: NSLayoutConstraint?
     var isFullScreen = false
     var branchTrailingToOverlay: NSLayoutConstraint?
     var branchTrailingToSplitH: NSLayoutConstraint?
@@ -59,6 +60,15 @@ final class TitleBarManager: NSObject {
                 if #available(macOS 15.3, *) {
                     self?.window.titlebarAppearsTransparent = false
                 }
+                self?.stripTitleBarChrome()
+            }
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didEnterFullScreenNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.updateOverlayConstraints()
+                self?.stripTitleBarChrome()
             }
         }
         NotificationCenter.default.addObserver(
@@ -161,25 +171,33 @@ final class TitleBarManager: NSObject {
     }
 
     func updateOverlayConstraints() {
+        let isStack = config.isStackMode
+        updateModeToggleButton(isStack: isStack)
+
         if isFullScreen {
             overlayLeadingConstraint?.constant = 0
             overlayTrailingConstraint?.constant = 0
-            pathLabelLeadingConstraint?.constant = 78
+            pathLabelLeadingConstraint?.constant = isStack ? 118 : 78
+            modeButtonLeadingConstraint?.constant = 82
             return
         }
-
-        let isStack = config.isStackMode
-        listModeButton?.isHidden = !isStack
         if isStack {
             overlayLeadingConstraint?.constant = 0
             overlayTrailingConstraint?.constant = 0
             pathLabelLeadingConstraint?.constant = 118
+            modeButtonLeadingConstraint?.constant = 82
             return
         }
 
         let position = config.config.general?.sidebarPosition ?? "left"
         let effectivelyVisible = appState.sidebarVisible && !controller.workspace.projects.isEmpty
         let sidebarTotal: CGFloat = effectivelyVisible ? config.sidebarWidth + 1 : 0
+
+        if position == "left" && effectivelyVisible {
+            modeButtonLeadingConstraint?.constant = config.sidebarWidth - 36
+        } else {
+            modeButtonLeadingConstraint?.constant = 82
+        }
 
         if position == "right" {
             overlayLeadingConstraint?.constant = 0
@@ -198,6 +216,13 @@ final class TitleBarManager: NSObject {
         window.titlebarSeparatorStyle = .none
         syncAppearance()
         installTitleBarOverlay()
+        updateWindowTitle()
+    }
+
+    private func updateModeToggleButton(isStack: Bool) {
+        guard let btn = modeToggleButton else { return }
+        let iconName = isStack ? "list.bullet" : "rectangle.stack"
+        btn.image = NSImage(systemSymbolName: iconName, accessibilityDescription: isStack ? "Switch to List Mode" : "Switch to Stack Mode")
     }
 
     // MARK: - Actions

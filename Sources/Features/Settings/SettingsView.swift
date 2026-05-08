@@ -7,7 +7,7 @@ struct SettingsView: View {
             GeneralSettingsPane()
                 .tabItem { Label("General", systemImage: "gearshape") }
             ListModeSettingsPane()
-                .tabItem { Label("List Mode", systemImage: "sidebar.left") }
+                .tabItem { Label("List Mode", systemImage: "list.bullet") }
             StackModeSettingsPane()
                 .tabItem { Label("Stack Mode", systemImage: "rectangle.stack") }
             ThemeSettingsPane()
