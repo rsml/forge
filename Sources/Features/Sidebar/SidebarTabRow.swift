@@ -48,7 +48,7 @@ struct SidebarTabRow: View {
                 Spacer()
 
                 if tab.needsAttention && !notificationsDisabled {
-                    AttentionDot(needsAttention: true, size: 6)
+                    AttentionDot(needsAttention: true)
                         .padding(.trailing, 4)
                 }
             }

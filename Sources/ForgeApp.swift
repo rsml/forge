@@ -8,6 +8,7 @@ struct ForgeApp: App {
     var body: some Scene {
         Settings {
             SettingsView()
+                .environment(appDelegate.configStore)
                 .environment(appDelegate.toastState)
         }
         .commands {

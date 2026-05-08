@@ -53,7 +53,7 @@ struct SidebarProjectRow: View {
                 Spacer()
 
                 if !isExpanded && project.tabs.contains(where: { $0.needsAttention && !attention.isHidden($0.uuid) }) {
-                    AttentionDot(needsAttention: true, size: 9)
+                    AttentionDot(needsAttention: true)
                         .padding(.trailing, 4)
                 }
             }

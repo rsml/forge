@@ -6,6 +6,8 @@ struct SettingsView: View {
         TabView {
             GeneralSettingsPane()
                 .tabItem { Label("General", systemImage: "gearshape") }
+            NotificationsSettingsPane()
+                .tabItem { Label("Notifications", systemImage: "bell.fill") }
             ListModeSettingsPane()
                 .tabItem { Label("List Mode", systemImage: "list.bullet") }
             StackModeSettingsPane()
@@ -21,6 +23,6 @@ struct SettingsView: View {
             AboutPane()
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
-        .frame(width: 700, height: 550)
+        .frame(width: 750, height: 550)
     }
 }

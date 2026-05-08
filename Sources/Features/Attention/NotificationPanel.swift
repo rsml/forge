@@ -51,7 +51,7 @@ struct NotificationPanel: View {
                             close()
                         } label: {
                             HStack {
-                                AttentionDot(needsAttention: true, size: 6)
+                                AttentionDot(needsAttention: true)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(item.project.name)
                                         .font(.caption)

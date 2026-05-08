@@ -3,12 +3,24 @@ import Foundation
 import UserNotifications
 import ForgeCore
 
+private final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
+    }
+}
+
 /// Concrete implementation of `NotificationPort` that delivers macOS notifications.
 ///
-/// Always shows an in-app toast banner. Additionally uses `UNUserNotificationCenter`
-/// when running as a proper .app bundle (for background notifications).
+/// Shows native macOS banners when running as a .app bundle with permission granted.
+/// Falls back to in-app toast when system notifications are unavailable.
 final class MacNotificationAdapter: NotificationPort, @unchecked Sendable {
     private let toastState: NotificationToastState
+
+    /// Static so it survives temporary adapter instances — UNUserNotificationCenter.delegate is weak.
+    private static let notificationDelegate = NotificationDelegate()
 
     init(toastState: NotificationToastState) {
         self.toastState = toastState
@@ -19,28 +31,38 @@ final class MacNotificationAdapter: NotificationPort, @unchecked Sendable {
     }
 
     func requestPermission() async -> Bool {
-        guard hasBundle else { return true }
+        guard hasBundle else {
+            ForgeLog.log("[attention] requestPermission: no bundle identifier, skipping")
+            return false
+        }
+        let center = UNUserNotificationCenter.current()
+        center.delegate = Self.notificationDelegate
         do {
-            return try await UNUserNotificationCenter.current()
-                .requestAuthorization(options: [.alert, .sound])
+            let granted = try await center.requestAuthorization(options: [.alert, .sound])
+            ForgeLog.log("[attention] requestPermission: granted=\(granted)")
+            return granted
         } catch {
+            ForgeLog.log("[attention] requestPermission error: \(error)")
             return false
         }
     }
 
     func send(title: String, body: String, sound: String?) async {
-        // Always show in-app toast
-        await MainActor.run {
-            toastState.show(title: title, message: body)
+        var sentSystemNotification = false
+
+        if hasBundle {
+            let granted = await requestPermission()
+            if granted {
+                sentSystemNotification = await sendViaUNUserNotification(
+                    title: title, body: body, sound: sound
+                )
+            }
         }
 
-        // Play sound
-        await MainActor.run { playSound(sound) }
-
-        // Also send system notification if we have a bundle
-        if hasBundle {
-            _ = await requestPermission()
-            await sendViaUNUserNotification(title: title, body: body, sound: sound)
+        if !sentSystemNotification {
+            ForgeLog.log("[attention] falling back to in-app toast")
+            await MainActor.run { toastState.show(title: title, message: body) }
+            await MainActor.run { playSound(sound) }
         }
     }
 
@@ -65,7 +87,8 @@ final class MacNotificationAdapter: NotificationPort, @unchecked Sendable {
 
     // MARK: - UNUserNotificationCenter (requires .app bundle)
 
-    private func sendViaUNUserNotification(title: String, body: String, sound: String?) async {
+    /// Returns `true` if the notification was successfully queued.
+    private func sendViaUNUserNotification(title: String, body: String, sound: String?) async -> Bool {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
@@ -76,7 +99,14 @@ final class MacNotificationAdapter: NotificationPort, @unchecked Sendable {
             content: content,
             trigger: nil
         )
-        try? await UNUserNotificationCenter.current().add(request)
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+            ForgeLog.log("[attention] system notification sent: \(title)")
+            return true
+        } catch {
+            ForgeLog.log("[attention] system notification failed: \(error)")
+            return false
+        }
     }
 
     private func resolveUNSound(_ sound: String?) -> UNNotificationSound {

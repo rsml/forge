@@ -29,7 +29,13 @@ struct StackView: View {
                let (project, tab) = controller.workspace.findTab(byUUID: uuid) {
                 GeometryReader { geo in
                     ZStack {
+                        if terminalSnapshot != nil {
+                            Color.black.opacity(0.5)
+                                .ignoresSafeArea()
+                        }
+
                         baseLayer(project: project, tab: tab)
+                            .clipped()
                             .overlay { Color.black.opacity(terminalSnapshot != nil ? (isDismissing ? 0.0 : 0.3) : 0.0) }
                             .scaleEffect(terminalSnapshot != nil ? (isDismissing ? 1.0 : 0.96) : 1.0)
 

@@ -160,7 +160,7 @@ struct WindowTab: View {
                         .foregroundStyle(Color.accentColor)
                         .frame(width: 14)
                 }
-                AttentionDot(needsAttention: tab.needsAttention && !notificationsDisabled, size: 8)
+                AttentionDot(needsAttention: tab.needsAttention && !notificationsDisabled)
                 Text(tab.name)
                     .font(secondaryFont)
                     .foregroundStyle((isActive || isHovered) ? .primary : .secondary)

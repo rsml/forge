@@ -13,6 +13,7 @@ struct ForgeConfig: Codable {
     var primaryFont: FontConfig?
     var secondaryFont: FontConfig?
     var terminalFont: FontConfig?
+    var notifications: NotificationSettings?
     var stackView: StackViewSettings?
 
     struct FontConfig: Codable {
@@ -44,8 +45,17 @@ struct ForgeConfig: Codable {
         var warnOnMoveTab: Bool?
         var sidebarPosition: String?    // "left" or "right"
         var tabBarPosition: String?     // "top" or "bottom"
-        var notificationsEnabled: Bool?  // defaults to false
-        var notificationSound: String?   // system sound name or custom file path
+        // Legacy — migrated to NotificationSettings on load
+        var notificationsEnabled: Bool?
+        var notificationSound: String?
+    }
+
+    struct NotificationSettings: Codable {
+        var enabled: Bool?              // defaults to false
+        var sound: String?              // system sound name or custom file path
+        var badgeColorMode: String?     // "accent" (default), "theme", "custom"
+        var badgeCustomColor: String?   // hex color string, e.g. "#FF0000"
+        var badgeSize: Double?          // default 8
     }
 
     struct TerminalSettings: Codable {
@@ -99,10 +109,26 @@ struct ForgeConfig: Codable {
 
     static func load() -> ForgeConfig {
         guard let data = try? Data(contentsOf: configURL),
-              let config = try? JSONDecoder().decode(ForgeConfig.self, from: data) else {
+              var config = try? JSONDecoder().decode(ForgeConfig.self, from: data) else {
             return defaultConfig
         }
+        config.migrateNotificationSettings()
         return config
+    }
+
+    /// One-time migration: move legacy notification fields from GeneralSettings to NotificationSettings.
+    mutating func migrateNotificationSettings() {
+        let legacyEnabled = general?.notificationsEnabled
+        let legacySound = general?.notificationSound
+        guard notifications == nil, legacyEnabled != nil || legacySound != nil else { return }
+
+        notifications = NotificationSettings(
+            enabled: legacyEnabled,
+            sound: legacySound
+        )
+        general?.notificationsEnabled = nil
+        general?.notificationSound = nil
+        save()
     }
 
     func save() {
