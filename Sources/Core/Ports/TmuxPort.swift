@@ -91,6 +91,7 @@ public protocol TmuxCommandPort {
 
     func sourceConfig(path: String) async
     func clearHistory(pane: String) async
+    func clearBellFlag(tabId: String) async
 }
 
 /// Control mode lifecycle (starting/stopping the persistent tmux connection).

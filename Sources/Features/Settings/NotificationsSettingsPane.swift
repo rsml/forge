@@ -18,6 +18,7 @@ struct NotificationsSettingsPane: View {
         Form {
             Section("Alerts") {
                 Toggle("Enable notifications", isOn: notificationsToggle)
+                    .padding(.vertical, -4)
 
                 if authorizationDenied {
                     Label {
@@ -52,10 +53,12 @@ struct NotificationsSettingsPane: View {
                     Text("Theme Accent Color").tag("theme")
                     Text("Custom").tag("custom")
                 }
+                .padding(.vertical, -4)
 
                 if (store.config.notifications?.badgeColorMode ?? "accent") == "custom" {
                     ColorPicker("Custom color", selection: customColorBinding, supportsOpacity: true)
                         .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] }
+                        .padding(.vertical, -4)
                 }
 
                 LabeledContent("Badge size") {
@@ -71,6 +74,7 @@ struct NotificationsSettingsPane: View {
                     AttentionDot(needsAttention: true)
                         .padding(.leading, 8)
                 }
+                .padding(.vertical, -4)
             }
         }
         .formStyle(.grouped)
@@ -147,6 +151,7 @@ struct NotificationsSettingsPane: View {
             }
             previewSound(url.path)
         }
+        .padding(.vertical, -4)
     }
 
     // MARK: - Badge Appearance Bindings

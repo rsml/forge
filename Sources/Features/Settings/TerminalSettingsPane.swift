@@ -36,6 +36,7 @@ struct TerminalSettingsPane: View {
                         .labelsHidden()
                     }
                 }
+                .padding(.vertical, -4)
 
                 Toggle("Use tmux for project persistence", isOn: Binding(
                     get: { store.config.terminal?.useTmuxPersistence ?? true },
@@ -46,6 +47,7 @@ struct TerminalSettingsPane: View {
                         }
                     }
                 ))
+                .padding(.vertical, -4)
             }
 
             Section("tmux Configuration") {

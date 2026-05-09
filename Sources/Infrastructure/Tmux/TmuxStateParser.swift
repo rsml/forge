@@ -4,7 +4,7 @@ import ForgeCore
 /// Parses tmux format string output into domain info structs
 enum TmuxStateParser {
     static let projectFormat = "#{session_id}\t#{session_name}\t#{session_windows}\t#{session_attached}\t#{session_path}"
-    static let tabFormat = "#{window_id}\t#{session_id}\t#{window_index}\t#{window_name}\t#{window_active}\t#{window_panes}\t#{window_bell_flag}"
+    static let tabFormat = "#{window_id}\t#{session_id}\t#{window_index}\t#{window_name}\t#{window_active}\t#{window_panes}\t#{@forge_bell}"
     static let paneFormat = "#{pane_id}\t#{window_id}\t#{pane_index}\t#{pane_active}\t#{pane_current_command}\t#{pane_current_path}\t#{pane_width}\t#{pane_height}\t#{pane_pid}"
 
     static func parseProjects(_ output: String) -> [ProjectInfo] {
@@ -28,7 +28,7 @@ enum TmuxStateParser {
             }
             return TabInfo(id: p[0], projectId: p[1], index: Int(p[2]) ?? 0,
                             name: p[3], active: p[4] != "0", paneCount: Int(p[5]) ?? 0,
-                            hasBell: p[6] != "0")
+                            hasBell: p[6] == "1")
         }
     }
 

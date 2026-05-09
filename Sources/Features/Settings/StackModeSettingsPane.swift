@@ -18,6 +18,7 @@ struct StackModeSettingsPane: View {
                     Text("Bottom").tag("bottom")
                 }
                 .pickerStyle(.segmented)
+                .padding(.vertical, -4)
             }
 
             Section("Attention") {
@@ -25,11 +26,13 @@ struct StackModeSettingsPane: View {
                     Text("Never").tag("never")
                     Text("Always").tag("always")
                 }
+                .padding(.vertical, -4)
 
                 Picker("Notify", selection: stackBinding(\.notify, default: "never")) {
                     Text("Never").tag("never")
                     Text("Always").tag("always")
                 }
+                .padding(.vertical, -4)
             }
         }
         .formStyle(.grouped)

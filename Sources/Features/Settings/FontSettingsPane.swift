@@ -92,6 +92,7 @@ struct FontSettingsPane: View {
                     Text(name).tag(name)
                 }
             }
+            .padding(.vertical, -4)
 
             LabeledContent("Size") {
                 HStack {
@@ -120,7 +121,7 @@ struct FontSettingsPane: View {
                     .labelsHidden()
                 }
             }
-
+            .padding(.vertical, -4)
 
             // Live preview
             let family = config?.family ?? defaultFamily

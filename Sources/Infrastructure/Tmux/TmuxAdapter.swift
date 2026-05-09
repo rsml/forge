@@ -118,6 +118,10 @@ final class TmuxAdapter: TmuxQueryPort, TmuxCommandPort, TmuxControlPort {
         controlMode.send("send-keys -t \(pane) C-l")
     }
 
+    func clearBellFlag(tabId: String) async {
+        _ = await runner.run("set-option", "-wu", "-t", tabId, "@forge_bell")
+    }
+
     func capturePaneContent(id: String, lastN: Int) async -> String? {
         await runner.run("capture-pane", "-p", "-t", id, "-S", "-\(lastN)")
     }

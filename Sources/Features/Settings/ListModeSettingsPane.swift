@@ -18,12 +18,14 @@ struct ListModeSettingsPane: View {
                     Text("Right").tag("right")
                 }
                 .pickerStyle(.segmented)
+                .padding(.vertical, -4)
 
                 Picker("Tab bar position", selection: generalBinding(\.tabBarPosition, default: "top")) {
                     Text("Top").tag("top")
                     Text("Bottom").tag("bottom")
                 }
                 .pickerStyle(.segmented)
+                .padding(.vertical, -4)
             }
 
             Section("Tab Highlight") {
@@ -32,10 +34,12 @@ struct ListModeSettingsPane: View {
                     Text("Theme Accent Color").tag("theme")
                     Text("Custom").tag("custom")
                 }
+                .padding(.vertical, -4)
 
                 if (store.config.general?.tabHighlightColorMode ?? "accent") == "custom" {
                     ColorPicker("Custom color", selection: customColorBinding, supportsOpacity: true)
                         .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] }
+                        .padding(.vertical, -4)
                 }
 
                 LabeledContent("Preview") {
@@ -51,6 +55,7 @@ struct ListModeSettingsPane: View {
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                         .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] }
                 }
+                .padding(.vertical, -4)
             }
         }
         .formStyle(.grouped)
