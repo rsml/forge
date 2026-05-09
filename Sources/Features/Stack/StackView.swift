@@ -34,10 +34,14 @@ struct StackView: View {
                                 .ignoresSafeArea()
                         }
 
-                        baseLayer(project: project, tab: tab)
-                            .clipped()
-                            .overlay { Color.black.opacity(terminalSnapshot != nil ? (isDismissing ? 0.0 : 0.3) : 0.0) }
-                            .scaleEffect(terminalSnapshot != nil ? (isDismissing ? 1.0 : 0.96) : 1.0)
+                        if terminalSnapshot != nil && attention.nextWindowUUID == nil {
+                            StackEmptyState()
+                        } else {
+                            baseLayer(project: project, tab: tab)
+                                .clipped()
+                                .overlay { Color.black.opacity(terminalSnapshot != nil ? (isDismissing ? 0.0 : 0.3) : 0.0) }
+                                .scaleEffect(terminalSnapshot != nil ? (isDismissing ? 1.0 : 0.96) : 1.0)
+                        }
 
                         if let snapshot = terminalSnapshot {
                             flyoutLayer(snapshot: snapshot, project: project, tab: tab)
