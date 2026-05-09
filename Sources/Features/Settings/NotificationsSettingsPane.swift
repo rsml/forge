@@ -55,11 +55,10 @@ struct NotificationsSettingsPane: View {
 
                 if (store.config.notifications?.badgeColorMode ?? "accent") == "custom" {
                     ColorPicker("Custom color", selection: customColorBinding, supportsOpacity: true)
+                        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] }
                 }
 
-                HStack {
-                    Text("Badge size")
-                    Spacer()
+                LabeledContent("Badge size") {
                     Stepper(
                         value: badgeSizeBinding,
                         in: 4...16,

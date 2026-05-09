@@ -35,14 +35,21 @@ struct ListModeSettingsPane: View {
 
                 if (store.config.general?.tabHighlightColorMode ?? "accent") == "custom" {
                     ColorPicker("Custom color", selection: customColorBinding, supportsOpacity: true)
+                        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] }
                 }
 
-                HStack(spacing: 8) {
-                    Text("Preview")
-                    Spacer()
-                    RoundedRectangle(cornerRadius: 1)
-                        .fill(store.tabHighlightColor.opacity(0.6))
-                        .frame(width: 24, height: 2)
+                LabeledContent("Preview") {
+                    let tabsOnBottom = (store.config.general?.tabBarPosition ?? "top") == "bottom"
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(store.resolvedTheme?.background.color ?? Color(red: 0.1, green: 0.1, blue: 0.1))
+                        .frame(width: 48, height: 24)
+                        .overlay(alignment: tabsOnBottom ? .top : .bottom) {
+                            RoundedRectangle(cornerRadius: 1)
+                                .fill(store.tabHighlightColor.opacity(0.6))
+                                .frame(height: 2)
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] }
                 }
             }
         }

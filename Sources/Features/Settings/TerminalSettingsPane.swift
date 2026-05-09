@@ -11,30 +11,30 @@ struct TerminalSettingsPane: View {
     var body: some View {
         Form {
             Section("Terminal") {
-                HStack {
-                    Text("Scrollback lines")
-                    Spacer()
-                    TextField("", text: $scrollbackText)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 80)
-                        .onSubmit { commitScrollback() }
-                        .onChange(of: scrollbackText) { _, newValue in
-                            // Allow only digits
-                            let filtered = newValue.filter(\.isNumber)
-                            if filtered != newValue { scrollbackText = filtered }
-                        }
-
-                    Stepper("", value: Binding(
-                        get: { scrollbackLines },
-                        set: { newValue in
-                            store.update {
-                                if $0.terminal == nil { $0.terminal = ForgeConfig.TerminalSettings() }
-                                $0.terminal!.scrollbackLines = newValue
+                LabeledContent("Scrollback lines") {
+                    HStack {
+                        Spacer()
+                        TextField("", text: $scrollbackText)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                            .onSubmit { commitScrollback() }
+                            .onChange(of: scrollbackText) { _, newValue in
+                                let filtered = newValue.filter(\.isNumber)
+                                if filtered != newValue { scrollbackText = filtered }
                             }
-                            scrollbackText = "\(newValue)"
-                        }
-                    ), in: 1000...500_000, step: 5000)
-                    .labelsHidden()
+
+                        Stepper("", value: Binding(
+                            get: { scrollbackLines },
+                            set: { newValue in
+                                store.update {
+                                    if $0.terminal == nil { $0.terminal = ForgeConfig.TerminalSettings() }
+                                    $0.terminal!.scrollbackLines = newValue
+                                }
+                                scrollbackText = "\(newValue)"
+                            }
+                        ), in: 1000...500_000, step: 5000)
+                        .labelsHidden()
+                    }
                 }
 
                 Toggle("Use tmux for project persistence", isOn: Binding(

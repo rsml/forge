@@ -40,6 +40,8 @@ final class WorkspaceController {
                 guard let self else { return }
                 for event in events {
                     switch event {
+                    case .bell(let tabUUID):
+                        self.attentionManager?.handleEvent(.bell(tabUUID: tabUUID))
                     case .commandCompleted(let tabUUID):
                         self.attentionManager?.handleEvent(.commandCompleted(tabUUID: tabUUID))
                     case .contentMatch(let tabUUID):

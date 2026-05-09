@@ -6,6 +6,7 @@ import Foundation
 public enum StateMerger {
 
     public enum PaneEvent: Equatable, Sendable {
+        case bell(tabUUID: UUID)
         case commandCompleted(tabUUID: UUID)
         case contentMatch(tabUUID: UUID)
     }

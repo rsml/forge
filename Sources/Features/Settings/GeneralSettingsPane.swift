@@ -6,30 +6,22 @@ struct GeneralSettingsPane: View {
 
     var body: some View {
         Form {
-            Section("Project") {
-                Picker("Default shell", selection: generalBinding(\.defaultShell, default: "zsh")) {
-                    Text("zsh").tag("zsh")
-                    Text("bash").tag("bash")
-                    Text("fish").tag("fish")
-                }
-
-                HStack {
-                    Text("Default project directory")
-                    Spacer()
+            Section("Startup") {
+                LabeledContent("Default directory") {
                     Text(store.config.general?.defaultProjectDir ?? "~")
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Button("Choose...") { pickDirectory() }
                 }
+                Toggle("Restore sessions on launch", isOn: generalBinding(\.autoRestore, default: true))
             }
 
-            Section("Behavior") {
-                Toggle("Auto-restore sessions on launch", isOn: generalBinding(\.autoRestore, default: true))
+            Section("Confirmations") {
                 Toggle("Warn before closing Forge", isOn: generalBinding(\.confirmBeforeClose, default: true))
                 Toggle("Warn before closing a project", isOn: generalBinding(\.warnOnCloseProject, default: true))
                 Toggle("Warn before closing a tab", isOn: generalBinding(\.warnOnCloseTab, default: false))
-                Toggle("Confirm before moving a tab between projects", isOn: generalBinding(\.warnOnMoveTab, default: true))
+                Toggle("Warn before moving a tab", isOn: generalBinding(\.warnOnMoveTab, default: true))
             }
         }
         .formStyle(.grouped)

@@ -20,10 +20,12 @@ public struct TabInfo {
     public let name: String
     public let active: Bool
     public let paneCount: Int
+    public let hasBell: Bool
 
-    public init(id: String, projectId: String, index: Int, name: String, active: Bool, paneCount: Int) {
+    public init(id: String, projectId: String, index: Int, name: String, active: Bool, paneCount: Int, hasBell: Bool = false) {
         self.id = id; self.projectId = projectId; self.index = index
         self.name = name; self.active = active; self.paneCount = paneCount
+        self.hasBell = hasBell
     }
 }
 

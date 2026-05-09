@@ -18,6 +18,7 @@ final class TmuxSyncEngine {
     private var lastGitBranchProjectId: String?
     private(set) var gitBranch: String?
     private let contentDetector = ContentDetector()
+    private var processedBells: Set<String> = []
 
     init(workspace: Workspace, tmux: any TmuxPort, config: ForgeConfigStore) {
         self.workspace = workspace
@@ -71,6 +72,7 @@ final class TmuxSyncEngine {
         let panesByWindow = Dictionary(grouping: allPanes, by: \.tabId)
 
         var paneEvents: [StateMerger.PaneEvent] = []
+        let bellTabIds = Set(allWindows.filter(\.hasBell).map(\.id))
         for project in workspace.projects {
             if let activeTabId = StateMerger.mergeTabs(
                 project: project, with: windowsBySession[project.id] ?? [],
@@ -80,8 +82,16 @@ final class TmuxSyncEngine {
             }
             for tab in project.tabs {
                 paneEvents.append(contentsOf: mergePaneState(tab: tab, panesByWindow[tab.id] ?? []))
+                if bellTabIds.contains(tab.id) && !processedBells.contains(tab.id) {
+                    processedBells.insert(tab.id)
+                    ForgeLog.log("[attention] Bell detected in tab \(tab.name) (\(tab.id))")
+                    for pane in tab.panes { pane.hasBell = true }
+                    paneEvents.append(.bell(tabUUID: tab.uuid))
+                }
             }
         }
+        // Reset dedup for windows whose bell flag cleared (ready for next bell)
+        processedBells = processedBells.intersection(bellTabIds)
 
         let contentEvents = await scanContentMatches()
         paneEvents.append(contentsOf: contentEvents)

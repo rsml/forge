@@ -93,32 +93,34 @@ struct FontSettingsPane: View {
                 }
             }
 
-            HStack {
-                Text("Size")
-                Spacer()
-                TextField("", value: Binding(
-                    get: { config?.size ?? defaultSize },
-                    set: { v in
-                        store.update {
-                            if $0[keyPath: keyPath] == nil { $0[keyPath: keyPath] = ForgeConfig.FontConfig() }
-                            $0[keyPath: keyPath]!.size = min(max(v, 8), 36)
+            LabeledContent("Size") {
+                HStack {
+                    Spacer()
+                    TextField("", value: Binding(
+                        get: { config?.size ?? defaultSize },
+                        set: { v in
+                            store.update {
+                                if $0[keyPath: keyPath] == nil { $0[keyPath: keyPath] = ForgeConfig.FontConfig() }
+                                $0[keyPath: keyPath]!.size = min(max(v, 8), 36)
+                            }
                         }
-                    }
-                ), format: .number)
-                .multilineTextAlignment(.trailing)
-                .frame(width: 50)
+                    ), format: .number)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 50)
 
-                Stepper("", value: Binding(
-                    get: { config?.size ?? defaultSize },
-                    set: { v in
-                        store.update {
-                            if $0[keyPath: keyPath] == nil { $0[keyPath: keyPath] = ForgeConfig.FontConfig() }
-                            $0[keyPath: keyPath]!.size = v
+                    Stepper("", value: Binding(
+                        get: { config?.size ?? defaultSize },
+                        set: { v in
+                            store.update {
+                                if $0[keyPath: keyPath] == nil { $0[keyPath: keyPath] = ForgeConfig.FontConfig() }
+                                $0[keyPath: keyPath]!.size = v
+                            }
                         }
-                    }
-                ), in: 8...36)
-                .labelsHidden()
+                    ), in: 8...36)
+                    .labelsHidden()
+                }
             }
+
 
             // Live preview
             let family = config?.family ?? defaultFamily
