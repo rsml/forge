@@ -10,6 +10,7 @@ struct StackView: View {
     @State private var isDismissing = false
     @State private var pendingAction: WorkspaceController.StackDismissAction?
     @State private var terminalSnapshot: NSImage?
+    @State private var dismissToEmpty = false
 
     private var toolbarPosition: String {
         configStore.config.stackView?.toolbarPosition ?? "bottom"
@@ -34,7 +35,7 @@ struct StackView: View {
                                 .ignoresSafeArea()
                         }
 
-                        if terminalSnapshot != nil && attention.nextWindowUUID == nil {
+                        if terminalSnapshot != nil && dismissToEmpty {
                             StackEmptyState()
                         } else {
                             baseLayer(project: project, tab: tab)
@@ -140,6 +141,7 @@ struct StackView: View {
     private func handleDismiss(_ action: WorkspaceController.StackDismissAction) {
         guard !isDismissing else { return }
         pendingAction = action
+        dismissToEmpty = (attention.nextWindowUUID == nil)
         terminalSnapshot = captureTerminalSnapshot()
 
         if let nextUUID = attention.nextWindowUUID,
@@ -157,6 +159,7 @@ struct StackView: View {
             isDismissing = false
             terminalSnapshot = nil
             pendingAction = nil
+            dismissToEmpty = false
         }
     }
 
