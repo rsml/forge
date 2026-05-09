@@ -78,6 +78,17 @@ final class WorkspaceController {
                 }
             )
 
+            NotificationCenter.default.addObserver(
+                forName: .forgeNavigateToTab, object: nil, queue: .main
+            ) { [weak self] note in
+                guard let self,
+                      let uuid = note.userInfo?["tabUUID"] as? UUID,
+                      let (project, tab) = self.workspace.findTab(byUUID: uuid) else { return }
+                self.selectProject(project)
+                self.selectTab(tab)
+                NSApp.activate()
+            }
+
             syncEngine.start()
             workspace.connected = true
             ForgeLog.log("[app] Connected. \(workspace.projects.count) sessions found.")

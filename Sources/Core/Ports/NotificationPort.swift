@@ -7,5 +7,6 @@ public protocol NotificationPort: Sendable {
     func requestPermission() async -> Bool
 
     /// Deliver a notification with the given title, body, and optional sound name.
-    func send(title: String, body: String, sound: String?) async
+    /// `tabUUID` identifies the originating tab so the notification can navigate on tap.
+    func send(title: String, body: String, sound: String?, tabUUID: UUID?) async
 }

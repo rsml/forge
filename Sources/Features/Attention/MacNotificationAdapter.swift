@@ -10,6 +10,18 @@ private final class NotificationDelegate: NSObject, UNUserNotificationCenterDele
     ) async -> UNNotificationPresentationOptions {
         [.banner, .sound]
     }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        let userInfo = response.notification.request.content.userInfo
+        guard let uuidString = userInfo["tabUUID"] as? String,
+              let uuid = UUID(uuidString: uuidString) else { return }
+        await MainActor.run {
+            NotificationCenter.default.post(name: .forgeNavigateToTab, object: nil, userInfo: ["tabUUID": uuid])
+        }
+    }
 }
 
 /// Concrete implementation of `NotificationPort` that delivers macOS notifications.
@@ -47,14 +59,14 @@ final class MacNotificationAdapter: NotificationPort, @unchecked Sendable {
         }
     }
 
-    func send(title: String, body: String, sound: String?) async {
+    func send(title: String, body: String, sound: String?, tabUUID: UUID? = nil) async {
         var sentSystemNotification = false
 
         if hasBundle {
             let granted = await requestPermission()
             if granted {
                 sentSystemNotification = await sendViaUNUserNotification(
-                    title: title, body: body, sound: sound
+                    title: title, body: body, sound: sound, tabUUID: tabUUID
                 )
             }
         }
@@ -88,11 +100,14 @@ final class MacNotificationAdapter: NotificationPort, @unchecked Sendable {
     // MARK: - UNUserNotificationCenter (requires .app bundle)
 
     /// Returns `true` if the notification was successfully queued.
-    private func sendViaUNUserNotification(title: String, body: String, sound: String?) async -> Bool {
+    private func sendViaUNUserNotification(title: String, body: String, sound: String?, tabUUID: UUID? = nil) async -> Bool {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = resolveUNSound(sound)
+        if let tabUUID {
+            content.userInfo = ["tabUUID": tabUUID.uuidString]
+        }
 
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,

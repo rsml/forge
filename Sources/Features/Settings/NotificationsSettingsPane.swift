@@ -62,6 +62,15 @@ struct NotificationsSettingsPane: View {
                 }
 
                 LabeledContent("Badge size") {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(store.resolvedTheme?.background.color ?? Color(red: 0.1, green: 0.1, blue: 0.1))
+                        .frame(width: 48, height: 24)
+                        .overlay {
+                            AttentionDot(needsAttention: true)
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] }
+
                     Stepper(
                         value: badgeSizeBinding,
                         in: 4...16,
@@ -71,8 +80,6 @@ struct NotificationsSettingsPane: View {
                             .monospacedDigit()
                             .frame(width: 40)
                     }
-                    AttentionDot(needsAttention: true)
-                        .padding(.leading, 8)
                 }
                 .padding(.vertical, -4)
             }
