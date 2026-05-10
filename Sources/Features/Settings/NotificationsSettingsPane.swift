@@ -57,15 +57,6 @@ struct NotificationsSettingsPane: View {
                     .padding(.vertical, -4)
             }
 
-            Section {
-                Toggle("Show notifications in stack mode", isOn: stackNotifyBinding)
-                    .padding(.vertical, -4)
-            } footer: {
-                Text("Recommended off. Stack mode always shows tabs that need attention in order, so notifications are usually unnecessary.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-
             Section("Badge") {
                 Picker("Badge color", selection: badgeColorModeBinding) {
                     Text("macOS Accent Color").tag("accent")
@@ -231,18 +222,6 @@ struct NotificationsSettingsPane: View {
                 store.update { config in
                     if config.notifications == nil { config.notifications = ForgeConfig.NotificationSettings() }
                     config.notifications![keyPath: keyPath] = newValue
-                }
-            }
-        )
-    }
-
-    private var stackNotifyBinding: Binding<Bool> {
-        Binding(
-            get: { store.config.stackView?.notifyInStackMode ?? false },
-            set: { newValue in
-                store.update { config in
-                    if config.stackView == nil { config.stackView = ForgeConfig.StackViewSettings() }
-                    config.stackView!.notifyInStackMode = newValue
                 }
             }
         )

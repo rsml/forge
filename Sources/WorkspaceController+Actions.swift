@@ -49,6 +49,19 @@ extension WorkspaceController {
         saveUIState()
     }
 
+    /// Navigate to a specific project + tab in one atomic update.
+    /// Avoids the flicker from selectProject (which restores a saved tab) + selectTab.
+    func navigateToTab(_ tab: Tab, in project: Project) {
+        if let currentSessionId = workspace.activeProjectId {
+            perProjectActiveTabId[currentSessionId] = workspace.activeTabId
+        }
+        workspace.activeProjectId = project.id
+        workspace.activeTabId = tab.id
+        Task { await tmux.switchClient(project: project.name) }
+        Task { await tmux.selectTab(id: tab.id) }
+        saveUIState()
+    }
+
     /// Switch tmux to a different window without updating workspace state.
     /// Used by stack dismiss animation to pre-switch the terminal while the
     /// snapshot flyout covers the transition.

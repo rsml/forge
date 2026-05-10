@@ -33,6 +33,14 @@ struct StackModeSettingsPane: View {
                     Text("Always").tag("always")
                 }
                 .padding(.vertical, -4)
+
+                Toggle(isOn: stackBinding(\.notifyInStackMode, default: false)) {
+                    Text("Show notifications in stack mode")
+                    Text("Recommended off. Stack mode always shows tabs that need attention in order, so notifications are usually unnecessary.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, -4)
             }
         }
         .formStyle(.grouped)

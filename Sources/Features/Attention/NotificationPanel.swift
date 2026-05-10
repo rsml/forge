@@ -45,8 +45,7 @@ struct NotificationPanel: View {
                 List {
                     ForEach(attentionItems, id: \.tab.id) { item in
                         Button {
-                            controller.selectProject(item.project)
-                            controller.selectTab(item.tab)
+                            controller.navigateToTab(item.tab, in: item.project)
                             close()
                             DispatchQueue.main.async {
                                 NotificationCenter.default.post(name: .forgeFocusTerminal, object: nil)
@@ -76,8 +75,7 @@ struct NotificationPanel: View {
             HStack {
                 if let latest = attentionItems.first {
                     Button("Jump to Latest") {
-                        controller.selectProject(latest.project)
-                        controller.selectTab(latest.tab)
+                        controller.navigateToTab(latest.tab, in: latest.project)
                         close()
                         DispatchQueue.main.async {
                             NotificationCenter.default.post(name: .forgeFocusTerminal, object: nil)

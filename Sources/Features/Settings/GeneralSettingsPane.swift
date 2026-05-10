@@ -26,8 +26,6 @@ struct GeneralSettingsPane: View {
                     .padding(.vertical, -4)
                 Toggle("Warn before closing a tab", isOn: generalBinding(\.warnOnCloseTab, default: false))
                     .padding(.vertical, -4)
-                Toggle("Warn before moving a tab", isOn: generalBinding(\.warnOnMoveTab, default: true))
-                    .padding(.vertical, -4)
             }
         }
         .formStyle(.grouped)

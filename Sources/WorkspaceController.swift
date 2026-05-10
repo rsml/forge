@@ -75,8 +75,7 @@ final class WorkspaceController {
                 guard let self,
                       let uuid = note.userInfo?["tabUUID"] as? UUID,
                       let (project, tab) = self.workspace.findTab(byUUID: uuid) else { return }
-                self.selectProject(project)
-                self.selectTab(tab)
+                self.navigateToTab(tab, in: project)
                 NSApp.activate()
                 DispatchQueue.main.async {
                     NotificationCenter.default.post(name: .forgeFocusTerminal, object: nil)
