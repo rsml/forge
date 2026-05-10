@@ -55,6 +55,8 @@ struct ForgeConfig: Codable {
     struct NotificationSettings: Codable {
         var enabled: Bool?              // defaults to false
         var sound: String?              // system sound name or custom file path
+        var activeTabBanner: Bool?      // show notification banner for active tab (default false)
+        var activeTabSound: Bool?       // play sound for active tab (default true)
         var badgeColorMode: String?     // "accent" (default), "theme", "custom"
         var badgeCustomColor: String?   // hex color string, e.g. "#FF0000"
         var badgeSize: Double?          // default 8
@@ -91,6 +93,7 @@ struct ForgeConfig: Codable {
         var toolbarPosition: String?        // "top" or "bottom"
         var bringToForeground: String?      // "never" or "always"
         var notify: String?                 // "always" or "never"
+        var notifyInStackMode: Bool?        // show notifications in stack mode (default false)
         var notificationSound: String?      // system sound name or custom file path
         var hiddenTabUUIDs: [String]?    // persisted hidden set
         var contentPatterns: [String]?      // user-defined patterns merged with defaults

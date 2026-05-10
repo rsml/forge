@@ -10,6 +10,7 @@ import ForgeCore
 final class WorkspaceController {
     let workspace = Workspace()
     var attentionManager: (any AttentionPort)?
+    var notifier: (any NotificationPort)?
     let config: ForgeConfigStore
     let toastState: NotificationToastState
     let syncEngine: TmuxSyncEngine
@@ -44,12 +45,15 @@ final class WorkspaceController {
                     switch event {
                     case .bell(let tabUUID):
                         self.attentionManager?.handleEvent(.bell(tabUUID: tabUUID))
+                        self.sendAttentionNotification(tabUUID: tabUUID)
                     case .silenceCleared(let tabUUID):
                         self.attentionManager?.markDone(tabUUID)
                     case .commandCompleted(let tabUUID):
                         self.attentionManager?.handleEvent(.commandCompleted(tabUUID: tabUUID))
+                        self.sendAttentionNotification(tabUUID: tabUUID)
                     case .contentMatch(let tabUUID):
                         self.attentionManager?.handleEvent(.contentMatch(tabUUID: tabUUID))
+                        self.sendAttentionNotification(tabUUID: tabUUID)
                     }
                 }
             }
@@ -155,6 +159,7 @@ final class WorkspaceController {
                 for pane in tab.panes where pane.status == .running { pane.hasBell = true }
                 if tab.panes.contains(where: { $0.status == .running }) {
                     attentionManager?.handleEvent(.bell(tabUUID: tab.uuid))
+                    sendAttentionNotification(tabUUID: tab.uuid)
                 }
             }
 

@@ -225,6 +225,29 @@ extension WorkspaceController {
 
     // MARK: - Attention
 
+    func sendAttentionNotification(tabUUID: UUID) {
+        guard config.config.notifications?.enabled == true, let notifier else { return }
+
+        // In stack mode, suppress notifications unless explicitly enabled
+        if config.isStackMode && !(config.config.stackView?.notifyInStackMode ?? false) { return }
+
+        let notifications = config.config.notifications
+        let sound = notifications?.sound
+        let isActiveTab = workspace.findTab(byUUID: tabUUID).map { $0.tab.id == workspace.activeTabId } ?? false
+
+        if isActiveTab {
+            let showBanner = notifications?.activeTabBanner ?? false
+            let playSound = notifications?.activeTabSound ?? true
+            if showBanner {
+                Task { await notifier.send(title: "Terminal needs attention", body: "A terminal is waiting for input", sound: sound, tabUUID: tabUUID) }
+            } else if playSound {
+                MacNotificationAdapter(toastState: toastState).playSound(sound)
+            }
+        } else {
+            Task { await notifier.send(title: "Terminal needs attention", body: "A terminal is waiting for input", sound: sound, tabUUID: tabUUID) }
+        }
+    }
+
     private func clearAttention(tab: Tab) {
         for pane in tab.panes {
             pane.hasBell = false

@@ -79,6 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let notifier = MacNotificationAdapter(toastState: toastState)
         attentionManager = AttentionManager(notifier: notifier, config: configStore)
         controller.attentionManager = attentionManager
+        controller.notifier = notifier
 
         createMainWindow()
         appState.bind(

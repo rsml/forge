@@ -34,11 +34,7 @@ final class AttentionManager: AttentionPort {
         guard !hiddenSet.contains(uuid) else { return }
         queue.enqueue(uuid)
 
-        let settings = config.config.stackView
-        if settings?.notify == "always" && config.config.notifications?.enabled == true {
-            Task { await notifier.send(title: "Terminal needs attention", body: "A terminal is waiting for input", sound: config.config.notifications?.sound, tabUUID: uuid) }
-        }
-        if settings?.bringToForeground == "always" {
+        if config.config.stackView?.bringToForeground == "always" {
             NSApp.activate()
         }
     }
