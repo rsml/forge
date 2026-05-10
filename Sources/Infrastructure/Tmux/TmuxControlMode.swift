@@ -105,8 +105,15 @@ final class TmuxControlMode: @unchecked Sendable {
 
         // Shrink the control mode client to 1x1 so it never wins the
         // "window-size largest" comparison against the real terminal view.
-        if let data = "refresh-client -C 1,1\n".data(using: .utf8) {
-            stdinPipe.fileHandleForWriting.write(data)
+        // Subscribe to silence flags for push-based idle detection.
+        let initCommands = """
+        refresh-client -C 1,1
+        refresh-client -B "silence:@*:#{window_silence_flag}"
+        """
+        for cmd in initCommands.split(separator: "\n") {
+            if let data = (cmd + "\n").data(using: .utf8) {
+                stdinPipe.fileHandleForWriting.write(data)
+            }
         }
 
         // Read stderr on a separate thread for diagnostics

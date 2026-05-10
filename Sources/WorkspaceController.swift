@@ -133,6 +133,16 @@ final class WorkspaceController {
                 ForgeLog.log("[control] Bell event for unknown tab: \(tabId)")
             }
 
+        case .silenceChanged(let tabId, let isSilent):
+            if let (_, tab) = workspace.findTab(byTmuxId: tabId) {
+                for pane in tab.panes { pane.hasBell = isSilent }
+                if isSilent {
+                    attentionManager?.handleEvent(.bell(tabUUID: tab.uuid))
+                } else {
+                    attentionManager?.markDone(tab.uuid)
+                }
+            }
+
         case .tabClose(let tabId):
             if let (_, tab) = workspace.findTab(byTmuxId: tabId) {
                 attentionManager?.removeTab(tab.uuid)

@@ -42,6 +42,9 @@ struct NotificationsSettingsPane: View {
                             body: "Forge notifications are working.",
                             sound: sound
                         )
+                        // Always play sound so the user gets feedback even if
+                        // macOS silently drops the system notification
+                        notifier.playSound(sound)
                         checkAuthorizationStatus()
                     }
                 }

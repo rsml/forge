@@ -71,7 +71,7 @@ final class TmuxSyncEngine {
         let panesByWindow = Dictionary(grouping: allPanes, by: \.tabId)
 
         var paneEvents: [StateMerger.PaneEvent] = []
-        let bellTabIds = Set(allWindows.filter(\.hasBell).map(\.id))
+        let silentTabIds = Set(allWindows.filter(\.hasBell).map(\.id))
         for project in workspace.projects {
             if let activeTabId = StateMerger.mergeTabs(
                 project: project, with: windowsBySession[project.id] ?? [],
@@ -81,11 +81,14 @@ final class TmuxSyncEngine {
             }
             for tab in project.tabs {
                 paneEvents.append(contentsOf: mergePaneState(tab: tab, panesByWindow[tab.id] ?? []))
-                if bellTabIds.contains(tab.id) {
-                    ForgeLog.log("[attention] Bell detected in tab \(tab.name) (\(tab.id))")
-                    for pane in tab.panes { pane.hasBell = true }
-                    paneEvents.append(.bell(tabUUID: tab.uuid))
-                    Task { await tmux.clearBellFlag(tabId: tab.id) }
+                // Sync silence state from tmux (covers app restart, missed subscription events)
+                let isSilent = silentTabIds.contains(tab.id)
+                let wasSilent = tab.panes.contains(where: \.hasBell)
+                if isSilent != wasSilent {
+                    for pane in tab.panes { pane.hasBell = isSilent }
+                    if isSilent {
+                        paneEvents.append(.bell(tabUUID: tab.uuid))
+                    }
                 }
             }
         }

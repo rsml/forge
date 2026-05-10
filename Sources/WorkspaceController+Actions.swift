@@ -14,10 +14,7 @@ extension WorkspaceController {
         switch action {
         case .done:
             if let (_, tab) = workspace.findTab(byUUID: uuid) {
-                for pane in tab.panes {
-                    pane.hasBell = false
-                    pane.hasContentMatch = false
-                }
+                clearAttention(tab: tab)
             }
             attention.markDone(uuid)
         case .hide:
@@ -203,5 +200,15 @@ extension WorkspaceController {
         guard toIndex >= 0, toIndex < project.tabs.count else { return }
         project.tabs.swapAt(fromIndex, toIndex)
         Task { await tmux.swapTab(id: tabId, offset: offset) }
+    }
+
+    // MARK: - Attention
+
+    private func clearAttention(tab: Tab) {
+        for pane in tab.panes {
+            pane.hasBell = false
+            pane.hasContentMatch = false
+        }
+        Task { await tmux.clearBellFlag(tabId: tab.id) }
     }
 }
