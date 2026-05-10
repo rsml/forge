@@ -10,7 +10,7 @@ struct BellEventHandlingTests {
     @Test("Bell state propagation through tab hierarchy")
     func testBellStatePropagation() {
         // Create test data structure
-        let pane = Pane(id: "pane1", tabId: "window1")
+        let pane = Pane(id: "pane1", tabId: "window1", currentCommand: "claude")
         let tab = Tab(id: "window1", projectId: "session1", index: 0, name: "test")
         tab.panes = [pane]
 
@@ -27,7 +27,7 @@ struct BellEventHandlingTests {
 
     @Test("Clearing bell state")
     func testClearingBellState() {
-        let pane = Pane(id: "pane1", tabId: "window1")
+        let pane = Pane(id: "pane1", tabId: "window1", currentCommand: "claude")
         let tab = Tab(id: "window1", projectId: "session1", index: 0, name: "test")
         tab.panes = [pane]
 
@@ -42,8 +42,8 @@ struct BellEventHandlingTests {
 
     @Test("Multiple panes bell state")
     func testMultiplePanesBellState() {
-        let pane1 = Pane(id: "pane1", tabId: "window1")
-        let pane2 = Pane(id: "pane2", tabId: "window1")
+        let pane1 = Pane(id: "pane1", tabId: "window1", currentCommand: "claude")
+        let pane2 = Pane(id: "pane2", tabId: "window1", currentCommand: "claude")
         let tab = Tab(id: "window1", projectId: "session1", index: 0, name: "test")
         tab.panes = [pane1, pane2]
 
@@ -62,7 +62,7 @@ struct BellEventHandlingTests {
 
     @Test("Project attention propagation")
     func testSessionAttentionPropagation() {
-        let pane = Pane(id: "pane1", tabId: "window1")
+        let pane = Pane(id: "pane1", tabId: "window1", currentCommand: "claude")
         let tab = Tab(id: "window1", projectId: "session1", index: 0, name: "test")
         tab.panes = [pane]
 

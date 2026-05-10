@@ -71,7 +71,8 @@ final class TmuxSyncEngine {
         let panesByWindow = Dictionary(grouping: allPanes, by: \.tabId)
 
         var paneEvents: [StateMerger.PaneEvent] = []
-        let silentTabIds = Set(allWindows.filter(\.hasBell).map(\.id))
+        let now = Date().timeIntervalSince1970
+        let tabInfoById = Dictionary(allWindows.map { ($0.id, $0) }, uniquingKeysWith: { $1 })
         for project in workspace.projects {
             if let activeTabId = StateMerger.mergeTabs(
                 project: project, with: windowsBySession[project.id] ?? [],
@@ -81,14 +82,25 @@ final class TmuxSyncEngine {
             }
             for tab in project.tabs {
                 paneEvents.append(contentsOf: mergePaneState(tab: tab, panesByWindow[tab.id] ?? []))
-                // Sync silence state from tmux (covers app restart, missed subscription events).
-                // Only SET hasBell here — never clear. Clearing is handled by the
-                // subscription with a debounce timer to avoid flicker from tab selection.
-                let isSilent = silentTabIds.contains(tab.id)
-                let wasSilent = tab.panes.contains(where: \.hasBell)
-                if isSilent && !wasSilent {
-                    for pane in tab.panes { pane.hasBell = true }
-                    paneEvents.append(.bell(tabUUID: tab.uuid))
+
+                guard let info = tabInfoById[tab.id] else { continue }
+                let hasRunningPanes = tab.panes.contains { $0.status == .running }
+                let hadBell = tab.panes.contains(where: \.hasBell)
+
+                if info.hasBell && !hadBell {
+                    // Window is silent — set bell for running panes (Claude idle, etc.)
+                    for pane in tab.panes where pane.status == .running { pane.hasBell = true }
+                    if hasRunningPanes {
+                        paneEvents.append(.bell(tabUUID: tab.uuid))
+                    }
+                } else if hadBell && !info.hasBell && hasRunningPanes {
+                    // Window has fresh output — only clear if activity is recent (< 3s),
+                    // meaning real sustained output, not a stale touch from tab selection.
+                    let activityAge = now - info.lastActivity
+                    if activityAge < 3 {
+                        for pane in tab.panes { pane.hasBell = false }
+                        paneEvents.append(.silenceCleared(tabUUID: tab.uuid))
+                    }
                 }
             }
         }

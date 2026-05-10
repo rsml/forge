@@ -62,7 +62,7 @@ final class TmuxAdapter: TmuxQueryPort, TmuxCommandPort, TmuxControlPort {
     }
 
     func killTab(id: String) async {
-        controlMode.send("kill-window -t \(id)")
+        _ = await runner.run("kill-window", "-t", id)
     }
 
     func selectTab(id: String) async {

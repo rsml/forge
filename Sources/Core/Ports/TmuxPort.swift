@@ -21,11 +21,12 @@ public struct TabInfo {
     public let active: Bool
     public let paneCount: Int
     public let hasBell: Bool
+    public let lastActivity: TimeInterval
 
-    public init(id: String, projectId: String, index: Int, name: String, active: Bool, paneCount: Int, hasBell: Bool = false) {
+    public init(id: String, projectId: String, index: Int, name: String, active: Bool, paneCount: Int, hasBell: Bool = false, lastActivity: TimeInterval = 0) {
         self.id = id; self.projectId = projectId; self.index = index
         self.name = name; self.active = active; self.paneCount = paneCount
-        self.hasBell = hasBell
+        self.hasBell = hasBell; self.lastActivity = lastActivity
     }
 }
 

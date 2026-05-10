@@ -32,9 +32,10 @@ public final class Pane: Identifiable {
     /// The command that was running before the most recent command change.
     public var previousCommand: String = ""
 
-    /// True if this pane needs user attention (bell, content match, idle agent, error)
+    /// True if this pane needs user attention (idle, bell, content match, error).
+    /// Idle shells and silent agents both count — attention is the inverse of busy.
     public var needsAttention: Bool {
-        hasBell || hasContentMatch || status == .needsAttention || status == .error
+        status == .idle || hasBell || hasContentMatch || status == .needsAttention || status == .error
     }
 
     public init(id: String, tabId: String, index: Int = 0, active: Bool = false,

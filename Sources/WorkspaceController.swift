@@ -16,8 +16,6 @@ final class WorkspaceController {
     let tmux: any TmuxPort
     private let uiState: UIStatePersistence
     var perProjectActiveTabId: [String: String] = [:]
-    /// Debounce timers for silence clearing — prevents dot flicker from brief activity (tab selection).
-    private var silenceClearTimers: [String: Task<Void, Never>] = [:]
     /// Set before intentionally stopping control mode (e.g. removing last project) to suppress reconnect toast.
     var expectingDisconnect = false
 
@@ -36,7 +34,7 @@ final class WorkspaceController {
     func connect() {
         Task {
             ForgeLog.log("[app] Connecting...")
-            await ensureServer()
+            cleanStaleSocket()
             if let configPath = tmux.configPath {
                 await tmux.sourceConfig(path: configPath)
             }
@@ -61,7 +59,11 @@ final class WorkspaceController {
             let allUUIDs = Set(workspace.projects.flatMap { $0.tabs.map(\.uuid) })
             attentionManager?.pruneStaleHiddenEntries(validUUIDs: allUUIDs)
 
-            startControlMode()
+            if workspace.projects.isEmpty {
+                expectingDisconnect = true
+            } else {
+                startControlMode()
+            }
 
             NotificationCenter.default.addObserver(
                 forName: .forgeNavigateToTab, object: nil, queue: .main
@@ -119,15 +121,12 @@ final class WorkspaceController {
 
     // MARK: - Private
 
-    private func ensureServer() async {
-        let sessions = await tmux.listProjects()
-        if sessions.isEmpty {
-            let socketPath = "/private/tmp/tmux-\(getuid())/forge"
-            if FileManager.default.fileExists(atPath: socketPath) {
-                try? FileManager.default.removeItem(atPath: socketPath)
-                ForgeLog.log("[app] Removed stale tmux socket")
-            }
-            await tmux.newProject(name: "forge-default", path: NSHomeDirectory())
+    private func cleanStaleSocket() {
+        let socketPath = "/private/tmp/tmux-\(getuid())/forge"
+        let sessions = (try? FileManager.default.contentsOfDirectory(atPath: "/private/tmp/tmux-\(getuid())")) ?? []
+        if sessions.isEmpty, FileManager.default.fileExists(atPath: socketPath) {
+            try? FileManager.default.removeItem(atPath: socketPath)
+            ForgeLog.log("[app] Removed stale tmux socket")
         }
     }
 
@@ -145,26 +144,13 @@ final class WorkspaceController {
             }
 
         case .silenceChanged(let tabId, let isSilent):
-            if isSilent {
-                // Silence onset: show dot immediately, cancel any pending clear.
-                silenceClearTimers[tabId]?.cancel()
-                silenceClearTimers[tabId] = nil
-                if let (_, tab) = workspace.findTab(byTmuxId: tabId) {
-                    for pane in tab.panes { pane.hasBell = true }
+            // Only react to silence onset — show dot instantly for running panes.
+            // Clearing is handled by the poll cycle checking window_activity freshness,
+            // which naturally ignores brief touches from tab selection.
+            if isSilent, let (_, tab) = workspace.findTab(byTmuxId: tabId) {
+                for pane in tab.panes where pane.status == .running { pane.hasBell = true }
+                if tab.panes.contains(where: { $0.status == .running }) {
                     attentionManager?.handleEvent(.bell(tabUUID: tab.uuid))
-                }
-            } else {
-                // Silence cleared: debounce 5s before removing dot.
-                // Brief activity (tab selection) restores silence within 2s, cancelling this.
-                silenceClearTimers[tabId]?.cancel()
-                silenceClearTimers[tabId] = Task { [weak self] in
-                    try? await Task.sleep(for: .seconds(5))
-                    guard !Task.isCancelled, let self else { return }
-                    if let (_, tab) = self.workspace.findTab(byTmuxId: tabId) {
-                        for pane in tab.panes { pane.hasBell = false }
-                        self.attentionManager?.markDone(tab.uuid)
-                    }
-                    self.silenceClearTimers[tabId] = nil
                 }
             }
 

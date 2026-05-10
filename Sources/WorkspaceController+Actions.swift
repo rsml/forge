@@ -105,18 +105,26 @@ extension WorkspaceController {
 
     func removeTab(_ tab: Tab) {
         ForgeLog.log("[app] Removing tab: \(tab.name) (\(tab.id))")
-        Task { await tmux.killTab(id: tab.id) }
+        Task {
+            await tmux.killTab(id: tab.id)
+            await syncEngine.refresh()
+        }
     }
 
     func removeTab(_ tab: Tab, in project: Project) {
         ForgeLog.log("[app] Removing tab: \(tab.name) from \(project.name)")
-        if let index = project.tabs.firstIndex(where: { $0.id == tab.id }) {
+        // Compute neighbor before kill — refresh will remove the tab from the model.
+        let neighborTab: Tab? = {
+            guard let index = project.tabs.firstIndex(where: { $0.id == tab.id }) else { return nil }
             let nextIndex = index > 0 ? index - 1 : min(index + 1, project.tabs.count - 1)
-            if nextIndex != index, nextIndex < project.tabs.count {
-                selectTab(project.tabs[nextIndex])
-            }
+            guard nextIndex != index, nextIndex < project.tabs.count else { return nil }
+            return project.tabs[nextIndex]
+        }()
+        Task {
+            await tmux.killTab(id: tab.id)
+            await syncEngine.refresh()
+            if let neighborTab { selectTab(neighborTab) }
         }
-        Task { await tmux.killTab(id: tab.id) }
     }
 
     func renameProject(_ project: Project, to name: String) {
