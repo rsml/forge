@@ -19,9 +19,7 @@ struct CommandPalette: View {
                     controller?.selectProject(project)
                 }))
             }
-            let commonCommands = ["go", "new-project", "new-tab", "settings", "theme", "toggle-sidebar"]
-            let common = sorted.filter { commonCommands.contains($0.name) }
-            for cmd in common {
+            for cmd in sorted {
                 items.append(CommandItem(command: cmd))
             }
             return items
@@ -82,7 +80,7 @@ struct CommandPalette: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 0) {
-                            ForEach(Array(results.enumerated().prefix(20)), id: \.offset) { index, item in
+                            ForEach(Array(results.enumerated()), id: \.offset) { index, item in
                                 CommandRow(item: item, isSelected: index == selectedIndex)
                                     .id(index)
                                     .contentShape(Rectangle())
