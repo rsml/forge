@@ -8,9 +8,8 @@ struct StackView: View {
     @Environment(AppState.self) private var appState
     @State private var isFullScreen = false
     @State private var isDismissing = false
-    @State private var pendingAction: WorkspaceController.StackDismissAction?
     @State private var terminalSnapshot: NSImage?
-    @State private var dismissToEmpty = false
+    @State private var flyoutInfo: (project: Project, tab: ForgeCore.Tab)?
 
     private var toolbarPosition: String {
         configStore.config.stackView?.toolbarPosition ?? "bottom"
@@ -26,37 +25,34 @@ struct StackView: View {
                 .frame(height: configStore.titlebarHeight)
             }
 
-            if let uuid = attention.currentTabUUID,
-               let (project, tab) = controller.workspace.findTab(byUUID: uuid) {
-                GeometryReader { geo in
-                    ZStack {
-                        if terminalSnapshot != nil {
-                            Color.black.opacity(0.5)
-                                .ignoresSafeArea()
-                        }
+            GeometryReader { geo in
+                ZStack {
+                    // Base layer: always the current natural state
+                    if let uuid = attention.currentTabUUID,
+                       let (project, tab) = controller.workspace.findTab(byUUID: uuid) {
+                        baseContent(
+                            project: project,
+                            tab: tab,
+                            onDismiss: terminalSnapshot == nil ? { action in handleDismiss(action) } : nil
+                        )
+                        .clipped()
+                        .overlay { Color.black.opacity(terminalSnapshot != nil ? (isDismissing ? 0.0 : 0.3) : 0.0) }
+                        .scaleEffect(terminalSnapshot != nil ? (isDismissing ? 1.0 : 0.96) : 1.0)
+                    } else if let staleUUID = attention.currentTabUUID {
+                        let _ = { attention.removeTab(staleUUID) }()
+                        StackEmptyState()
+                    } else {
+                        StackEmptyState()
+                    }
 
-                        if terminalSnapshot != nil && dismissToEmpty {
-                            StackEmptyState()
-                        } else {
-                            baseLayer(project: project, tab: tab)
-                                .clipped()
-                                .overlay { Color.black.opacity(terminalSnapshot != nil ? (isDismissing ? 0.0 : 0.3) : 0.0) }
-                                .scaleEffect(terminalSnapshot != nil ? (isDismissing ? 1.0 : 0.96) : 1.0)
-                        }
-
-                        if let snapshot = terminalSnapshot {
-                            flyoutLayer(snapshot: snapshot, project: project, tab: tab)
-                                .scaleEffect(isDismissing ? 0.92 : 1.0)
-                                .offset(y: isDismissing ? -(geo.size.height + 100) : 0)
-                                .shadow(color: .black.opacity(0.4), radius: 12, y: 3)
-                        }
+                    // Flyout layer: independent of attention queue state
+                    if let snapshot = terminalSnapshot, let info = flyoutInfo {
+                        flyoutLayer(snapshot: snapshot, project: info.project, tab: info.tab)
+                            .scaleEffect(isDismissing ? 0.92 : 1.0)
+                            .offset(y: isDismissing ? -(geo.size.height + 100) : 0)
+                            .shadow(color: .black.opacity(0.4), radius: 12, y: 3)
                     }
                 }
-            } else if let staleUUID = attention.currentTabUUID {
-                let _ = { attention.removeTab(staleUUID) }()
-                StackEmptyState()
-            } else {
-                StackEmptyState()
             }
         }
         .onChange(of: attention.currentTabUUID) { _, newUUID in
@@ -79,45 +75,21 @@ struct StackView: View {
         }
     }
 
-    private func baseLayer(project: Project, tab: ForgeCore.Tab) -> some View {
-        let resolved = resolveBaseToolbar(fallbackProject: project, fallbackTab: tab)
-        let dismissHandler: ((WorkspaceController.StackDismissAction) -> Void)? =
-            terminalSnapshot == nil ? { action in self.handleDismiss(action) } : nil
-        return baseContent(
-            terminalProject: project,
-            toolbarProject: resolved.project,
-            toolbarTab: resolved.tab,
-            onDismiss: dismissHandler
-        )
-    }
-
     @ViewBuilder
     private func baseContent(
-        terminalProject: Project,
-        toolbarProject: Project,
-        toolbarTab: ForgeCore.Tab,
+        project: Project,
+        tab: ForgeCore.Tab,
         onDismiss: ((WorkspaceController.StackDismissAction) -> Void)?
     ) -> some View {
         VStack(spacing: 0) {
             if toolbarPosition == "top" {
-                StackToolbar(project: toolbarProject, tab: toolbarTab, onDismiss: onDismiss)
-                TerminalArea(project: terminalProject)
+                StackToolbar(project: project, tab: tab, onDismiss: onDismiss)
+                TerminalArea(project: project)
             } else {
-                TerminalArea(project: terminalProject)
-                StackToolbar(project: toolbarProject, tab: toolbarTab, onDismiss: onDismiss)
+                TerminalArea(project: project)
+                StackToolbar(project: project, tab: tab, onDismiss: onDismiss)
             }
         }
-    }
-
-    private func resolveBaseToolbar(
-        fallbackProject: Project, fallbackTab: ForgeCore.Tab
-    ) -> (project: Project, tab: ForgeCore.Tab) {
-        if terminalSnapshot != nil,
-           let nextUUID = attention.nextWindowUUID,
-           let next = controller.workspace.findTab(byUUID: nextUUID) {
-            return next
-        }
-        return (fallbackProject, fallbackTab)
     }
 
     @ViewBuilder
@@ -140,26 +112,24 @@ struct StackView: View {
 
     private func handleDismiss(_ action: WorkspaceController.StackDismissAction) {
         guard !isDismissing else { return }
-        pendingAction = action
-        dismissToEmpty = (attention.nextWindowUUID == nil)
+
+        // Save current item for flyout before advancing queue
+        if let uuid = attention.currentTabUUID,
+           let found = controller.workspace.findTab(byUUID: uuid) {
+            flyoutInfo = found
+        }
+
         terminalSnapshot = captureTerminalSnapshot()
 
-        if let nextUUID = attention.nextWindowUUID,
-           let (nextProject, nextTab) = controller.workspace.findTab(byUUID: nextUUID),
-           let currentUUID = attention.currentTabUUID,
-           let (currentProject, _) = controller.workspace.findTab(byUUID: currentUUID),
-           nextProject.id == currentProject.id {
-            controller.switchTerminalWindow(tabId: nextTab.id)
-        }
+        // Advance queue NOW — base layer immediately shows next item (or empty state)
+        controller.stackDismiss(action)
 
         withAnimation(.easeOut(duration: 0.2)) {
             isDismissing = true
         } completion: {
-            controller.stackDismiss(pendingAction ?? action)
             isDismissing = false
             terminalSnapshot = nil
-            pendingAction = nil
-            dismissToEmpty = false
+            flyoutInfo = nil
         }
     }
 
