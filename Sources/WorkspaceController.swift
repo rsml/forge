@@ -16,6 +16,8 @@ final class WorkspaceController {
     let tmux: any TmuxPort
     private let uiState: UIStatePersistence
     var perProjectActiveTabId: [String: String] = [:]
+    /// Debounce timers for silence clearing — prevents dot flicker from brief activity (tab selection).
+    private var silenceClearTimers: [String: Task<Void, Never>] = [:]
 
     var gitBranch: String? { syncEngine.gitBranch }
 
@@ -136,11 +138,27 @@ final class WorkspaceController {
             }
 
         case .silenceChanged(let tabId, let isSilent):
-            // Only react to silence onset (instant dot). Silence clearing is handled
-            // by the poll cycle — this avoids flicker from brief activity like tab selection.
-            if isSilent, let (_, tab) = workspace.findTab(byTmuxId: tabId) {
-                for pane in tab.panes { pane.hasBell = true }
-                attentionManager?.handleEvent(.bell(tabUUID: tab.uuid))
+            if isSilent {
+                // Silence onset: show dot immediately, cancel any pending clear.
+                silenceClearTimers[tabId]?.cancel()
+                silenceClearTimers[tabId] = nil
+                if let (_, tab) = workspace.findTab(byTmuxId: tabId) {
+                    for pane in tab.panes { pane.hasBell = true }
+                    attentionManager?.handleEvent(.bell(tabUUID: tab.uuid))
+                }
+            } else {
+                // Silence cleared: debounce 5s before removing dot.
+                // Brief activity (tab selection) restores silence within 2s, cancelling this.
+                silenceClearTimers[tabId]?.cancel()
+                silenceClearTimers[tabId] = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(5))
+                    guard !Task.isCancelled, let self else { return }
+                    if let (_, tab) = self.workspace.findTab(byTmuxId: tabId) {
+                        for pane in tab.panes { pane.hasBell = false }
+                        self.attentionManager?.markDone(tab.uuid)
+                    }
+                    self.silenceClearTimers[tabId] = nil
+                }
             }
 
         case .tabClose(let tabId):

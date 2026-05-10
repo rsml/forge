@@ -81,15 +81,14 @@ final class TmuxSyncEngine {
             }
             for tab in project.tabs {
                 paneEvents.append(contentsOf: mergePaneState(tab: tab, panesByWindow[tab.id] ?? []))
-                // Sync silence state from tmux (covers app restart, clearing after sustained activity)
+                // Sync silence state from tmux (covers app restart, missed subscription events).
+                // Only SET hasBell here — never clear. Clearing is handled by the
+                // subscription with a debounce timer to avoid flicker from tab selection.
                 let isSilent = silentTabIds.contains(tab.id)
                 let wasSilent = tab.panes.contains(where: \.hasBell)
                 if isSilent && !wasSilent {
                     for pane in tab.panes { pane.hasBell = true }
                     paneEvents.append(.bell(tabUUID: tab.uuid))
-                } else if !isSilent && wasSilent {
-                    for pane in tab.panes { pane.hasBell = false }
-                    paneEvents.append(.silenceCleared(tabUUID: tab.uuid))
                 }
             }
         }
