@@ -101,10 +101,17 @@ struct ForgeMenuCommands: Commands {
 
         // MARK: View
         CommandMenu("View") {
+            Button("Tab Switcher") {
+                appState.dispatch(.showTabSwitcher)
+            }
+            .keyboardShortcut(KeyboardShortcuts.tabSwitcher.key, modifiers: KeyboardShortcuts.tabSwitcher.modifiers)
+
             Button("Command Palette") {
                 appState.dispatch(.showCommandPalette)
             }
             .keyboardShortcut(KeyboardShortcuts.commandPalette.key, modifiers: KeyboardShortcuts.commandPalette.modifiers)
+
+            Divider()
 
             Button("Toggle Sidebar") {
                 appState.dispatch(.toggleSidebar)

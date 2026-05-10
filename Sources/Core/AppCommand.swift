@@ -3,6 +3,7 @@
 public enum AppCommand: Equatable, Sendable {
     // Modals
     case showProjectPicker
+    case showTabSwitcher
     case showCommandPalette
     case showNotifications
     case dismissModal

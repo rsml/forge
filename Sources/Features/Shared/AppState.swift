@@ -9,6 +9,7 @@ final class AppState {
     var activeModal: Modal? = nil
     enum Modal: Equatable {
         case projectPicker
+        case tabSwitcher
         case commandPalette
         case notifications
     }
@@ -52,6 +53,7 @@ final class AppState {
         switch command {
         // Modals
         case .showProjectPicker:   activeModal = .projectPicker
+        case .showTabSwitcher:     activeModal = .tabSwitcher
         case .showCommandPalette:  activeModal = .commandPalette
         case .showNotifications:   activeModal = .notifications
         case .dismissModal:        activeModal = nil

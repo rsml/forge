@@ -10,12 +10,13 @@ enum KeyboardShortcuts {
     static var newTab: Shortcut { resolve("newTab", default: Shortcut("t", modifiers: .command, label: "New Tab")) }
     static var closePane: Shortcut { resolve("closePane", default: Shortcut("w", modifiers: .command, label: "Close Pane")) }
     static var closeProject: Shortcut { resolve("closeProject", default: Shortcut("w", modifiers: [.command, .shift], label: "Close Project")) }
-    static var renameTab: Shortcut { resolve("renameTab", default: Shortcut("t", modifiers: [.command, .shift], label: "Rename Tab")) }
-    static var renameProject: Shortcut { resolve("renameProject", default: Shortcut("p", modifiers: [.command, .shift], label: "Rename Project")) }
+    static var renameTab: Shortcut { resolve("renameTab", default: Shortcut("r", modifiers: .command, label: "Rename Tab")) }
+    static var renameProject: Shortcut { resolve("renameProject", default: Shortcut("r", modifiers: [.command, .shift], label: "Rename Project")) }
 
     // MARK: - View
     static var toggleSidebar: Shortcut { resolve("toggleSidebar", default: Shortcut("b", modifiers: .command, label: "Toggle Sidebar")) }
-    static var commandPalette: Shortcut { resolve("commandPalette", default: Shortcut("p", modifiers: .command, label: "Command Palette")) }
+    static var tabSwitcher: Shortcut { resolve("tabSwitcher", default: Shortcut("p", modifiers: .command, label: "Tab Switcher")) }
+    static var commandPalette: Shortcut { resolve("commandPalette", default: Shortcut("p", modifiers: [.command, .shift], label: "Command Palette")) }
     static var notifications: Shortcut { resolve("notifications", default: Shortcut("n", modifiers: [.command, .shift], label: "Notifications")) }
     static var toggleMode: Shortcut { resolve("toggleMode", default: Shortcut("m", modifiers: [.command, .shift], label: "Toggle Mode")) }
 
@@ -48,10 +49,11 @@ enum KeyboardShortcuts {
         ("newTab", Shortcut("t", modifiers: .command, label: "New Tab"), "File"),
         ("closePane", Shortcut("w", modifiers: .command, label: "Close Pane"), "File"),
         ("closeProject", Shortcut("w", modifiers: [.command, .shift], label: "Close Project"), "File"),
-        ("renameTab", Shortcut("t", modifiers: [.command, .shift], label: "Rename Tab"), "File"),
-        ("renameProject", Shortcut("p", modifiers: [.command, .shift], label: "Rename Project"), "File"),
+        ("renameTab", Shortcut("r", modifiers: .command, label: "Rename Tab"), "File"),
+        ("renameProject", Shortcut("r", modifiers: [.command, .shift], label: "Rename Project"), "File"),
         ("toggleSidebar", Shortcut("b", modifiers: .command, label: "Toggle Sidebar"), "View"),
-        ("commandPalette", Shortcut("p", modifiers: .command, label: "Command Palette"), "View"),
+        ("tabSwitcher", Shortcut("p", modifiers: .command, label: "Tab Switcher"), "View"),
+        ("commandPalette", Shortcut("p", modifiers: [.command, .shift], label: "Command Palette"), "View"),
         ("notifications", Shortcut("n", modifiers: [.command, .shift], label: "Notifications"), "View"),
         ("toggleMode", Shortcut("m", modifiers: [.command, .shift], label: "Toggle Mode"), "View"),
         ("stackDone", Shortcut(.return, modifiers: .command, label: "Done"), "Stack"),

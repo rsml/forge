@@ -1,53 +1,66 @@
 import SwiftUI
 import ForgeCore
 
-struct CommandPalette: View {
-    @Environment(CommandRegistry.self) private var registry
+struct TabSwitcher: View {
+    @Environment(WorkspaceController.self) var controller
     @Binding var isPresented: Bool
     @State private var query = ""
     @State private var selectedIndex = 0
     @State private var useMouseSelection = true
     @FocusState private var isFieldFocused: Bool
 
-    private var results: [Command] {
-        let sorted = registry.commands.sorted { $0.label < $1.label }
-        if query.isEmpty { return sorted }
-        let term = query.lowercased()
-        return sorted.filter { $0.label.lowercased().contains(term) }
+    private var results: [SwitcherItem] {
+        let workspace = controller.workspace
+        var items: [SwitcherItem] = []
+        for project in workspace.projects {
+            if matches(project.name) {
+                items.append(SwitcherItem(title: project.name, context: nil, action: { [weak controller] in
+                    controller?.selectProject(project)
+                }))
+            }
+            for tab in project.tabs {
+                if matches(tab.name) || matches(project.name) {
+                    items.append(SwitcherItem(title: tab.name, context: project.name, action: { [weak controller] in
+                        controller?.selectProject(project)
+                        controller?.selectTab(tab)
+                    }))
+                }
+            }
+        }
+        return items
+    }
+
+    private func matches(_ text: String) -> Bool {
+        query.isEmpty || text.lowercased().contains(query.lowercased())
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 4) {
-                Text(">")
-                    .foregroundStyle(.tertiary)
-                    .font(.system(size: 13, design: .monospaced))
-                TextField("", text: $query)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .focused($isFieldFocused)
-                    .onSubmit { executeSelected() }
-                    .onChange(of: query) {
-                        selectedIndex = 0
-                        useMouseSelection = false
-                    }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            TextField("Switch to project or tab...", text: $query)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+                .focused($isFieldFocused)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .onSubmit { executeSelected() }
+                .onChange(of: query) {
+                    selectedIndex = 0
+                    useMouseSelection = false
+                }
 
             if !results.isEmpty {
                 Divider()
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 0) {
-                            ForEach(Array(results.enumerated()), id: \.offset) { index, cmd in
+                            ForEach(Array(results.enumerated()), id: \.offset) { index, item in
                                 HStack {
-                                    Text(cmd.label)
+                                    Text(item.title)
                                         .font(.system(size: 13))
                                     Spacer()
-                                    if let hint = cmd.shortcutHint {
-                                        Text(hint)
-                                            .font(.system(size: 12, design: .rounded))
+                                    if let context = item.context {
+                                        Text(context)
+                                            .font(.system(size: 11))
                                             .foregroundStyle(.secondary)
                                     }
                                 }
@@ -98,9 +111,9 @@ struct CommandPalette: View {
 
     private func executeSelected() {
         guard selectedIndex < results.count else { return }
-        let cmd = results[selectedIndex]
+        let item = results[selectedIndex]
         dismiss()
-        cmd.action()
+        item.action()
     }
 
     private func dismiss() {
@@ -108,4 +121,10 @@ struct CommandPalette: View {
         query = ""
         selectedIndex = 0
     }
+}
+
+struct SwitcherItem {
+    let title: String
+    let context: String?
+    let action: () -> Void
 }
