@@ -96,7 +96,11 @@ final class WorkspaceController {
             },
             onDisconnect: { [weak self] in
                 Task { @MainActor in
-                    guard let self, !self.expectingDisconnect else { return }
+                    guard let self else { return }
+                    if self.expectingDisconnect {
+                        self.tmux.stopControlMode()
+                        return
+                    }
                     self.toastState.show(
                         title: "Connection lost",
                         message: "Reconnecting to tmux...",

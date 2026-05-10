@@ -78,10 +78,8 @@ extension WorkspaceController {
 
     func removeProject(_ project: Project) {
         ForgeLog.log("[app] Removing project: \(project.name)")
-        let isLastProject = workspace.projects.count == 1
-        if isLastProject {
+        if workspace.projects.count == 1 {
             expectingDisconnect = true
-            tmux.stopControlMode()
         }
         if let index = workspace.projects.firstIndex(where: { $0.id == project.id }) {
             let nextIndex = index > 0 ? index - 1 : min(1, workspace.projects.count - 1)
