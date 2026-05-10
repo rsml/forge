@@ -46,9 +46,11 @@ struct NotificationPanel: View {
                     ForEach(attentionItems, id: \.tab.id) { item in
                         Button {
                             controller.selectProject(item.project)
-                            // Navigate to the tab that needs attention
                             controller.selectTab(item.tab)
                             close()
+                            DispatchQueue.main.async {
+                                NotificationCenter.default.post(name: .forgeFocusTerminal, object: nil)
+                            }
                         } label: {
                             HStack {
                                 AttentionDot(needsAttention: true)
@@ -75,9 +77,11 @@ struct NotificationPanel: View {
                 if let latest = attentionItems.first {
                     Button("Jump to Latest") {
                         controller.selectProject(latest.project)
-                        // selectTab automatically clears hasBell for this tab's panes
                         controller.selectTab(latest.tab)
                         close()
+                        DispatchQueue.main.async {
+                            NotificationCenter.default.post(name: .forgeFocusTerminal, object: nil)
+                        }
                     }
                 }
                 Spacer()

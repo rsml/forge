@@ -78,6 +78,9 @@ final class WorkspaceController {
                 self.selectProject(project)
                 self.selectTab(tab)
                 NSApp.activate()
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .forgeFocusTerminal, object: nil)
+                }
             }
 
             syncEngine.start()
@@ -102,6 +105,9 @@ final class WorkspaceController {
                 Task { @MainActor in
                     guard let self else { return }
                     if self.expectingDisconnect {
+                        self.workspace.projects.removeAll()
+                        self.workspace.activeProjectId = nil
+                        self.workspace.activeTabId = nil
                         self.tmux.stopControlMode()
                         return
                     }

@@ -7,6 +7,16 @@ struct ForgeTerminalView: NSViewRepresentable {
     @Environment(ForgeConfigStore.self) private var configStore
     let sessionName: String
 
+    final class Coordinator {
+        var focusObserver: NSObjectProtocol?
+
+        deinit {
+            if let focusObserver { NotificationCenter.default.removeObserver(focusObserver) }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeNSView(context: Context) -> LocalProcessTerminalView {
         let terminal = LocalProcessTerminalView(frame: .zero)
         terminal.autoresizingMask = [.width, .height]
@@ -50,6 +60,13 @@ struct ForgeTerminalView: NSViewRepresentable {
 
         // Grab focus so the terminal receives keyboard input
         DispatchQueue.main.async {
+            terminal.window?.makeFirstResponder(terminal)
+        }
+
+        context.coordinator.focusObserver = NotificationCenter.default.addObserver(
+            forName: .forgeFocusTerminal, object: nil, queue: .main
+        ) { [weak terminal] _ in
+            guard let terminal else { return }
             terminal.window?.makeFirstResponder(terminal)
         }
 

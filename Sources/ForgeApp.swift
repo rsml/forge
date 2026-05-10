@@ -37,6 +37,7 @@ func bundleResource(_ filename: String) -> URL? {
 extension Notification.Name {
     static let forgeConfigChanged = Notification.Name("forgeConfigChanged")
     static let forgeNavigateToTab = Notification.Name("forgeNavigateToTab")
+    static let forgeFocusTerminal = Notification.Name("forgeFocusTerminal")
     static let forgeWindowTitleChanged = Notification.Name("forgeWindowTitleChanged")
 }
 

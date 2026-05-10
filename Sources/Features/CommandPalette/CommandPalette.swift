@@ -19,7 +19,7 @@ struct CommandPalette: View {
                     controller?.selectProject(project)
                 }))
             }
-            let commonCommands = ["go", "new-project", "new-tab", "theme", "toggle-sidebar"]
+            let commonCommands = ["go", "new-project", "new-tab", "settings", "theme", "toggle-sidebar"]
             let common = sorted.filter { commonCommands.contains($0.name) }
             for cmd in common {
                 items.append(CommandItem(command: cmd))
@@ -127,8 +127,9 @@ struct CommandPalette: View {
     private func executeSelected() {
         guard selectedIndex < results.count else { return }
         let item = results[selectedIndex]
-        item.execute(argumentFrom(query))
+        let arg = argumentFrom(query)
         dismiss()
+        item.execute(arg)
     }
 
     private func dismiss() {
@@ -165,6 +166,11 @@ struct CommandRow: View {
                 }
             }
             Spacer()
+            if let hint = item.shortcutHint {
+                Text(hint)
+                    .font(.system(size: 12, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -176,12 +182,14 @@ struct CommandItem {
     let title: String
     let subtitle: String
     let icon: String
+    let shortcutHint: String?
     let execute: (String) -> Void
 
     init(title: String, subtitle: String, icon: String, action: @escaping () -> Void) {
         self.title = title
         self.subtitle = subtitle
         self.icon = icon
+        self.shortcutHint = nil
         self.execute = { _ in action() }
     }
 
@@ -189,6 +197,7 @@ struct CommandItem {
         self.title = "/\(command.name)"
         self.subtitle = command.description
         self.icon = command.icon
+        self.shortcutHint = command.shortcutHint
         self.execute = command.execute
     }
 }
