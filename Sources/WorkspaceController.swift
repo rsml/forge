@@ -42,6 +42,8 @@ final class WorkspaceController {
                     switch event {
                     case .bell(let tabUUID):
                         self.attentionManager?.handleEvent(.bell(tabUUID: tabUUID))
+                    case .silenceCleared(let tabUUID):
+                        self.attentionManager?.markDone(tabUUID)
                     case .commandCompleted(let tabUUID):
                         self.attentionManager?.handleEvent(.commandCompleted(tabUUID: tabUUID))
                     case .contentMatch(let tabUUID):
@@ -134,13 +136,11 @@ final class WorkspaceController {
             }
 
         case .silenceChanged(let tabId, let isSilent):
-            if let (_, tab) = workspace.findTab(byTmuxId: tabId) {
-                for pane in tab.panes { pane.hasBell = isSilent }
-                if isSilent {
-                    attentionManager?.handleEvent(.bell(tabUUID: tab.uuid))
-                } else {
-                    attentionManager?.markDone(tab.uuid)
-                }
+            // Only react to silence onset (instant dot). Silence clearing is handled
+            // by the poll cycle — this avoids flicker from brief activity like tab selection.
+            if isSilent, let (_, tab) = workspace.findTab(byTmuxId: tabId) {
+                for pane in tab.panes { pane.hasBell = true }
+                attentionManager?.handleEvent(.bell(tabUUID: tab.uuid))
             }
 
         case .tabClose(let tabId):

@@ -60,7 +60,7 @@ struct RefreshPipelineTests {
         var queue = AttentionQueue()
         for event in events {
             switch event {
-            case .bell(let uuid), .commandCompleted(let uuid), .contentMatch(let uuid):
+            case .bell(let uuid), .silenceCleared(let uuid), .commandCompleted(let uuid), .contentMatch(let uuid):
                 queue.enqueue(uuid)
             }
         }
@@ -89,7 +89,7 @@ struct RefreshPipelineTests {
         var queue = AttentionQueue()
         for event in events1 + events2 {
             switch event {
-            case .bell(let uuid), .commandCompleted(let uuid), .contentMatch(let uuid):
+            case .bell(let uuid), .silenceCleared(let uuid), .commandCompleted(let uuid), .contentMatch(let uuid):
                 queue.enqueue(uuid)
             }
         }
@@ -107,7 +107,7 @@ struct RefreshPipelineTests {
         var queue = AttentionQueue()
         for event in events {
             switch event {
-            case .bell(let uuid), .commandCompleted(let uuid), .contentMatch(let uuid):
+            case .bell(let uuid), .silenceCleared(let uuid), .commandCompleted(let uuid), .contentMatch(let uuid):
                 queue.enqueue(uuid)
             }
         }
@@ -134,7 +134,7 @@ struct RefreshPipelineTests {
         var queue = AttentionQueue()
         for event in events1 + events2 + events3 {
             switch event {
-            case .bell(let uuid), .commandCompleted(let uuid), .contentMatch(let uuid):
+            case .bell(let uuid), .silenceCleared(let uuid), .commandCompleted(let uuid), .contentMatch(let uuid):
                 queue.enqueue(uuid)
             }
         }
