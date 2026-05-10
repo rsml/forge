@@ -55,10 +55,10 @@ final class TmuxAdapter: TmuxQueryPort, TmuxCommandPort, TmuxControlPort {
         controlMode.send("rename-session -t \(shellQuote(target)) \(shellQuote(newName))")
     }
 
-    func newTab(project: String, path: String?) async {
-        var cmd = "new-window -t \(shellQuote("\(project):"))"
-        if let path { cmd += " -c \(shellQuote(path))" }
-        controlMode.send(cmd)
+    func newTab(project: String, path: String?) async -> String? {
+        var args = ["new-window", "-P", "-F", "#{window_id}", "-t", "\(project):"]
+        if let path { args += ["-c", path] }
+        return await runner.run(args)?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func killTab(id: String) async {

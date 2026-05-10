@@ -18,6 +18,8 @@ final class WorkspaceController {
     var perProjectActiveTabId: [String: String] = [:]
     /// Debounce timers for silence clearing — prevents dot flicker from brief activity (tab selection).
     private var silenceClearTimers: [String: Task<Void, Never>] = [:]
+    /// Set before intentionally stopping control mode (e.g. removing last project) to suppress reconnect toast.
+    var expectingDisconnect = false
 
     var gitBranch: String? { syncEngine.gitBranch }
 
@@ -59,28 +61,7 @@ final class WorkspaceController {
             let allUUIDs = Set(workspace.projects.flatMap { $0.tabs.map(\.uuid) })
             attentionManager?.pruneStaleHiddenEntries(validUUIDs: allUUIDs)
 
-            tmux.startControlMode(
-                onEvent: { [weak self] event in
-                    Task { @MainActor in
-                        self?.handleEvent(event)
-                    }
-                },
-                onDisconnect: { [weak self] in
-                    Task { @MainActor in
-                        self?.toastState.show(
-                            title: "Connection lost",
-                            message: "Reconnecting to tmux...",
-                            icon: "exclamationmark.triangle.fill",
-                            duration: 300
-                        )
-                    }
-                },
-                onReconnect: { [weak self] in
-                    Task { @MainActor in
-                        self?.toastState.dismiss()
-                    }
-                }
-            )
+            startControlMode()
 
             NotificationCenter.default.addObserver(
                 forName: .forgeNavigateToTab, object: nil, queue: .main
@@ -102,6 +83,32 @@ final class WorkspaceController {
     func disconnect() {
         syncEngine.stop()
         tmux.stopControlMode()
+    }
+
+    func startControlMode() {
+        tmux.startControlMode(
+            onEvent: { [weak self] event in
+                Task { @MainActor in
+                    self?.handleEvent(event)
+                }
+            },
+            onDisconnect: { [weak self] in
+                Task { @MainActor in
+                    guard let self, !self.expectingDisconnect else { return }
+                    self.toastState.show(
+                        title: "Connection lost",
+                        message: "Reconnecting to tmux...",
+                        icon: "exclamationmark.triangle.fill",
+                        duration: 300
+                    )
+                }
+            },
+            onReconnect: { [weak self] in
+                Task { @MainActor in
+                    self?.toastState.dismiss()
+                }
+            }
+        )
     }
 
     // MARK: - UI State

@@ -75,7 +75,8 @@ public protocol TmuxCommandPort {
     func killProject(name: String) async
     func renameProject(target: String, newName: String) async
 
-    func newTab(project: String, path: String?) async
+    @discardableResult
+    func newTab(project: String, path: String?) async -> String?
     func killTab(id: String) async
     func selectTab(id: String) async
     func renameTab(id: String, newName: String) async

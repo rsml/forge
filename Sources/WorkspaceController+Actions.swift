@@ -66,6 +66,10 @@ extension WorkspaceController {
             )
             return
         }
+        if expectingDisconnect {
+            expectingDisconnect = false
+            startControlMode()
+        }
         await syncEngine.refresh()
         if let project = workspace.projects.first(where: { $0.name == name }) {
             selectProject(project)
@@ -74,6 +78,11 @@ extension WorkspaceController {
 
     func removeProject(_ project: Project) {
         ForgeLog.log("[app] Removing project: \(project.name)")
+        let isLastProject = workspace.projects.count == 1
+        if isLastProject {
+            expectingDisconnect = true
+            tmux.stopControlMode()
+        }
         if let index = workspace.projects.firstIndex(where: { $0.id == project.id }) {
             let nextIndex = index > 0 ? index - 1 : min(1, workspace.projects.count - 1)
             if nextIndex != index {
@@ -85,7 +94,13 @@ extension WorkspaceController {
 
     func addTab(in project: Project) {
         ForgeLog.log("[app] Adding tab in project: \(project.name)")
-        Task { await tmux.newTab(project: project.id, path: project.path) }
+        Task {
+            guard let windowId = await tmux.newTab(project: project.id, path: project.path) else { return }
+            await syncEngine.refresh()
+            if let tab = project.tabs.first(where: { $0.id == windowId }) {
+                selectTab(tab)
+            }
+        }
     }
 
     func removeTab(_ tab: Tab) {
