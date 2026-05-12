@@ -78,7 +78,10 @@ final class TmuxSyncEngine {
                 project: project, with: windowsBySession[project.id] ?? [],
                 activeProjectId: workspace.activeProjectId
             ) {
-                workspace.activeTabId = activeTabId
+                let currentTabExists = project.tabs.contains { $0.id == workspace.activeTabId }
+                if !currentTabExists {
+                    workspace.activeTabId = activeTabId
+                }
             }
             for tab in project.tabs {
                 paneEvents.append(contentsOf: mergePaneState(tab: tab, panesByWindow[tab.id] ?? []))
