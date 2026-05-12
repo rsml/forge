@@ -30,10 +30,10 @@ enum KeyboardShortcuts {
     static var splitVertical: Shortcut { resolve("splitVertical", default: Shortcut("d", modifiers: [.command, .shift], label: "Split Vertically")) }
 
     // MARK: - Tabs
-    static var selectTabLeft: Shortcut { resolve("selectTabLeft", default: Shortcut("[", modifiers: [.command, .shift], label: "Select Tab Left")) }
-    static var selectTabRight: Shortcut { resolve("selectTabRight", default: Shortcut("]", modifiers: [.command, .shift], label: "Select Tab Right")) }
-    static var moveTabLeft: Shortcut { resolve("moveTabLeft", default: Shortcut(.leftArrow, modifiers: [.command, .shift], label: "Move Tab Left")) }
-    static var moveTabRight: Shortcut { resolve("moveTabRight", default: Shortcut(.rightArrow, modifiers: [.command, .shift], label: "Move Tab Right")) }
+    static var selectTabLeft: Shortcut { resolve("selectTabLeft", default: Shortcut("[", modifiers: [.command, .shift], label: "Previous Tab")) }
+    static var selectTabRight: Shortcut { resolve("selectTabRight", default: Shortcut("]", modifiers: [.command, .shift], label: "Next Tab")) }
+    static var moveTabLeft: Shortcut { resolve("moveTabLeft", default: Shortcut(.leftArrow, modifiers: [.command, .shift], label: "Move Tab Back")) }
+    static var moveTabRight: Shortcut { resolve("moveTabRight", default: Shortcut(.rightArrow, modifiers: [.command, .shift], label: "Move Tab Forward")) }
 
     // MARK: - Projects
     static var nextProject: Shortcut { resolve("nextProject", default: Shortcut(.tab, modifiers: .control, label: "Next Project")) }
@@ -61,10 +61,10 @@ enum KeyboardShortcuts {
         ("stackMoveToBack", Shortcut("]", modifiers: [.command, .shift], label: "Move to Back"), "Stack"),
         ("splitHorizontal", Shortcut("d", modifiers: .command, label: "Split Horizontally"), "Splits"),
         ("splitVertical", Shortcut("d", modifiers: [.command, .shift], label: "Split Vertically"), "Splits"),
-        ("selectTabLeft", Shortcut("[", modifiers: [.command, .shift], label: "Select Tab Left"), "Tabs"),
-        ("selectTabRight", Shortcut("]", modifiers: [.command, .shift], label: "Select Tab Right"), "Tabs"),
-        ("moveTabLeft", Shortcut(.leftArrow, modifiers: [.command, .shift], label: "Move Tab Left"), "Tabs"),
-        ("moveTabRight", Shortcut(.rightArrow, modifiers: [.command, .shift], label: "Move Tab Right"), "Tabs"),
+        ("selectTabLeft", Shortcut("[", modifiers: [.command, .shift], label: "Previous Tab"), "Tabs"),
+        ("selectTabRight", Shortcut("]", modifiers: [.command, .shift], label: "Next Tab"), "Tabs"),
+        ("moveTabLeft", Shortcut(.leftArrow, modifiers: [.command, .shift], label: "Move Tab Back"), "Tabs"),
+        ("moveTabRight", Shortcut(.rightArrow, modifiers: [.command, .shift], label: "Move Tab Forward"), "Tabs"),
         ("nextProject", Shortcut(.tab, modifiers: .control, label: "Next Project"), "Projects"),
         ("prevProject", Shortcut(.tab, modifiers: [.control, .shift], label: "Previous Project"), "Projects"),
         ("settings", Shortcut(",", modifiers: .command, label: "Settings"), "App"),

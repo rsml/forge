@@ -140,7 +140,7 @@ struct ReorderableStack<Item: Identifiable, Content: View>: View {
                     )
                     .scaleEffect(isDragging ? 1.03 : 1.0)
                     .animation(.spring(response: 0.25, dampingFraction: 0.85), value: neighborOffset(for: index))
-                    .simultaneousGesture(
+                    .gesture(
                         DragGesture(minimumDistance: 3, coordinateSpace: .named(coordinateSpaceID))
                             .onChanged { value in
                                 if draggedIndex == nil {

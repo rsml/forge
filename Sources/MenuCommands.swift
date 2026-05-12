@@ -173,7 +173,7 @@ struct ForgeMenuCommands: Commands {
 
             Divider()
 
-            Button("Select Tab Left") {
+            Button("Previous Tab") {
                 guard let project = controller.workspace.activeProject,
                       let tabId = controller.workspace.activeTabId,
                       let idx = project.tabs.firstIndex(where: { $0.id == tabId }),
@@ -184,7 +184,7 @@ struct ForgeMenuCommands: Commands {
             .keyboardShortcut(KeyboardShortcuts.selectTabLeft.key, modifiers: KeyboardShortcuts.selectTabLeft.modifiers)
 
             if !config.isStackMode {
-                Button("Select Tab Right") {
+                Button("Next Tab") {
                     guard let project = controller.workspace.activeProject,
                           let tabId = controller.workspace.activeTabId,
                           let idx = project.tabs.firstIndex(where: { $0.id == tabId }),
@@ -213,12 +213,12 @@ struct ForgeMenuCommands: Commands {
                 .keyboardShortcut(KeyboardShortcuts.stackMoveToBack.key, modifiers: KeyboardShortcuts.stackMoveToBack.modifiers)
             }
 
-            Button("Move Tab Left") {
+            Button("Move Tab Back") {
                 appState.dispatch(.moveTabLeft)
             }
             .keyboardShortcut(KeyboardShortcuts.moveTabLeft.key, modifiers: KeyboardShortcuts.moveTabLeft.modifiers)
 
-            Button("Move Tab Right") {
+            Button("Move Tab Forward") {
                 appState.dispatch(.moveTabRight)
             }
             .keyboardShortcut(KeyboardShortcuts.moveTabRight.key, modifiers: KeyboardShortcuts.moveTabRight.modifiers)

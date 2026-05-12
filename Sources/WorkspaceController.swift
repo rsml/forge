@@ -161,10 +161,13 @@ final class WorkspaceController {
             // Clearing is handled by the poll cycle checking window_activity freshness,
             // which naturally ignores brief touches from tab selection.
             if isSilent, let (_, tab) = workspace.findTab(byTmuxId: tabId) {
+                let alreadyHadBell = tab.panes.contains(where: \.hasBell)
                 for pane in tab.panes where pane.status == .running { pane.hasBell = true }
                 if tab.panes.contains(where: { $0.status == .running }) {
                     attentionManager?.handleEvent(.bell(tabUUID: tab.uuid))
-                    sendAttentionNotification(tabUUID: tab.uuid)
+                    if !alreadyHadBell {
+                        sendAttentionNotification(tabUUID: tab.uuid)
+                    }
                 }
             }
 

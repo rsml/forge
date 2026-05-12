@@ -66,7 +66,7 @@ struct SidebarProjectRow: View {
         )
         .contentShape(Rectangle())
         .onHover { isHeaderHovered = $0 }
-        .onTapGesture { controller.selectProject(project) }
+        .highPriorityGesture(TapGesture().onEnded { controller.selectProject(project) })
     }
 
     @ViewBuilder
@@ -109,10 +109,10 @@ struct SidebarProjectRow: View {
             )
             .contentShape(Rectangle())
             .onHover { hovering in hoveredTabId = hovering ? tab.id : nil }
-            .onTapGesture {
+            .highPriorityGesture(TapGesture().onEnded {
                 controller.selectProject(project)
                 controller.selectTab(tab)
-            }
+            })
             .contextMenu {
                 Button("Rename") { appState.startTabRename(tab) }
                     .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)

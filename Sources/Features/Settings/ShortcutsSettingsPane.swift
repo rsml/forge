@@ -6,6 +6,8 @@ struct ShortcutsSettingsPane: View {
     @State private var recordingId: String?
     @State private var captureSession = KeyCaptureSession()
     @State private var conflicts: Set<String> = []
+    @State private var conflictPeers: [String: String] = [:]  // id → conflicting peer id
+    @State private var highlightedId: String?
 
     private var shortcuts: [String: ForgeConfig.ShortcutConfig] {
         store.config.shortcuts ?? [:]
@@ -66,14 +68,25 @@ struct ShortcutsSettingsPane: View {
                     HStack(spacing: 0) {
                         Text(entry.shortcut.label)
                             .font(.system(size: 13))
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(minWidth: 130, alignment: .leading)
 
                         HStack(spacing: 8) {
                             if conflicts.contains(entry.id) {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .foregroundStyle(.yellow)
                                     .font(.system(size: 12))
-                                    .tooltip("Conflicts with another shortcut")
+                                    .onTapGesture {
+                                        if let peer = conflictPeers[entry.id] {
+                                            highlightedId = peer
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                                if highlightedId == peer { highlightedId = nil }
+                                            }
+                                        }
+                                    }
+                                    .onHover { inside in
+                                        if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                                    }
+                                    .tooltip(conflictPeerLabel(for: entry.id))
                             }
 
                             ShortcutRecorder(
@@ -97,9 +110,24 @@ struct ShortcutsSettingsPane: View {
                         }
                     }
                     .padding(.vertical, 3)
+                    .padding(.horizontal, 6)
+                    .background {
+                        if highlightedId == entry.id {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.yellow.opacity(0.15))
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.25), value: highlightedId)
                 }
             }
         }
+    }
+
+    private func conflictPeerLabel(for id: String) -> String {
+        guard let peerId = conflictPeers[id],
+              let peer = KeyboardShortcuts.allDefaults.first(where: { $0.id == peerId })
+        else { return "Conflicts with another shortcut" }
+        return "Conflicts with \(peer.shortcut.label)"
     }
 
     private func resolveHint(id: String, default shortcut: Shortcut) -> String {
@@ -134,15 +162,19 @@ struct ShortcutsSettingsPane: View {
     private func detectConflicts() {
         var seen: [String: String] = [:]
         var found: Set<String> = []
+        var peers: [String: String] = [:]
         for entry in KeyboardShortcuts.allDefaults {
             let hint = resolveHint(id: entry.id, default: entry.shortcut)
             if let existing = seen[hint] {
                 found.insert(existing)
                 found.insert(entry.id)
+                peers[entry.id] = existing
+                peers[existing] = entry.id
             } else {
                 seen[hint] = entry.id
             }
         }
         conflicts = found
+        conflictPeers = peers
     }
 }
