@@ -96,12 +96,12 @@ final class TmuxAdapter: TmuxQueryPort, TmuxCommandPort, TmuxControlPort {
 
     func swapTab(id: String, offset: Int) async {
         let target = offset > 0 ? "+\(offset)" : "\(offset)"
-        controlMode.send("swap-window -s \(id) -t \(target)")
+        controlMode.send("swap-window -d -s \(id) -t \(target)")
     }
 
     func reorderTab(id: String, swapWith: [String]) async {
         for targetId in swapWith {
-            controlMode.send("swap-window -s \(id) -t \(targetId)")
+            controlMode.send("swap-window -d -s \(id) -t \(targetId)")
         }
     }
 

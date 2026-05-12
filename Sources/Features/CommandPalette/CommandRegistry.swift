@@ -113,10 +113,10 @@ final class CommandRegistry {
         })
 
         // Sidebar
-        register(Command(label: "Collapse All") {
+        register(Command(label: "Collapse All Projects") {
             appState.dispatch(.collapseAll)
         })
-        register(Command(label: "Expand All") {
+        register(Command(label: "Expand All Projects") {
             appState.dispatch(.expandAll)
         })
 
