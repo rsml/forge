@@ -78,9 +78,9 @@ struct SidebarProjectRow: View {
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 16, height: 28)
                 .contentShape(Rectangle())
-                .onTapGesture {
+                .highPriorityGesture(TapGesture().onEnded {
                     withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
-                }
+                })
         } else {
             Image(systemName: "chevron.right")
                 .font(.caption2)
@@ -89,9 +89,9 @@ struct SidebarProjectRow: View {
                 .frame(width: 16, height: 28)
                 .contentShape(Rectangle())
                 .onHover { isChevronHovered = $0 }
-                .onTapGesture {
+                .highPriorityGesture(TapGesture().onEnded {
                     withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
-                }
+                })
         }
     }
 

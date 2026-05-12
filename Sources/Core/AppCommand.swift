@@ -24,6 +24,10 @@ public enum AppCommand: Equatable, Sendable {
     case moveTabLeft
     case moveTabRight
 
+    // Project movement
+    case moveProjectBack
+    case moveProjectForward
+
     // Stack actions
     case stackDone
     case stackHide

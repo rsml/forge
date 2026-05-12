@@ -8,7 +8,7 @@ enum KeyboardShortcuts {
     // MARK: - File
     static var newProject: Shortcut { resolve("newProject", default: Shortcut("n", modifiers: .command, label: "New Project")) }
     static var newTab: Shortcut { resolve("newTab", default: Shortcut("t", modifiers: .command, label: "New Tab")) }
-    static var closePane: Shortcut { resolve("closePane", default: Shortcut("w", modifiers: .command, label: "Close Pane")) }
+    static var closePane: Shortcut { resolve("closePane", default: Shortcut("w", modifiers: .command, label: "Close Tab / Pane")) }
     static var closeProject: Shortcut { resolve("closeProject", default: Shortcut("w", modifiers: [.command, .shift], label: "Close Project")) }
     static var renameTab: Shortcut { resolve("renameTab", default: Shortcut("r", modifiers: .command, label: "Rename Tab")) }
     static var renameProject: Shortcut { resolve("renameProject", default: Shortcut("r", modifiers: [.command, .shift], label: "Rename Project")) }
@@ -23,52 +23,61 @@ enum KeyboardShortcuts {
     // MARK: - Stack
     static var stackDone: Shortcut { resolve("stackDone", default: Shortcut(.return, modifiers: .command, label: "Done")) }
     static var stackHide: Shortcut { resolve("stackHide", default: Shortcut("h", modifiers: [.command, .shift], label: "Hide")) }
-    static var stackMoveToBack: Shortcut { resolve("stackMoveToBack", default: Shortcut("]", modifiers: [.command, .shift], label: "Move to Back")) }
+    static var stackMoveToBack: Shortcut { resolve("stackMoveToBack", default: Shortcut("]", modifiers: [.control, .shift], label: "Move to Back")) }
 
     // MARK: - Splits
     static var splitHorizontal: Shortcut { resolve("splitHorizontal", default: Shortcut("d", modifiers: .command, label: "Split Horizontally")) }
     static var splitVertical: Shortcut { resolve("splitVertical", default: Shortcut("d", modifiers: [.command, .shift], label: "Split Vertically")) }
 
     // MARK: - Tabs
-    static var selectTabLeft: Shortcut { resolve("selectTabLeft", default: Shortcut("[", modifiers: [.command, .shift], label: "Previous Tab")) }
-    static var selectTabRight: Shortcut { resolve("selectTabRight", default: Shortcut("]", modifiers: [.command, .shift], label: "Next Tab")) }
-    static var moveTabLeft: Shortcut { resolve("moveTabLeft", default: Shortcut(.leftArrow, modifiers: [.command, .shift], label: "Move Tab Back")) }
-    static var moveTabRight: Shortcut { resolve("moveTabRight", default: Shortcut(.rightArrow, modifiers: [.command, .shift], label: "Move Tab Forward")) }
+    static var selectTabLeft: Shortcut { resolve("selectTabLeft", default: Shortcut(.leftArrow, modifiers: [.command, .shift], label: "Previous Tab")) }
+    static var selectTabRight: Shortcut { resolve("selectTabRight", default: Shortcut(.rightArrow, modifiers: [.command, .shift], label: "Next Tab")) }
+    static var moveTabLeft: Shortcut { resolve("moveTabLeft", default: Shortcut("[", modifiers: [.command, .shift], label: "Move Tab Back")) }
+    static var moveTabRight: Shortcut { resolve("moveTabRight", default: Shortcut("]", modifiers: [.command, .shift], label: "Move Tab Forward")) }
 
     // MARK: - Projects
-    static var nextProject: Shortcut { resolve("nextProject", default: Shortcut(.tab, modifiers: .control, label: "Next Project")) }
-    static var prevProject: Shortcut { resolve("prevProject", default: Shortcut(.tab, modifiers: [.control, .shift], label: "Previous Project")) }
+    static var nextProject: Shortcut { resolve("nextProject", default: Shortcut(.rightArrow, modifiers: [.option, .shift], label: "Next Project")) }
+    static var prevProject: Shortcut { resolve("prevProject", default: Shortcut(.leftArrow, modifiers: [.option, .shift], label: "Previous Project")) }
+    static var moveProjectBack: Shortcut { resolve("moveProjectBack", default: Shortcut("[", modifiers: [.option, .shift], label: "Move Project Back")) }
+    static var moveProjectForward: Shortcut { resolve("moveProjectForward", default: Shortcut("]", modifiers: [.option, .shift], label: "Move Project Forward")) }
 
     // MARK: - App
-    static var settings: Shortcut { resolve("settings", default: Shortcut(",", modifiers: .command, label: "Settings")) }
+    static var settings: Shortcut { resolve("settings", default: Shortcut(",", modifiers: .command, label: "Open Settings")) }
     static var clearScrollback: Shortcut { resolve("clearScrollback", default: Shortcut("k", modifiers: .command, label: "Clear Scrollback")) }
 
     // MARK: - All Defaults (for settings UI)
     static let allDefaults: [(id: String, shortcut: Shortcut, category: String)] = [
-        ("newProject", Shortcut("n", modifiers: .command, label: "New Project"), "File"),
-        ("newTab", Shortcut("t", modifiers: .command, label: "New Tab"), "File"),
-        ("closePane", Shortcut("w", modifiers: .command, label: "Close Pane"), "File"),
-        ("closeProject", Shortcut("w", modifiers: [.command, .shift], label: "Close Project"), "File"),
-        ("renameTab", Shortcut("r", modifiers: .command, label: "Rename Tab"), "File"),
-        ("renameProject", Shortcut("r", modifiers: [.command, .shift], label: "Rename Project"), "File"),
-        ("toggleSidebar", Shortcut("b", modifiers: .command, label: "Toggle Sidebar"), "View"),
-        ("tabSwitcher", Shortcut("p", modifiers: .command, label: "Tab Switcher"), "View"),
-        ("commandPalette", Shortcut("p", modifiers: [.command, .shift], label: "Command Palette"), "View"),
-        ("notifications", Shortcut("n", modifiers: [.command, .shift], label: "Notifications"), "View"),
-        ("toggleMode", Shortcut("m", modifiers: [.command, .shift], label: "Toggle Mode"), "View"),
-        ("stackDone", Shortcut(.return, modifiers: .command, label: "Done"), "Stack"),
-        ("stackHide", Shortcut("h", modifiers: [.command, .shift], label: "Hide"), "Stack"),
-        ("stackMoveToBack", Shortcut("]", modifiers: [.command, .shift], label: "Move to Back"), "Stack"),
-        ("splitHorizontal", Shortcut("d", modifiers: .command, label: "Split Horizontally"), "Splits"),
-        ("splitVertical", Shortcut("d", modifiers: [.command, .shift], label: "Split Vertically"), "Splits"),
-        ("selectTabLeft", Shortcut("[", modifiers: [.command, .shift], label: "Previous Tab"), "Tabs"),
-        ("selectTabRight", Shortcut("]", modifiers: [.command, .shift], label: "Next Tab"), "Tabs"),
-        ("moveTabLeft", Shortcut(.leftArrow, modifiers: [.command, .shift], label: "Move Tab Back"), "Tabs"),
-        ("moveTabRight", Shortcut(.rightArrow, modifiers: [.command, .shift], label: "Move Tab Forward"), "Tabs"),
-        ("nextProject", Shortcut(.tab, modifiers: .control, label: "Next Project"), "Projects"),
-        ("prevProject", Shortcut(.tab, modifiers: [.control, .shift], label: "Previous Project"), "Projects"),
-        ("settings", Shortcut(",", modifiers: .command, label: "Settings"), "App"),
-        ("clearScrollback", Shortcut("k", modifiers: .command, label: "Clear Scrollback"), "App"),
+        // App
+        ("settings", Shortcut(",", modifiers: .command, label: "Open Settings"), "App"),
+        ("toggleSidebar", Shortcut("b", modifiers: .command, label: "Toggle Sidebar"), "App"),
+        ("tabSwitcher", Shortcut("p", modifiers: .command, label: "Tab Switcher"), "App"),
+        ("commandPalette", Shortcut("p", modifiers: [.command, .shift], label: "Command Palette"), "App"),
+        ("notifications", Shortcut("n", modifiers: [.command, .shift], label: "Notifications"), "App"),
+        ("toggleMode", Shortcut("m", modifiers: [.command, .shift], label: "Toggle Mode"), "App"),
+        // Projects
+        ("newProject", Shortcut("n", modifiers: .command, label: "New Project"), "Projects"),
+        ("closeProject", Shortcut("w", modifiers: [.command, .shift], label: "Close Project"), "Projects"),
+        ("renameProject", Shortcut("r", modifiers: [.command, .shift], label: "Rename Project"), "Projects"),
+        ("prevProject", Shortcut(.leftArrow, modifiers: [.option, .shift], label: "Previous Project"), "Projects"),
+        ("nextProject", Shortcut(.rightArrow, modifiers: [.option, .shift], label: "Next Project"), "Projects"),
+        ("moveProjectBack", Shortcut("[", modifiers: [.option, .shift], label: "Move Project Back"), "Projects"),
+        ("moveProjectForward", Shortcut("]", modifiers: [.option, .shift], label: "Move Project Forward"), "Projects"),
+        // Tabs
+        ("newTab", Shortcut("t", modifiers: .command, label: "New Tab"), "Tabs"),
+        ("closePane", Shortcut("w", modifiers: .command, label: "Close Tab / Pane"), "Tabs"),
+        ("renameTab", Shortcut("r", modifiers: .command, label: "Rename Tab"), "Tabs"),
+        ("selectTabLeft", Shortcut(.leftArrow, modifiers: [.command, .shift], label: "Previous Tab"), "Tabs"),
+        ("selectTabRight", Shortcut(.rightArrow, modifiers: [.command, .shift], label: "Next Tab"), "Tabs"),
+        ("moveTabLeft", Shortcut("[", modifiers: [.command, .shift], label: "Move Tab Back"), "Tabs"),
+        ("moveTabRight", Shortcut("]", modifiers: [.command, .shift], label: "Move Tab Forward"), "Tabs"),
+        // Terminal
+        ("splitHorizontal", Shortcut("d", modifiers: .command, label: "Split Horizontally"), "Terminal"),
+        ("splitVertical", Shortcut("d", modifiers: [.command, .shift], label: "Split Vertically"), "Terminal"),
+        ("clearScrollback", Shortcut("k", modifiers: .command, label: "Clear Scrollback"), "Terminal"),
+        // Stack Mode
+        ("stackDone", Shortcut(.return, modifiers: .command, label: "Done"), "Stack Mode"),
+        ("stackHide", Shortcut("h", modifiers: [.command, .shift], label: "Hide"), "Stack Mode"),
+        ("stackMoveToBack", Shortcut("]", modifiers: [.control, .shift], label: "Move to Back"), "Stack Mode"),
     ]
 
     // MARK: - Resolution
@@ -140,8 +149,20 @@ struct Shortcut {
         case .delete: return "⌫"
         case .space: return "Space"
         default:
-            let char = String(key.character)
-            return char.uppercased()
+            let char = key.character
+            if modifiers.contains(.shift), let unshifted = Self.unshiftMap[char] {
+                return String(unshifted).uppercased()
+            }
+            return String(char).uppercased()
         }
     }
+
+    /// Maps shifted characters back to their unshifted key (US keyboard layout).
+    private static let unshiftMap: [Character: Character] = [
+        "{": "[", "}": "]", "<": ",", ">": ".",
+        "~": "`", "!": "1", "@": "2", "#": "3",
+        "$": "4", "%": "5", "^": "6", "&": "7",
+        "*": "8", "(": "9", ")": "0", "_": "-",
+        "+": "=", "|": "\\", ":": ";", "\"": "'", "?": "/",
+    ]
 }

@@ -236,6 +236,16 @@ struct ForgeMenuCommands: Commands {
             }
             .keyboardShortcut(KeyboardShortcuts.nextProject.key, modifiers: KeyboardShortcuts.nextProject.modifiers)
 
+            Button("Move Project Back") {
+                appState.dispatch(.moveProjectBack)
+            }
+            .keyboardShortcut(KeyboardShortcuts.moveProjectBack.key, modifiers: KeyboardShortcuts.moveProjectBack.modifiers)
+
+            Button("Move Project Forward") {
+                appState.dispatch(.moveProjectForward)
+            }
+            .keyboardShortcut(KeyboardShortcuts.moveProjectForward.key, modifiers: KeyboardShortcuts.moveProjectForward.modifiers)
+
             Button("Previous Project") {
                 let sessions = controller.workspace.projects
                 guard sessions.count > 1,

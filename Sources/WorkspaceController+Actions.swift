@@ -236,6 +236,15 @@ extension WorkspaceController {
         Task { await tmux.swapTab(id: tabId, offset: offset) }
     }
 
+    func swapProject(offset: Int) {
+        guard let activeId = workspace.activeProjectId,
+              let fromIndex = workspace.projects.firstIndex(where: { $0.id == activeId })
+        else { return }
+        let toIndex = fromIndex + offset
+        guard toIndex >= 0, toIndex < workspace.projects.count else { return }
+        workspace.projects.swapAt(fromIndex, toIndex)
+    }
+
     // MARK: - Attention
 
     func sendAttentionNotification(tabUUID: UUID) {

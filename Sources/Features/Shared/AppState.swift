@@ -114,6 +114,10 @@ final class AppState {
         case .moveTabLeft:  controller.swapTab(offset: -1)
         case .moveTabRight: controller.swapTab(offset: 1)
 
+        // Project movement
+        case .moveProjectBack:    controller.swapProject(offset: -1)
+        case .moveProjectForward: controller.swapProject(offset: 1)
+
         // Stack actions — set trigger for StackView to animate
         case .stackDone:       pendingStackAction = .done
         case .stackHide:       pendingStackAction = .hide

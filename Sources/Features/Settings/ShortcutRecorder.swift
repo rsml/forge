@@ -22,6 +22,7 @@ struct ShortcutRecorder: View {
                 } else {
                     Text(current.isEmpty ? "None" : current)
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .tracking(1.5)
                         .foregroundStyle(current.isEmpty ? .tertiary : .primary)
                 }
             }
@@ -77,6 +78,14 @@ final class KeyCaptureSession {
         monitor = nil
     }
 
+    private static let unshiftMap: [Character: Character] = [
+        "{": "[", "}": "]", "<": ",", ">": ".",
+        "~": "`", "!": "1", "@": "2", "#": "3",
+        "$": "4", "%": "5", "^": "6", "&": "7",
+        "*": "8", "(": "9", ")": "0", "_": "-",
+        "+": "=", "|": "\\", ":": ";", "\"": "'", "?": "/",
+    ]
+
     private static func parse(_ event: NSEvent) -> KeyCaptureResult? {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         var modifiers: [String] = []
@@ -87,7 +96,11 @@ final class KeyCaptureSession {
         if flags.contains(.shift)    { modifiers.append("shift");    display += "⇧" }
         if flags.contains(.command)  { modifiers.append("command");  display += "⌘" }
 
-        let keyLabel = keyString(for: event)
+        var keyLabel = keyString(for: event)
+        // Unshift: when shift is held, charactersIgnoringModifiers still returns the shifted char
+        if flags.contains(.shift), let ch = keyLabel.first, let unshifted = unshiftMap[ch] {
+            keyLabel = String(unshifted)
+        }
         display += keyLabel.uppercased()
 
         return KeyCaptureResult(display: display, key: keyLabel.lowercased(), modifiers: modifiers)

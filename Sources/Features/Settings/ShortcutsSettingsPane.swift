@@ -18,19 +18,18 @@ struct ShortcutsSettingsPane: View {
             HStack(alignment: .top, spacing: 24) {
                 VStack(alignment: .leading, spacing: 24) {
                     categorySection("App")
-                    categorySection("File")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 24) {
-                    categorySection("View")
-                    categorySection("Splits")
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: 24) {
-                    categorySection("Tabs")
                     categorySection("Projects")
+                    categorySection("Tabs")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 24) {
+                    categorySection("Terminal")
+                    categorySection("Stack Mode")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }

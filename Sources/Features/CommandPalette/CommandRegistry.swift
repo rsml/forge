@@ -96,6 +96,17 @@ final class CommandRegistry {
             appState.dispatch(.moveTabRight)
         })
 
+        // Stack actions
+        register(Command(label: KeyboardShortcuts.stackDone.label, shortcutHint: KeyboardShortcuts.stackDone.hint) {
+            appState.dispatch(.stackDone)
+        })
+        register(Command(label: KeyboardShortcuts.stackHide.label, shortcutHint: KeyboardShortcuts.stackHide.hint) {
+            appState.dispatch(.stackHide)
+        })
+        register(Command(label: KeyboardShortcuts.stackMoveToBack.label, shortcutHint: KeyboardShortcuts.stackMoveToBack.hint) {
+            appState.dispatch(.stackMoveToBack)
+        })
+
         // Project navigation
         register(Command(label: KeyboardShortcuts.nextProject.label, shortcutHint: KeyboardShortcuts.nextProject.hint) {
             let projects = controller.workspace.projects
@@ -110,6 +121,12 @@ final class CommandRegistry {
                   let activeId = controller.workspace.activeProjectId,
                   let idx = projects.firstIndex(where: { $0.id == activeId }) else { return }
             controller.selectProject(projects[(idx - 1 + projects.count) % projects.count])
+        })
+        register(Command(label: KeyboardShortcuts.moveProjectBack.label, shortcutHint: KeyboardShortcuts.moveProjectBack.hint) {
+            appState.dispatch(.moveProjectBack)
+        })
+        register(Command(label: KeyboardShortcuts.moveProjectForward.label, shortcutHint: KeyboardShortcuts.moveProjectForward.hint) {
+            appState.dispatch(.moveProjectForward)
         })
 
         // Sidebar
