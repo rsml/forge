@@ -97,13 +97,15 @@ struct SidebarProjectList: View {
                     controller.workspace.projects.move(fromOffsets: IndexSet(integer: from), toOffset: to)
                 }
             }
-            .padding(.horizontal, 0)
             .padding(.top, 4)
+
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) {
+                    appState.dispatch(.showProjectPicker)
+                }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
-            appState.dispatch(.showProjectPicker)
-        }
     }
 }

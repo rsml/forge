@@ -241,6 +241,10 @@ extension WorkspaceController {
     func sendAttentionNotification(tabUUID: UUID) {
         guard config.config.notifications?.enabled == true, let notifier else { return }
 
+        // Suppress if the badge is already visible — the user already knows
+        if let (_, tab) = workspace.findTab(byUUID: tabUUID),
+           tab.panes.contains(where: \.hasBell) { return }
+
         // In stack mode, suppress notifications unless explicitly enabled
         if config.isStackMode && !(config.config.stackView?.notifyInStackMode ?? false) { return }
 
