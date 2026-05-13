@@ -104,10 +104,16 @@ final class WorkspaceController {
                 Task { @MainActor in
                     guard let self else { return }
                     if self.expectingDisconnect {
-                        self.workspace.projects.removeAll()
-                        self.workspace.activeProjectId = nil
-                        self.workspace.activeTabId = nil
-                        self.tmux.stopControlMode()
+                        self.expectingDisconnect = false
+                        // Workspace still has the removed project (sync hasn't run yet).
+                        // count <= 1 means the last project was removed — clean up.
+                        if self.workspace.projects.count <= 1 {
+                            self.workspace.projects.removeAll()
+                            self.workspace.activeProjectId = nil
+                            self.workspace.activeTabId = nil
+                            self.tmux.stopControlMode()
+                        }
+                        // Non-last: suppress toast, control mode will reconnect.
                         return
                     }
                     self.toastState.show(

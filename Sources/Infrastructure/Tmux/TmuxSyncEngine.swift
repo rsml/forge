@@ -66,6 +66,10 @@ final class TmuxSyncEngine {
 
     func refresh() async {
         let sessionInfos = await tmux.listProjects()
+        // Empty results while workspace has projects means the tmux query failed
+        // (e.g., during control mode reconnect after session kill). Skip this
+        // refresh — the next cycle will pick up the correct state.
+        guard !sessionInfos.isEmpty || workspace.projects.isEmpty else { return }
         let allWindows = await tmux.listAllTabs()
         let allPanes = await tmux.listAllPanes()
 

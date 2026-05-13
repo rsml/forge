@@ -91,9 +91,9 @@ extension WorkspaceController {
 
     func removeProject(_ project: Project) {
         ForgeLog.log("[app] Removing project: \(project.name)")
-        if workspace.projects.count == 1 {
-            expectingDisconnect = true
-        }
+        // Killing any session may disconnect control mode (if it's attached to
+        // that session). Set the flag so onDisconnect suppresses the toast.
+        expectingDisconnect = true
         if let index = workspace.projects.firstIndex(where: { $0.id == project.id }) {
             let nextIndex = index > 0 ? index - 1 : min(1, workspace.projects.count - 1)
             if nextIndex != index {
