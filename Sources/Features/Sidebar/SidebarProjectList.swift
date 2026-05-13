@@ -101,8 +101,8 @@ struct SidebarProjectList: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
+        .simultaneousGesture(TapGesture(count: 2).onEnded {
             appState.dispatch(.showProjectPicker)
-        }
+        })
     }
 }
