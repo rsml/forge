@@ -18,6 +18,9 @@ final class TmuxSyncEngine {
     private var lastGitBranchProjectId: String?
     private(set) var gitBranch: String?
     private let contentDetector = ContentDetector()
+    /// Tracks consecutive refresh cycles where a tab's silence flag is 0.
+    /// hasBell only clears after 2+ consecutive non-silent polls (avoids flicker from tab selection).
+    private var nonSilentCount: [String: Int] = [:]
 
     init(workspace: Workspace, tmux: any TmuxPort, config: ForgeConfigStore) {
         self.workspace = workspace
@@ -90,20 +93,26 @@ final class TmuxSyncEngine {
                 let hasRunningPanes = tab.panes.contains { $0.status == .running }
                 let hadBell = tab.panes.contains(where: \.hasBell)
 
-                if info.hasBell && !hadBell {
-                    // Window is silent — set bell for running panes (Claude idle, etc.)
-                    for pane in tab.panes where pane.status == .running { pane.hasBell = true }
-                    if hasRunningPanes {
-                        paneEvents.append(.bell(tabUUID: tab.uuid))
+                if info.hasBell {
+                    nonSilentCount[tab.id] = 0
+                    if !hadBell {
+                        for pane in tab.panes where pane.status == .running { pane.hasBell = true }
+                        if hasRunningPanes {
+                            paneEvents.append(.bell(tabUUID: tab.uuid))
+                        }
                     }
-                } else if hadBell && !info.hasBell && hasRunningPanes {
-                    // Window has fresh output — only clear if activity is recent (< 3s),
-                    // meaning real sustained output, not a stale touch from tab selection.
-                    let activityAge = now - info.lastActivity
-                    if activityAge < 3 {
+                } else if hadBell && hasRunningPanes {
+                    // Require 2+ consecutive non-silent polls before clearing.
+                    // Tab selection causes a single non-silent poll then silence restores.
+                    let count = (nonSilentCount[tab.id] ?? 0) + 1
+                    nonSilentCount[tab.id] = count
+                    if count >= 2 {
                         for pane in tab.panes { pane.hasBell = false }
                         paneEvents.append(.silenceCleared(tabUUID: tab.uuid))
+                        nonSilentCount[tab.id] = 0
                     }
+                } else {
+                    nonSilentCount[tab.id] = 0
                 }
             }
         }
