@@ -83,6 +83,11 @@ extension WorkspaceController {
             expectingDisconnect = false
             startControlMode()
         }
+
+        if let adapter = tmux as? TmuxAdapter {
+            await restoreSession(name: name, path: path, adapter: adapter)
+        }
+
         await syncEngine.refresh()
         if let project = workspace.projects.first(where: { $0.name == name }) {
             selectProject(project)
@@ -299,5 +304,78 @@ extension WorkspaceController {
             pane.hasContentMatch = false
         }
         Task { await tmux.clearBellFlag(tabId: tab.id) }
+    }
+
+    // MARK: - Session Restore
+
+    private func restoreSession(name: String, path: String, adapter: TmuxAdapter) async {
+        let canonical = URL(fileURLWithPath: path).standardized.path
+        guard let snapshot = SessionSnapshotStore.load(path: canonical),
+              !snapshot.tabs.isEmpty else { return }
+
+        ForgeLog.log("[app] Restoring \(snapshot.tabs.count) tabs for \(name)")
+
+        for (i, tab) in snapshot.tabs.enumerated() {
+            let windowTarget: String
+            if i == 0 {
+                await adapter.renameWindow(target: "\(name):0", name: tab.name)
+                windowTarget = "\(name):0"
+            } else {
+                let firstDir = tab.panes.first?.directory ?? path
+                guard let windowId = await adapter.restoreTab(session: name, name: tab.name, directory: firstDir) else {
+                    ForgeLog.log("[app] Failed to restore tab \(tab.name)")
+                    continue
+                }
+                windowTarget = windowId
+            }
+
+            if tab.panes.count > 1, let layout = tab.layout {
+                let tree = LayoutParser.parse(layout)
+                let existingPaneIds = await adapter.listPaneIds(window: windowTarget)
+                guard let firstPaneId = existingPaneIds.first else { continue }
+
+                var leafPaneIds: [String] = []
+                await collectLeafPanes(tree: tree, adapter: adapter, currentPaneId: firstPaneId, leafPaneIds: &leafPaneIds)
+
+                await adapter.applyLayout(windowId: windowTarget, layout: layout)
+
+                for (j, pane) in tab.panes.enumerated() where j < leafPaneIds.count {
+                    if pane.directory != path {
+                        await adapter.sendKeys(paneId: leafPaneIds[j], keys: "cd \(quoteForShell(pane.directory))")
+                    }
+                }
+            } else if let pane = tab.panes.first, i == 0, pane.directory != path {
+                if let paneId = (await adapter.listPaneIds(window: windowTarget)).first {
+                    await adapter.sendKeys(paneId: paneId, keys: "cd \(quoteForShell(pane.directory))")
+                }
+            }
+        }
+
+        SessionSnapshotStore.delete(path: canonical)
+        ForgeLog.log("[app] Restored session snapshot for \(name)")
+    }
+
+    private func collectLeafPanes(
+        tree: SplitNode, adapter: TmuxAdapter,
+        currentPaneId: String, leafPaneIds: inout [String]
+    ) async {
+        switch tree {
+        case .leaf:
+            leafPaneIds.append(currentPaneId)
+        case .split(let direction, let children):
+            var childPaneIds = [currentPaneId]
+            for _ in children.dropFirst() {
+                if let newId = await adapter.restoreSplit(targetPane: currentPaneId, direction: direction) {
+                    childPaneIds.append(newId)
+                }
+            }
+            for (i, child) in children.enumerated() where i < childPaneIds.count {
+                await collectLeafPanes(tree: child, adapter: adapter, currentPaneId: childPaneIds[i], leafPaneIds: &leafPaneIds)
+            }
+        }
+    }
+
+    private func quoteForShell(_ s: String) -> String {
+        "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }
