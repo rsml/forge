@@ -100,12 +100,9 @@ struct SidebarProjectList: View {
             .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture(count: 2) {
-                    appState.dispatch(.showProjectPicker)
-                }
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            appState.dispatch(.showProjectPicker)
         }
     }
 }

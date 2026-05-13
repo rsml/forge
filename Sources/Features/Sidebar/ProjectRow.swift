@@ -37,26 +37,32 @@ struct SidebarProjectRow: View {
         HStack(spacing: 6) {
             chevronOrIndex
 
-            if isRenaming {
-                InlineRenameField(
-                    text: Binding(
-                        get: { appState.renameText },
-                        set: { appState.renameText = $0 }
-                    ),
-                    font: .system(.body, weight: .medium),
-                    onCancel: { appState.renamingProjectId = nil },
-                    onCommit: { appState.commitProjectRename(project) }
-                )
-            } else {
-                TruncatingText(project.name, font: configStore.primaryFont.weight(isActive ? .medium : .regular))
-                    .foregroundStyle(isActive ? .primary : .secondary)
-                Spacer()
+            Group {
+                if isRenaming {
+                    InlineRenameField(
+                        text: Binding(
+                            get: { appState.renameText },
+                            set: { appState.renameText = $0 }
+                        ),
+                        font: .system(.body, weight: .medium),
+                        onCancel: { appState.renamingProjectId = nil },
+                        onCommit: { appState.commitProjectRename(project) }
+                    )
+                } else {
+                    HStack {
+                        TruncatingText(project.name, font: configStore.primaryFont.weight(isActive ? .medium : .regular))
+                            .foregroundStyle(isActive ? .primary : .secondary)
+                        Spacer()
 
-                if !isExpanded && project.tabs.contains(where: { $0.needsAttention && !attention.isHidden($0.uuid) }) {
-                    AttentionDot(needsAttention: true)
-                        .padding(.trailing, 4)
+                        if !isExpanded && project.tabs.contains(where: { $0.needsAttention && !attention.isHidden($0.uuid) }) {
+                            AttentionDot(needsAttention: true)
+                                .padding(.trailing, 4)
+                        }
+                    }
                 }
             }
+            .contentShape(Rectangle())
+            .highPriorityGesture(TapGesture().onEnded { controller.selectProject(project) })
         }
         .frame(minHeight: 28)
         .padding(.horizontal, 4)
@@ -64,9 +70,7 @@ struct SidebarProjectRow: View {
             RoundedRectangle(cornerRadius: 4)
                 .fill(isHeaderHovered ? Color.primary.opacity(0.06) : Color.clear)
         )
-        .contentShape(Rectangle())
         .onHover { isHeaderHovered = $0 }
-        .highPriorityGesture(TapGesture().onEnded { controller.selectProject(project) })
     }
 
     @ViewBuilder
@@ -78,9 +82,9 @@ struct SidebarProjectRow: View {
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 16, height: 28)
                 .contentShape(Rectangle())
-                .highPriorityGesture(TapGesture().onEnded {
+                .onTapGesture {
                     withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
-                })
+                }
         } else {
             Image(systemName: "chevron.right")
                 .font(.caption2)
@@ -89,9 +93,9 @@ struct SidebarProjectRow: View {
                 .frame(width: 16, height: 28)
                 .contentShape(Rectangle())
                 .onHover { isChevronHovered = $0 }
-                .highPriorityGesture(TapGesture().onEnded {
+                .onTapGesture {
                     withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
-                })
+                }
         }
     }
 
