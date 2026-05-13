@@ -51,7 +51,7 @@ public struct PaneInfo {
     }
 }
 
-public enum SplitDirection { case horizontal, vertical }
+public enum SplitDirection: Sendable { case horizontal, vertical }
 
 // MARK: - Focused Protocols
 
