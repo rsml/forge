@@ -138,6 +138,62 @@ final class TmuxAdapter: TmuxQueryPort, TmuxCommandPort, TmuxControlPort {
         controlMode.stop()
     }
 
+    // MARK: - Session Snapshot
+
+    func captureSessionSnapshot(project: String, path: String) async -> SessionSnapshot? {
+        guard let tabOutput = await runner.run("list-windows", "-t", project, "-F", TmuxStateParser.snapshotTabFormat),
+              let paneOutput = await runner.run("list-panes", "-s", "-t", project, "-F", TmuxStateParser.snapshotPaneFormat)
+        else { return nil }
+
+        let tabInfos = TmuxStateParser.parseSnapshotTabs(tabOutput)
+        let paneInfos = TmuxStateParser.parseSnapshotPanes(paneOutput)
+        let panesByWindow = Dictionary(grouping: paneInfos, by: \.windowIndex)
+
+        let tabs = tabInfos.sorted(by: { $0.index < $1.index }).map { tab in
+            let panes = (panesByWindow[tab.index] ?? []).sorted(by: { $0.index < $1.index }).map {
+                PaneSnapshot(directory: $0.directory, index: $0.index)
+            }
+            let layout: String? = panes.count > 1 ? tab.layout : nil
+            return TabSnapshot(name: tab.name, index: tab.index, layout: layout, panes: panes)
+        }
+
+        let canonical = URL(fileURLWithPath: path).standardized.path
+        return SessionSnapshot(path: canonical, tabs: tabs)
+    }
+
+    // MARK: - Session Restore
+
+    func restoreTab(session: String, name: String, directory: String) async -> String? {
+        await runner.run("new-window", "-P", "-F", "#{window_id}", "-t", "\(session):", "-n", name, "-c", directory)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func restoreSplit(targetPane: String, direction: SplitDirection) async -> String? {
+        let flag = direction == .horizontal ? "-h" : "-v"
+        return await runner.run("split-window", flag, "-P", "-F", "#{pane_id}", "-t", targetPane)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func applyLayout(windowId: String, layout: String) async {
+        _ = await runner.run("select-layout", "-t", windowId, layout)
+    }
+
+    func sendKeys(paneId: String, keys: String) async {
+        _ = await runner.run("send-keys", "-t", paneId, keys, "Enter")
+    }
+
+    func renameWindow(target: String, name: String) async {
+        _ = await runner.run("rename-window", "-t", target, name)
+    }
+
+    func listPaneIds(window: String) async -> [String] {
+        guard let output = await runner.run("list-panes", "-t", window, "-F", "#{pane_id}") else { return [] }
+        return output.trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: "\n").map(String.init)
+    }
+
+    // MARK: - Helpers
+
     // Wraps s in single quotes and escapes any embedded single quotes so the
     // resulting token is safe to embed in a tmux control-mode command string.
     // Example: "my 'proj'" → "'my '\\''proj'\\'''"

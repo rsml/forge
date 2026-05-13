@@ -44,4 +44,37 @@ enum TmuxStateParser {
                           width: Int(p[6]) ?? 80, height: Int(p[7]) ?? 24, pid: Int(p[8]) ?? 0)
         }
     }
+
+    // MARK: - Snapshot Formats
+
+    static let snapshotTabFormat = "#{window_index}\t#{window_name}\t#{window_layout}"
+    static let snapshotPaneFormat = "#{window_index}\t#{pane_index}\t#{pane_current_path}"
+
+    struct SnapshotTabInfo {
+        let index: Int
+        let name: String
+        let layout: String
+    }
+
+    struct SnapshotPaneInfo {
+        let windowIndex: Int
+        let index: Int
+        let directory: String
+    }
+
+    static func parseSnapshotTabs(_ output: String) -> [SnapshotTabInfo] {
+        output.split(separator: "\n").compactMap { line in
+            let p = line.split(separator: "\t", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
+            guard p.count >= 3 else { return nil }
+            return SnapshotTabInfo(index: Int(p[0]) ?? 0, name: p[1], layout: p[2])
+        }
+    }
+
+    static func parseSnapshotPanes(_ output: String) -> [SnapshotPaneInfo] {
+        output.split(separator: "\n").compactMap { line in
+            let p = line.split(separator: "\t", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
+            guard p.count >= 3 else { return nil }
+            return SnapshotPaneInfo(windowIndex: Int(p[0]) ?? 0, index: Int(p[1]) ?? 0, directory: p[2])
+        }
+    }
 }
