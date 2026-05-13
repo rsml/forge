@@ -18,9 +18,9 @@ final class TmuxSyncEngine {
     private var lastGitBranchProjectId: String?
     private(set) var gitBranch: String?
     private let contentDetector = ContentDetector()
-    /// Tracks consecutive refresh cycles where a tab's silence flag is 0.
-    /// hasBell only clears after 2+ consecutive non-silent polls (avoids flicker from tab selection).
-    private var nonSilentCount: [String: Int] = [:]
+    /// Tracks when a tab first became non-silent. hasBell only clears after
+    /// sustained non-silence (> 5s), avoiding flicker from brief activity like tab selection.
+    private var nonSilentSince: [String: Date] = [:]
 
     init(workspace: Workspace, tmux: any TmuxPort, config: ForgeConfigStore) {
         self.workspace = workspace
@@ -94,7 +94,7 @@ final class TmuxSyncEngine {
                 let hadBell = tab.panes.contains(where: \.hasBell)
 
                 if info.hasBell {
-                    nonSilentCount[tab.id] = 0
+                    nonSilentSince[tab.id] = nil
                     if !hadBell {
                         for pane in tab.panes where pane.status == .running { pane.hasBell = true }
                         if hasRunningPanes {
@@ -102,17 +102,19 @@ final class TmuxSyncEngine {
                         }
                     }
                 } else if hadBell && hasRunningPanes {
-                    // Require 2+ consecutive non-silent polls before clearing.
-                    // Tab selection causes a single non-silent poll then silence restores.
-                    let count = (nonSilentCount[tab.id] ?? 0) + 1
-                    nonSilentCount[tab.id] = count
-                    if count >= 2 {
+                    // Only clear after sustained non-silence (> 5s).
+                    // Tab selection causes brief non-silence (< 2s) then restores.
+                    let since = nonSilentSince[tab.id] ?? {
+                        nonSilentSince[tab.id] = Date()
+                        return Date()
+                    }()
+                    if Date().timeIntervalSince(since) > 5 {
                         for pane in tab.panes { pane.hasBell = false }
                         paneEvents.append(.silenceCleared(tabUUID: tab.uuid))
-                        nonSilentCount[tab.id] = 0
+                        nonSilentSince[tab.id] = nil
                     }
                 } else {
-                    nonSilentCount[tab.id] = 0
+                    nonSilentSince[tab.id] = nil
                 }
             }
         }
