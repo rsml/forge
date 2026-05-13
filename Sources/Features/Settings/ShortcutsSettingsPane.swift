@@ -104,8 +104,8 @@ struct ShortcutsSettingsPane: View {
                                     .font(.system(size: 14))
                             }
                             .buttonStyle(.plain)
-                            .opacity(shortcuts[entry.id] != nil ? 1 : 0.3)
-                            .disabled(shortcuts[entry.id] == nil)
+                            .opacity(hasMeaningfulOverride(id: entry.id, default: entry.shortcut) ? 1 : 0)
+                            .disabled(!hasMeaningfulOverride(id: entry.id, default: entry.shortcut))
                         }
                     }
                     .padding(.vertical, 3)
@@ -127,6 +127,19 @@ struct ShortcutsSettingsPane: View {
               let peer = KeyboardShortcuts.allDefaults.first(where: { $0.id == peerId })
         else { return "Conflicts with another shortcut" }
         return "Conflicts with \(peer.shortcut.label)"
+    }
+
+    private func hasMeaningfulOverride(id: String, default shortcut: Shortcut) -> Bool {
+        guard let override = shortcuts[id] else { return false }
+        let overrideShortcut = Shortcut(from: override, label: "")
+        return normalizedHint(overrideShortcut) != normalizedHint(shortcut)
+    }
+
+    /// Normalize a shortcut's hint so that shift-equivalent keys compare equal
+    /// (e.g. ⇧⌘[ and ⇧⌘{ are the same physical key combo).
+    private func normalizedHint(_ shortcut: Shortcut) -> String {
+        // Shortcut.hint already unshifts via the unshiftMap, so just use it directly
+        shortcut.hint.lowercased()
     }
 
     private func resolveHint(id: String, default shortcut: Shortcut) -> String {
