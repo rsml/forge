@@ -89,11 +89,19 @@ extension WorkspaceController {
         }
     }
 
-    func removeProject(_ project: Project) {
+    func removeProject(_ project: Project) async {
         ForgeLog.log("[app] Removing project: \(project.name)")
         // Killing any session may disconnect control mode (if it's attached to
         // that session). Set the flag so onDisconnect suppresses the toast.
         expectingDisconnect = true
+
+        // Snapshot tab layout before kill
+        if let path = project.path {
+            if let snapshot = await (tmux as? TmuxAdapter)?.captureSessionSnapshot(project: project.name, path: path) {
+                SessionSnapshotStore.save(snapshot)
+            }
+        }
+
         if let index = workspace.projects.firstIndex(where: { $0.id == project.id }) {
             let nextIndex = index > 0 ? index - 1 : min(1, workspace.projects.count - 1)
             if nextIndex != index {
@@ -172,7 +180,7 @@ extension WorkspaceController {
         case .tab(let tab, let project):
             removeTab(tab, in: project)
         case .project(let project):
-            removeProject(project)
+            Task { await removeProject(project) }
         }
     }
 

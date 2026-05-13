@@ -65,7 +65,7 @@ struct ForgeMenuCommands: Commands {
                 alert.addButton(withTitle: "Cancel")
                 alert.alertStyle = .warning
                 guard alert.runModal() == .alertFirstButtonReturn else { return }
-                controller.removeProject(project)
+                Task { await controller.removeProject(project) }
             }
             .keyboardShortcut(KeyboardShortcuts.closeProject.key, modifiers: KeyboardShortcuts.closeProject.modifiers)
 

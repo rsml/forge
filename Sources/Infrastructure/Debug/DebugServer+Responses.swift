@@ -133,7 +133,7 @@ extension DebugServer {
         case "removeProject":
             if let name = args["name"] as? String,
                let project = ctrl.workspace.projects.first(where: { $0.name == name }) {
-                ctrl.removeProject(project)
+                await ctrl.removeProject(project)
                 return jsonResponse(["ok": true, "removed": name])
             }
             return jsonResponse(["error": "Project not found"], status: "404 Not Found")

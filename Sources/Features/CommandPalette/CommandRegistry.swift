@@ -46,7 +46,7 @@ final class CommandRegistry {
             alert.addButton(withTitle: "Cancel")
             alert.alertStyle = .warning
             guard alert.runModal() == .alertFirstButtonReturn else { return }
-            controller.removeProject(project)
+            Task { await controller.removeProject(project) }
         })
         register(Command(label: KeyboardShortcuts.renameTab.label, shortcutHint: KeyboardShortcuts.renameTab.hint) {
             appState.dispatch(.renameTab)

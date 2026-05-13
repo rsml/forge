@@ -93,7 +93,7 @@ struct SidebarProjectList: View {
                         Button("New Tab") { controller.addTab(in: project) }
                             .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
                         Divider()
-                        Button("Close Project", role: .destructive) { controller.removeProject(project) }
+                        Button("Close Project", role: .destructive) { Task { await controller.removeProject(project) } }
                             .keyboardShortcut(KeyboardShortcuts.closeProject.key, modifiers: KeyboardShortcuts.closeProject.modifiers)
                     }
                 } onReorder: { from, to in
