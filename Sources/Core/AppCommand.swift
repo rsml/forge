@@ -28,6 +28,9 @@ public enum AppCommand: Equatable, Sendable {
     case moveProjectBack
     case moveProjectForward
 
+    // Notifications
+    case toggleNotifications
+
     // Stack actions
     case stackDone
     case stackHide

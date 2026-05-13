@@ -20,6 +20,9 @@ enum KeyboardShortcuts {
     static var notifications: Shortcut { resolve("notifications", default: Shortcut("n", modifiers: [.command, .shift], label: "Notifications")) }
     static var toggleMode: Shortcut { resolve("toggleMode", default: Shortcut("m", modifiers: [.command, .shift], label: "Toggle Mode")) }
 
+    // MARK: - Notifications
+    static var toggleNotifications: Shortcut { resolve("toggleNotifications", default: Shortcut("h", modifiers: [.command, .shift], label: "Toggle Notifications")) }
+
     // MARK: - Stack
     static var stackDone: Shortcut { resolve("stackDone", default: Shortcut(.return, modifiers: .command, label: "Done")) }
     static var stackHide: Shortcut { resolve("stackHide", default: Shortcut("h", modifiers: [.command, .shift], label: "Hide")) }
@@ -54,6 +57,7 @@ enum KeyboardShortcuts {
         ("commandPalette", Shortcut("p", modifiers: [.command, .shift], label: "Command Palette"), "App"),
         ("notifications", Shortcut("n", modifiers: [.command, .shift], label: "Notifications"), "App"),
         ("toggleMode", Shortcut("m", modifiers: [.command, .shift], label: "Toggle Mode"), "App"),
+        ("toggleNotifications", Shortcut("h", modifiers: [.command, .shift], label: "Toggle Notifications"), "Tabs"),
         // Projects
         ("newProject", Shortcut("n", modifiers: .command, label: "New Project"), "Projects"),
         ("closeProject", Shortcut("w", modifiers: [.command, .shift], label: "Close Project"), "Projects"),

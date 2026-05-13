@@ -69,10 +69,12 @@ struct WindowTabBar: View {
                                     Button("Enable Notifications") {
                                         attention.unhide(tab.uuid)
                                     }
+                                    .keyboardShortcut(KeyboardShortcuts.toggleNotifications.key, modifiers: KeyboardShortcuts.toggleNotifications.modifiers)
                                 } else {
                                     Button("Disable Notifications") {
                                         attention.hide(tab.uuid)
                                     }
+                                    .keyboardShortcut(KeyboardShortcuts.toggleNotifications.key, modifiers: KeyboardShortcuts.toggleNotifications.modifiers)
                                 }
                                 Button("Close Tab", role: .destructive) {
                                     controller.removeTab(tab, in: project)

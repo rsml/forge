@@ -245,6 +245,21 @@ extension WorkspaceController {
         workspace.projects.swapAt(fromIndex, toIndex)
     }
 
+    // MARK: - Notifications
+
+    func toggleNotifications() {
+        guard let attention = attentionManager,
+              let project = workspace.activeProject,
+              let tabId = workspace.activeTabId,
+              let tab = project.tabs.first(where: { $0.id == tabId })
+        else { return }
+        if attention.isHidden(tab.uuid) {
+            attention.unhide(tab.uuid)
+        } else {
+            attention.hide(tab.uuid)
+        }
+    }
+
     // MARK: - Attention
 
     func sendAttentionNotification(tabUUID: UUID) {

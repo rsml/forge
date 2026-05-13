@@ -88,10 +88,13 @@ struct SidebarProjectList: View {
                     )
                     .contextMenu {
                         Button("Rename...") { appState.startProjectRename(project) }
+                            .keyboardShortcut(KeyboardShortcuts.renameProject.key, modifiers: KeyboardShortcuts.renameProject.modifiers)
                         Divider()
                         Button("New Tab") { controller.addTab(in: project) }
+                            .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
                         Divider()
                         Button("Close Project", role: .destructive) { controller.removeProject(project) }
+                            .keyboardShortcut(KeyboardShortcuts.closeProject.key, modifiers: KeyboardShortcuts.closeProject.modifiers)
                     }
                 } onReorder: { from, to in
                     controller.workspace.projects.move(fromOffsets: IndexSet(integer: from), toOffset: to)

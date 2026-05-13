@@ -118,6 +118,10 @@ final class AppState {
         case .moveProjectBack:    controller.swapProject(offset: -1)
         case .moveProjectForward: controller.swapProject(offset: 1)
 
+        // Notifications
+        case .toggleNotifications:
+            controller.toggleNotifications()
+
         // Stack actions — set trigger for StackView to animate
         case .stackDone:       pendingStackAction = .done
         case .stackHide:       pendingStackAction = .hide

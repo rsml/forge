@@ -122,8 +122,10 @@ struct SidebarProjectRow: View {
                     .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
                 if attention.isHidden(tab.uuid) {
                     Button("Enable Notifications") { attention.unhide(tab.uuid) }
+                        .keyboardShortcut(KeyboardShortcuts.toggleNotifications.key, modifiers: KeyboardShortcuts.toggleNotifications.modifiers)
                 } else {
                     Button("Disable Notifications") { attention.hide(tab.uuid) }
+                        .keyboardShortcut(KeyboardShortcuts.toggleNotifications.key, modifiers: KeyboardShortcuts.toggleNotifications.modifiers)
                 }
                 Button("Close Tab", role: .destructive) { controller.removeTab(tab, in: project) }
                     .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)

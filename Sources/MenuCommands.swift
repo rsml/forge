@@ -213,6 +213,14 @@ struct ForgeMenuCommands: Commands {
                 .keyboardShortcut(KeyboardShortcuts.stackMoveToBack.key, modifiers: KeyboardShortcuts.stackMoveToBack.modifiers)
             }
 
+            if !config.isStackMode {
+                Divider()
+                Button("Toggle Notifications") {
+                    appState.dispatch(.toggleNotifications)
+                }
+                .keyboardShortcut(KeyboardShortcuts.toggleNotifications.key, modifiers: KeyboardShortcuts.toggleNotifications.modifiers)
+            }
+
             Button("Move Tab Back") {
                 appState.dispatch(.moveTabLeft)
             }

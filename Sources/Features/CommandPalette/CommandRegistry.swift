@@ -96,6 +96,11 @@ final class CommandRegistry {
             appState.dispatch(.moveTabRight)
         })
 
+        // Notifications
+        register(Command(label: KeyboardShortcuts.toggleNotifications.label, shortcutHint: KeyboardShortcuts.toggleNotifications.hint) {
+            appState.dispatch(.toggleNotifications)
+        })
+
         // Stack actions
         register(Command(label: KeyboardShortcuts.stackDone.label, shortcutHint: KeyboardShortcuts.stackDone.hint) {
             appState.dispatch(.stackDone)
