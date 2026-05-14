@@ -38,7 +38,9 @@ struct ForgeMenuCommands: Commands {
             .keyboardShortcut(KeyboardShortcuts.newProject.key, modifiers: KeyboardShortcuts.newProject.modifiers)
 
             Button("New Tab") {
-                if let project = controller.workspace.activeProject {
+                if config.isStackMode {
+                    appState.dispatch(.showStackNewTab)
+                } else if let project = controller.workspace.activeProject {
                     controller.addTab(in: project)
                 }
             }

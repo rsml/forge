@@ -35,6 +35,13 @@ struct ModalOverlays: ViewModifier {
                     }
                 }
             }
+            .overlay {
+                if appState.activeModal == .stackNewTab {
+                    modalContainer(width: 360, maxHeight: 400) {
+                        StackNewTabPicker(onDismiss: { appState.dispatch(.dismissModal) })
+                    }
+                }
+            }
     }
 
     private func modalBinding(_ modal: AppState.Modal) -> Binding<Bool> {

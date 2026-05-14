@@ -30,7 +30,9 @@ final class CommandRegistry {
             appState.dispatch(.showProjectPicker)
         })
         register(Command(label: KeyboardShortcuts.newTab.label, shortcutHint: KeyboardShortcuts.newTab.hint) {
-            if let project = controller.workspace.activeProject {
+            if controller.config.isStackMode {
+                appState.dispatch(.showStackNewTab)
+            } else if let project = controller.workspace.activeProject {
                 controller.addTab(in: project)
             }
         })

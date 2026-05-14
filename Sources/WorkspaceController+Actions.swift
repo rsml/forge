@@ -91,6 +91,9 @@ extension WorkspaceController {
         await syncEngine.refresh()
         if let project = workspace.projects.first(where: { $0.name == name }) {
             selectProject(project)
+            if config.isStackMode, let tab = project.tabs.first {
+                attentionManager?.promoteToFront(tab.uuid)
+            }
         }
     }
 
@@ -123,6 +126,9 @@ extension WorkspaceController {
             await syncEngine.refresh()
             if let tab = project.tabs.first(where: { $0.id == windowId }) {
                 selectTab(tab)
+                if config.isStackMode {
+                    attentionManager?.promoteToFront(tab.uuid)
+                }
             }
         }
     }

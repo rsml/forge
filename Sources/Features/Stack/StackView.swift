@@ -83,11 +83,19 @@ struct StackView: View {
     ) -> some View {
         VStack(spacing: 0) {
             if toolbarPosition == "top" {
-                StackToolbar(project: project, tab: tab, onDismiss: onDismiss)
+                StackToolbar(
+                    project: project, tab: tab, onDismiss: onDismiss,
+                    onSplit: { direction in controller.splitPane(direction: direction) },
+                    onNewTab: { appState.dispatch(.showStackNewTab) }
+                )
                 TerminalArea(project: project)
             } else {
                 TerminalArea(project: project)
-                StackToolbar(project: project, tab: tab, onDismiss: onDismiss)
+                StackToolbar(
+                    project: project, tab: tab, onDismiss: onDismiss,
+                    onSplit: { direction in controller.splitPane(direction: direction) },
+                    onNewTab: { appState.dispatch(.showStackNewTab) }
+                )
             }
         }
     }

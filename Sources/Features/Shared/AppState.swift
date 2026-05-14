@@ -12,6 +12,7 @@ final class AppState {
         case tabSwitcher
         case commandPalette
         case notifications
+        case stackNewTab
     }
 
     // Sidebar
@@ -56,6 +57,7 @@ final class AppState {
         case .showTabSwitcher:     activeModal = .tabSwitcher
         case .showCommandPalette:  activeModal = .commandPalette
         case .showNotifications:   activeModal = .notifications
+        case .showStackNewTab:     activeModal = .stackNewTab
         case .dismissModal:        activeModal = nil
 
         // Sidebar

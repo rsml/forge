@@ -6,13 +6,15 @@ struct StackToolbar: View {
     let project: Project
     let tab: ForgeCore.Tab
     var onDismiss: ((WorkspaceController.StackDismissAction) -> Void)?
+    var onSplit: ((SplitDirection) -> Void)?
+    var onNewTab: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 0) {
-            labels
+            leftGroup
                 .padding(.leading, 4)
             Spacer()
-            actionButtons
+            rightGroup
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 2)
@@ -26,8 +28,15 @@ struct StackToolbar: View {
         }
     }
 
-    private var labels: some View {
+    private var leftGroup: some View {
         HStack(spacing: 6) {
+            if onNewTab != nil {
+                IconButton(systemName: "plus") {
+                    onNewTab?()
+                }
+                .frame(width: 40, height: 28)
+                .tooltip(KeyboardShortcuts.newTab)
+            }
             Text(project.name)
                 .font(.system(size: 12, weight: .medium))
             Text(tab.name)
@@ -36,7 +45,32 @@ struct StackToolbar: View {
         }
     }
 
-    private var actionButtons: some View {
+    private var rightGroup: some View {
+        HStack(spacing: 0) {
+            splitButtons
+            dismissButtons
+        }
+    }
+
+    private var splitButtons: some View {
+        HStack(spacing: 0) {
+            IconButton(systemName: "rectangle.split.2x1") {
+                onSplit?(.horizontal)
+            }
+            .frame(width: 40, height: 28)
+            .tooltip(KeyboardShortcuts.splitHorizontal)
+
+            IconButton(systemName: "rectangle.split.1x2") {
+                onSplit?(.vertical)
+            }
+            .frame(width: 40, height: 28)
+            .tooltip(KeyboardShortcuts.splitVertical)
+        }
+        .opacity(onSplit == nil ? 0.5 : 1.0)
+        .allowsHitTesting(onSplit != nil)
+    }
+
+    private var dismissButtons: some View {
         HStack(spacing: 0) {
             IconButton(systemName: "checkmark") {
                 onDismiss?(.done)

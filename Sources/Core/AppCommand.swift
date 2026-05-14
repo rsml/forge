@@ -35,4 +35,5 @@ public enum AppCommand: Equatable, Sendable {
     case stackDone
     case stackHide
     case stackMoveToBack
+    case showStackNewTab
 }
