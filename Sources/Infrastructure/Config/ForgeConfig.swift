@@ -47,6 +47,7 @@ struct ForgeConfig: Codable {
         var tabBarPosition: String?     // "top" or "bottom"
         var tabHighlightColorMode: String?  // "accent" (default), "theme", "custom"
         var tabHighlightCustomColor: String? // hex color string, e.g. "#FF0000"
+        var nativePaneRendering: Bool?
         // Legacy — migrated to NotificationSettings on load
         var notificationsEnabled: Bool?
         var notificationSound: String?
