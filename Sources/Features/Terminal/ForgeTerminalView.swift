@@ -110,7 +110,7 @@ struct ForgeTerminalView: NSViewRepresentable {
     }
 
     /// Converts a ThemeColor to SwiftTerm's Color (UInt16 components, 0-65535).
-    private static func themeColorToTermColor(_ color: ThemeColor) -> SwiftTerm.Color {
+    static func themeColorToTermColor(_ color: ThemeColor) -> SwiftTerm.Color {
         SwiftTerm.Color(
             red: UInt16(color.red * 65535),
             green: UInt16(color.green * 65535),

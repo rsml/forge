@@ -1,0 +1,112 @@
+import AppKit
+import SwiftTerm
+import ForgeCore
+
+/// Native pane rendering: renderer creation, lifecycle, and scrollback seeding.
+extension WorkspaceController {
+
+    /// Creates a SwiftTermRenderer for the given pane, wires input/resize callbacks,
+    /// and registers it with the output router.
+    func createRenderer(for paneId: String) -> SwiftTermRenderer {
+        let font = resolvedTerminalFont
+        let (foreground, background, palette) = resolvedTerminalColors
+
+        let renderer = SwiftTermRenderer(
+            font: font,
+            foreground: foreground,
+            background: background,
+            colors: palette
+        )
+
+        // Wire keyboard input to tmux via control mode (sub-ms latency)
+        renderer.onInput = { [weak self] data in
+            guard let self, let adapter = self.tmux as? TmuxAdapter else { return }
+            let hex = data.map { String(format: "%02x", $0) }.joined(separator: " ")
+            adapter.controlModeSend("send-keys -H -t \(paneId) \(hex)")
+        }
+
+        // Wire resize to tmux via control mode
+        renderer.onResize = { [weak self] cols, rows in
+            guard let self, let adapter = self.tmux as? TmuxAdapter else { return }
+            adapter.controlModeSend("resize-pane -t \(paneId) -x \(cols) -y \(rows)")
+        }
+
+        outputRouter.register(paneId: paneId, renderer: renderer)
+        return renderer
+    }
+
+    /// Updates the active renderer when the active project/tab/pane changes.
+    /// For Phase 2, only renders the first pane of the active tab.
+    func updateActiveRenderer() {
+        guard config.isNativePaneRendering else { return }
+
+        guard let project = workspace.activeProject,
+              let tabId = workspace.activeTabId,
+              let tab = project.tabs.first(where: { $0.id == tabId }),
+              let pane = tab.panes.first(where: { $0.active }) ?? tab.panes.first
+        else {
+            activeRenderer = nil
+            return
+        }
+
+        // Already have a renderer for this pane — keep it
+        if let current = activeRenderer,
+           outputRouter.hasRenderer(for: pane.id, matching: current) {
+            return
+        }
+
+        let renderer = createRenderer(for: pane.id)
+        activeRenderer = renderer
+
+        // Seed scrollback from tmux capture
+        Task {
+            if let content = await tmux.capturePaneContent(id: pane.id, lastN: 2000),
+               !content.isEmpty {
+                renderer.feedScrollback(content)
+            }
+        }
+    }
+
+    /// Seeds renderers for all panes in the active project after initial connect.
+    func seedActiveRenderers() {
+        guard let project = workspace.activeProject,
+              let tabId = workspace.activeTabId,
+              let tab = project.tabs.first(where: { $0.id == tabId }),
+              let pane = tab.panes.first(where: { $0.active }) ?? tab.panes.first
+        else { return }
+
+        let renderer = createRenderer(for: pane.id)
+        activeRenderer = renderer
+
+        Task {
+            if let content = await tmux.capturePaneContent(id: pane.id, lastN: 2000),
+               !content.isEmpty {
+                renderer.feedScrollback(content)
+            }
+        }
+    }
+
+    // MARK: - Private Helpers
+
+    private var resolvedTerminalFont: NSFont {
+        let family = config.config.terminalFont?.family ??
+                     config.config.terminal?.fontFamily ??
+                     config.config.appearance?.fontFamily
+        let size = config.config.terminalFont?.size ??
+                   config.config.terminal?.fontSize ??
+                   config.config.appearance?.fontSize ?? 13
+        return FontResolver.resolveTerminalFont(family: family, size: CGFloat(size))
+    }
+
+    private var resolvedTerminalColors: (foreground: NSColor, background: NSColor, palette: [SwiftTerm.Color]?) {
+        if let theme = config.resolvedTheme {
+            let fg = NSColor(theme.foreground.color)
+            let bg = NSColor(theme.background.color)
+            let palette = theme.ansiColors.prefix(16).map { ForgeTerminalView.themeColorToTermColor($0) }
+            return (fg, bg, palette.count == 16 ? palette : nil)
+        }
+        let fg = NSColor(red: 0.77, green: 0.78, blue: 0.78, alpha: 1.0)
+        let bg = NSColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0)
+        return (fg, bg, nil)
+    }
+}

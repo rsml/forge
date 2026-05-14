@@ -21,4 +21,8 @@ final class OutputRouter {
     func route(paneId: String, data: Data) {
         renderers[paneId]?.feed(data)
     }
+
+    func hasRenderer(for paneId: String, matching renderer: TerminalRenderer) -> Bool {
+        renderers[paneId] === renderer
+    }
 }

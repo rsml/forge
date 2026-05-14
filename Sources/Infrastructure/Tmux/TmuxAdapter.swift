@@ -13,6 +13,12 @@ final class TmuxAdapter: TmuxQueryPort, TmuxCommandPort, TmuxControlPort {
         configPath: runner.configPath
     )
 
+    /// Set before starting control mode to skip `refresh-client -C 1,1` for native rendering.
+    var nativeRendering: Bool {
+        get { controlMode.nativeRendering }
+        set { controlMode.nativeRendering = newValue }
+    }
+
     func listProjects() async -> [ProjectInfo] {
         guard let output = await runner.run("list-sessions", "-F", TmuxStateParser.projectFormat),
               !output.isEmpty else { return [] }
@@ -137,6 +143,14 @@ final class TmuxAdapter: TmuxQueryPort, TmuxCommandPort, TmuxControlPort {
 
     func stopControlMode() {
         controlMode.stop()
+    }
+
+    // MARK: - Control Mode Pass-Through
+
+    /// Direct pass-through to control mode for sub-ms latency commands (send-keys, resize-pane).
+    /// Use this instead of runner.run() for interactive input during native rendering.
+    func controlModeSend(_ command: String) {
+        controlMode.send(command)
     }
 
     // MARK: - Session Snapshot

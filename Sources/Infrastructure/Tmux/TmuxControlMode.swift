@@ -19,6 +19,8 @@ final class TmuxControlMode: @unchecked Sendable {
     private var wasDisconnected = false
     private let maxRetries = 5
     private let lock = NSLock()
+    /// When true, skips `refresh-client -C 1,1` (no tmux-rendered view to constrain).
+    var nativeRendering = false
 
     init(tmuxPath: String, socketName: String = "forge", configPath: String? = nil) {
         self.tmuxPath = tmuxPath
@@ -109,12 +111,14 @@ final class TmuxControlMode: @unchecked Sendable {
 
         // Shrink the control mode client to 1x1 so it never wins the
         // "window-size largest" comparison against the real terminal view.
+        // When native rendering is on, skip this — there's no tmux-rendered view to constrain.
         // Subscribe to silence flags for push-based idle detection.
-        let initCommands = """
-        refresh-client -C 1,1
-        refresh-client -B "silence:@*:#{window_silence_flag}"
-        """
-        for cmd in initCommands.split(separator: "\n") {
+        var initCommands: [String] = []
+        if !nativeRendering {
+            initCommands.append("refresh-client -C 1,1")
+        }
+        initCommands.append("refresh-client -B \"silence:@*:#{window_silence_flag}\"")
+        for cmd in initCommands {
             if let data = (cmd + "\n").data(using: .utf8) {
                 stdinPipe.fileHandleForWriting.write(data)
             }

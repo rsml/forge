@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import Observation
 import ForgeCore
+import SwiftTerm
 
 /// Orchestrates domain state, routes events, delegates commands to ports.
 /// Views consume this via @Environment. Action methods live in WorkspaceController+Actions.
@@ -19,6 +20,9 @@ final class WorkspaceController {
     var perProjectActiveTabId: [String: String] = [:]
     /// Set before intentionally stopping control mode (e.g. removing last project) to suppress reconnect toast.
     var expectingDisconnect = false
+    let outputRouter = OutputRouter()
+    /// Currently active renderer for native pane rendering. Triggers SwiftUI updates.
+    var activeRenderer: SwiftTermRenderer?
 
     var gitBranch: String? { syncEngine.gitBranch }
 
@@ -82,6 +86,11 @@ final class WorkspaceController {
                 }
             }
 
+            // Seed native renderers for the active project's panes after initial sync
+            if config.isNativePaneRendering {
+                seedActiveRenderers()
+            }
+
             syncEngine.start()
             workspace.connected = true
             ForgeLog.log("[app] Connected. \(workspace.projects.count) sessions found.")
@@ -94,13 +103,27 @@ final class WorkspaceController {
     }
 
     func startControlMode() {
+        // Set native rendering flag on the adapter before starting control mode
+        if let adapter = tmux as? TmuxAdapter {
+            adapter.nativeRendering = config.isNativePaneRendering
+        }
+
+        var outputHandler: (@Sendable (String, Data) -> Void)?
+        if config.isNativePaneRendering {
+            outputHandler = { [weak self] paneId, data in
+                Task { @MainActor in
+                    self?.outputRouter.route(paneId: paneId, data: data)
+                }
+            }
+        }
+
         tmux.startControlMode(
             onEvent: { [weak self] event in
                 Task { @MainActor in
                     self?.handleEvent(event)
                 }
             },
-            onOutput: nil,
+            onOutput: outputHandler,
             onDisconnect: { [weak self] in
                 Task { @MainActor in
                     guard let self else { return }
