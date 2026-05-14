@@ -128,10 +128,11 @@ final class TmuxAdapter: TmuxQueryPort, TmuxCommandPort, TmuxControlPort {
 
     func startControlMode(
         onEvent: @escaping @Sendable (String) -> Void,
+        onOutput: (@Sendable (String, Data) -> Void)?,
         onDisconnect: (@Sendable () -> Void)?,
         onReconnect: (@Sendable () -> Void)?
     ) {
-        controlMode.start(onEvent: onEvent, onDisconnect: onDisconnect, onReconnect: onReconnect)
+        controlMode.start(onEvent: onEvent, onOutput: onOutput, onDisconnect: onDisconnect, onReconnect: onReconnect)
     }
 
     func stopControlMode() {

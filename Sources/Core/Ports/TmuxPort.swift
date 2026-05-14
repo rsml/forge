@@ -103,6 +103,7 @@ public protocol TmuxControlPort {
 
     func startControlMode(
         onEvent: @escaping @Sendable (String) -> Void,
+        onOutput: (@Sendable (String, Data) -> Void)?,
         onDisconnect: (@Sendable () -> Void)?,
         onReconnect: (@Sendable () -> Void)?
     )

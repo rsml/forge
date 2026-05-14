@@ -100,6 +100,7 @@ final class WorkspaceController {
                     self?.handleEvent(event)
                 }
             },
+            onOutput: nil,
             onDisconnect: { [weak self] in
                 Task { @MainActor in
                     guard let self else { return }

@@ -1,4 +1,5 @@
 import Foundation
+import ForgeCore
 
 /// Manages a tmux control mode (-CC) connection for push-based state updates.
 /// Automatically reconnects when the connection drops (e.g., after switch-client).
@@ -10,6 +11,7 @@ final class TmuxControlMode: @unchecked Sendable {
     private let socketName: String
     private let configPath: String?
     private var onEvent: (@Sendable (String) -> Void)?
+    private var onOutput: (@Sendable (String, Data) -> Void)?
     private var onDisconnect: (@Sendable () -> Void)?
     private var onReconnect: (@Sendable () -> Void)?
     private var shouldReconnect = false
@@ -26,11 +28,13 @@ final class TmuxControlMode: @unchecked Sendable {
 
     func start(
         onEvent: @escaping @Sendable (String) -> Void,
+        onOutput: (@Sendable (String, Data) -> Void)? = nil,
         onDisconnect: (@Sendable () -> Void)? = nil,
         onReconnect: (@Sendable () -> Void)? = nil
     ) {
         lock.lock()
         self.onEvent = onEvent
+        self.onOutput = onOutput
         self.onDisconnect = onDisconnect
         self.onReconnect = onReconnect
         self.shouldReconnect = true
@@ -198,9 +202,23 @@ final class TmuxControlMode: @unchecked Sendable {
         while let idx = buffer.firstIndex(of: "\n") {
             let line = String(buffer[buffer.startIndex..<idx])
             buffer = String(buffer[buffer.index(after: idx)...])
-            if line.hasPrefix("%") && !line.hasPrefix("%output") {
+            if line.hasPrefix("%output ") {
+                parseAndRouteOutput(line)
+            } else if line.hasPrefix("%") {
                 onEvent?(line)
             }
         }
+    }
+
+    private func parseAndRouteOutput(_ line: String) {
+        // Format: %output %<pane_id> <escaped_data>
+        // Skip "%output " (8 chars), find pane ID, then payload
+        let content = line.dropFirst(8)
+        guard let spaceIdx = content.firstIndex(of: " ") else { return }
+        let paneId = String(content[content.startIndex..<spaceIdx])
+        let payload = String(content[content.index(after: spaceIdx)...])
+        let decoded = TmuxOutputDecoder.decode(payload)
+        guard !decoded.isEmpty else { return }
+        onOutput?(paneId, Data(decoded))
     }
 }
