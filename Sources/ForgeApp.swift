@@ -114,6 +114,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ghosttyApp = ga
         }
         controller.ghosttyApp = ghosttyApp
+        if configStore.isNativePTY, let ga = ghosttyApp {
+            controller.processAdapter = ProcessAdapter(ghosttyApp: ga)
+        }
 
         createMainWindow()
         appState.bind(
