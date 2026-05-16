@@ -49,8 +49,20 @@ else
     echo "==> Cached at $CACHE_XCFW"
 fi
 
+# Fix library naming: ghostty's zig build emits "ghostty-internal.a" for macOS
+# but SPM requires the "lib" prefix on static libraries.
+MACOS_DIR="$CACHE_XCFW/macos-arm64_x86_64"
+if [[ -f "$MACOS_DIR/ghostty-internal.a" && ! -f "$MACOS_DIR/libghostty-internal.a" ]]; then
+    mv "$MACOS_DIR/ghostty-internal.a" "$MACOS_DIR/libghostty-internal.a"
+    sed -i '' 's|<string>ghostty-internal.a</string>|<string>libghostty-internal.a</string>|g' "$CACHE_XCFW/Info.plist"
+    echo "==> Fixed library name prefix for SPM compatibility"
+fi
+
 # Refresh ranlib index (required by Xcode 26+)
-MACOS_ARCHIVE="$CACHE_XCFW/macos-arm64_x86_64/libghostty.a"
+MACOS_ARCHIVE="$CACHE_XCFW/macos-arm64_x86_64/libghostty-internal.a"
+if [[ ! -f "$MACOS_ARCHIVE" ]]; then
+    MACOS_ARCHIVE="$CACHE_XCFW/macos-arm64_x86_64/libghostty.a"
+fi
 if [[ -f "$MACOS_ARCHIVE" ]]; then
     echo "==> Refreshing libghostty archive index..."
     xcrun ranlib "$MACOS_ARCHIVE" 2>/dev/null || true
