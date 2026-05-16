@@ -53,8 +53,12 @@ final class GhosttyRenderer: TerminalRenderer {
         surface = ghostty_surface_new(app, &config)
         nsView.surface = surface
 
+        // Wire resize: GhosttyNSView queries ghostty_surface_size after set_size
+        nsView.onSurfaceResize = { [weak self] cols, rows in
+            self?.onResize?(cols, rows)
+        }
+
         if let surface {
-            // Set initial Retina scale — viewDidMoveToWindow updates later.
             ghostty_surface_set_content_scale(surface, 2.0, 2.0)
             ForgeLog.log("[ghostty] Surface created successfully")
         } else {

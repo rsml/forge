@@ -8,6 +8,8 @@ import QuartzCore
 final class GhosttyNSView: NSView {
     // Set by GhosttyRenderer after surface creation.
     var surface: ghostty_surface_t?
+    /// Called after ghostty_surface_set_size with the computed (cols, rows).
+    var onSurfaceResize: ((Int, Int) -> Void)?
 
     // MARK: - Layer Setup
 
@@ -39,6 +41,11 @@ final class GhosttyNSView: NSView {
         let h = UInt32(newSize.height * scale)
         guard w > 0, h > 0 else { return }
         ghostty_surface_set_size(surface, w, h)
+        // Query computed cols/rows and notify
+        let size = ghostty_surface_size(surface)
+        if size.columns > 0 && size.rows > 0 {
+            onSurfaceResize?(Int(size.columns), Int(size.rows))
+        }
     }
 
     override func viewDidChangeBackingProperties() {
