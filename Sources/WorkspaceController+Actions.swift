@@ -39,9 +39,13 @@ extension WorkspaceController {
             workspace.activeTabId = tab.id
         }
 
-        Task { await tmux.switchClient(project: project.name) }
         saveUIState()
-        updateRenderers()
+        // switchClient must complete before updateRenderers — resize commands
+        // only work when the control mode client is attached to the correct session.
+        Task {
+            await tmux.switchClient(project: project.name)
+            updateRenderers()
+        }
     }
 
     func selectTab(_ tab: Tab) {
@@ -59,10 +63,12 @@ extension WorkspaceController {
         }
         workspace.activeProjectId = project.id
         workspace.activeTabId = tab.id
-        Task { await tmux.switchClient(project: project.name) }
         Task { await tmux.selectTab(id: tab.id) }
         saveUIState()
-        updateRenderers()
+        Task {
+            await tmux.switchClient(project: project.name)
+            updateRenderers()
+        }
     }
 
     /// Switch tmux to a different window without updating workspace state.

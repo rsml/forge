@@ -123,6 +123,7 @@ private struct SplitContainer: View {
     private func endDrag() {
         dragStartProportions = nil
         controller.suppressPaneResize = false
+        controller.sendResizePaneOnFlush = true
         controller.flushPendingResizes()
     }
 

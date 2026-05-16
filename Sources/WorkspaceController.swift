@@ -24,10 +24,15 @@ final class WorkspaceController {
     var paneRenderers: [String: any TerminalRenderer] = [:]
     /// Total terminal area frame size (set by TerminalArea via GeometryReader).
     var terminalAreaSize: CGSize = .zero
-    /// When true, onResize handlers store commands instead of sending them.
-    /// Set by PaneSplitView during divider drag to prevent tmux redraws.
+    /// When true, resize flush is deferred until drag ends.
     var suppressPaneResize = false
     var pendingResizes: [String: (cols: Int, rows: Int)] = [:]
+    var resizeFlushWork: DispatchWorkItem?
+    /// Set true after a divider drag — tells flushPendingResizes to send
+    /// individual resize-pane commands (applying user's proportions).
+    /// On startup/window-resize, only resize-window is sent so tmux
+    /// preserves its existing layout proportions.
+    var sendResizePaneOnFlush = false
     /// Ghostty app instance for native rendering. Nil when using SwiftTerm fallback.
     var ghosttyApp: GhosttyApp?
 
@@ -104,8 +109,13 @@ final class WorkspaceController {
                 }
             }
 
-            // Seed native renderers for the active project's panes after initial sync
+            // Seed native renderers for the active project's panes after initial sync.
+            // switchClient ensures the control mode client is on the active session
+            // before renderers fire resize commands.
             if config.isNativePaneRendering {
+                if let project = workspace.activeProject {
+                    await tmux.switchClient(project: project.name)
+                }
                 updateRenderers()
             }
 

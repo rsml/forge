@@ -84,30 +84,11 @@ extension WorkspaceController {
             guard let self, let adapter = self.tmux as? TmuxAdapter else { return }
             ForgeLog.log("[debug] Renderer \(paneId) resize: \(cols)x\(rows)")
 
-            // During divider drag, store pending sizes instead of flooding tmux.
-            if self.suppressPaneResize {
-                self.pendingResizes[paneId] = (cols, rows)
-                return
-            }
-
-            // Ensure the tmux window is large enough for the pane.
-            // refresh-client -C sets the client size (for future windows).
-            // resize-window directly sizes the current window (avoids race
-            // where resize-pane arrives before window recalculates from client).
-            let viewFrame = renderer.view.frame
-            if cols > 0, rows > 0, viewFrame.width > 0, viewFrame.height > 0 {
-                let cellW = viewFrame.width / CGFloat(cols)
-                let cellH = viewFrame.height / CGFloat(rows)
-                let areaSize = self.terminalAreaSize
-                let refWidth = areaSize.width > 0 ? areaSize.width : viewFrame.width
-                let refHeight = areaSize.height > 0 ? areaSize.height : viewFrame.height
-                let totalCols = max(Int(refWidth / cellW), cols)
-                let totalRows = max(Int(refHeight / cellH), rows)
-                adapter.controlModeSend("refresh-client -C \(totalCols),\(totalRows)")
-                adapter.controlModeSend("resize-window -t \(paneId) -x \(totalCols) -y \(totalRows)")
-            }
-
-            adapter.controlModeSend("resize-pane -t \(paneId) -x \(cols) -y \(rows)")
+            // Store every pane's latest size and schedule a batched flush.
+            // This avoids conflicting resize-pane commands when multiple
+            // renderers fire independently — all panes are resized together.
+            self.pendingResizes[paneId] = (cols, rows)
+            self.scheduleResizeFlush()
         }
 
         outputRouter.register(paneId: paneId, renderer: renderer)
@@ -150,9 +131,23 @@ extension WorkspaceController {
         }
     }
 
-    /// Send stored resize commands after a divider drag ends.
+    /// Schedule a batched resize flush after all renderers have reported sizes.
+    /// During drag, the flush is deferred until drag ends.
+    func scheduleResizeFlush() {
+        if suppressPaneResize { return }
+        resizeFlushWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.flushPendingResizes()
+        }
+        resizeFlushWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: work)
+    }
+
+    /// Send all stored resize commands as a single batch.
+    /// resize-window first (sets total), then resize-pane for each pane.
     func flushPendingResizes() {
         guard !pendingResizes.isEmpty, let adapter = tmux as? TmuxAdapter else { return }
+
         // Compute total window size from any pane's cell metrics
         if let (firstId, firstSize) = pendingResizes.first,
            let renderer = paneRenderers[firstId] {
@@ -167,8 +162,15 @@ extension WorkspaceController {
                 adapter.controlModeSend("resize-window -t \(firstId) -x \(totalCols) -y \(totalRows)")
             }
         }
-        for (paneId, size) in pendingResizes {
-            adapter.controlModeSend("resize-pane -t \(paneId) -x \(size.cols) -y \(size.rows)")
+
+        // Only send individual resize-pane after a drag (user explicitly set proportions).
+        // On startup/window-resize, tmux proportionally scales its existing layout —
+        // sending resize-pane would override tmux's stored proportions.
+        if sendResizePaneOnFlush {
+            for (paneId, size) in pendingResizes {
+                adapter.controlModeSend("resize-pane -t \(paneId) -x \(size.cols) -y \(size.rows)")
+            }
+            sendResizePaneOnFlush = false
         }
         pendingResizes.removeAll()
     }
