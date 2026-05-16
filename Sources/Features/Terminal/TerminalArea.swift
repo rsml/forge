@@ -9,23 +9,32 @@ struct TerminalArea: View {
     var body: some View {
         if configStore.isNativePaneRendering, !controller.paneRenderers.isEmpty,
            let tab = project.tabs.first(where: { $0.id == controller.workspace.activeTabId }) {
-            if let firstPaneId = tab.panes.first?.id,
-               let renderer = controller.paneRenderers[firstPaneId] {
-                // Temporary: single-pane view. Step 4 replaces with PaneSplitView.
-                PaneTerminalView(renderer: renderer)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .ignoresSafeArea(edges: [.bottom, .trailing])
-                    .id(firstPaneId)
-                    .border(Color.blue.opacity(0.5), width: 1) // DEBUG
-                    .background(Color(red: 0.1, green: 0.1, blue: 0.1))
-            }
+            nativeTerminal(tab: tab)
         } else {
-            // Legacy path: tmux attach rendered by SwiftTerm LocalProcessTerminalView
             ForgeTerminalView(sessionName: project.name)
-                .padding(.trailing, -15) // Compensate for SwiftTerm's reserved legacy scroller width
+                .padding(.trailing, -15)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .ignoresSafeArea(edges: [.bottom, .trailing])
                 .id(project.id)
+                .background(Color(red: 0.1, green: 0.1, blue: 0.1))
+        }
+    }
+
+    @ViewBuilder
+    private func nativeTerminal(tab: ForgeCore.Tab) -> some View {
+        if tab.panes.count > 1, let layout = tab.layout {
+            // Multi-pane: parse layout tree and render split view
+            let tree = LayoutParser.parse(layout)
+            PaneSplitView(node: tree, panes: tab.panes[...], renderers: controller.paneRenderers)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea(edges: [.bottom, .trailing])
+                .background(Color(red: 0.1, green: 0.1, blue: 0.1))
+        } else if let pane = tab.panes.first, let renderer = controller.paneRenderers[pane.id] {
+            // Single pane: direct render
+            PaneTerminalView(renderer: renderer)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea(edges: [.bottom, .trailing])
+                .id(pane.id)
                 .background(Color(red: 0.1, green: 0.1, blue: 0.1))
         }
     }
