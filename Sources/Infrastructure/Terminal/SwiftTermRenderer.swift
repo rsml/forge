@@ -35,6 +35,10 @@ final class SwiftTermRenderer: NSObject, TerminalRenderer, @preconcurrency Termi
         terminalView.feed(text: content)
     }
 
+    func setFocused(_ focused: Bool) {
+        // SwiftTerm doesn't have a cursor focus API — no-op.
+    }
+
     // MARK: - TerminalViewDelegate
 
     func send(source: TerminalView, data: ArraySlice<UInt8>) {

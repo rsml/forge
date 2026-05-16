@@ -10,6 +10,8 @@ final class GhosttyNSView: NSView {
     var surface: ghostty_surface_t?
     /// Called after ghostty_surface_set_size with the computed (cols, rows).
     var onSurfaceResize: ((Int, Int) -> Void)?
+    /// Called when this view becomes first responder (user clicked to focus).
+    var onFocusGained: (() -> Void)?
 
     // MARK: - Layer Setup
 
@@ -87,6 +89,7 @@ final class GhosttyNSView: NSView {
         let result = super.becomeFirstResponder()
         if result, let surface {
             ghostty_surface_set_focus(surface, true)
+            onFocusGained?()
         }
         return result
     }

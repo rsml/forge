@@ -13,7 +13,13 @@ extension WorkspaceController {
         let renderer: any TerminalRenderer
 
         if let ghosttyApp {
-            renderer = GhosttyRenderer(ghosttyApp: ghosttyApp)
+            let ghosttyRenderer = GhosttyRenderer(ghosttyApp: ghosttyApp)
+            // Click-to-focus: tell tmux which pane is active when the user clicks.
+            ghosttyRenderer.nsView.onFocusGained = { [weak self] in
+                guard let self, let adapter = self.tmux as? TmuxAdapter else { return }
+                adapter.controlModeSend("select-pane -t \(paneId)")
+            }
+            renderer = ghosttyRenderer
         } else {
             let font = resolvedTerminalFont
             let (foreground, background, palette) = resolvedTerminalColors
@@ -126,9 +132,13 @@ extension WorkspaceController {
         for pane in tab.panes where paneRenderers[pane.id] == nil {
             let renderer = createRenderer(for: pane)
             paneRenderers[pane.id] = renderer
-            // No scrollback seeding here — new panes get live %output immediately.
-            // For existing panes on project switch, the %output stream resumes
-            // and the shell redraws on the next keystroke or prompt.
+        }
+
+        // Update cursor focus: only the active pane gets a blinking cursor,
+        // others show an outline (unfocused) cursor.
+        let activePaneId = tab.panes.first(where: \.active)?.id
+        for (id, renderer) in paneRenderers {
+            renderer.setFocused(id == activePaneId)
         }
     }
 

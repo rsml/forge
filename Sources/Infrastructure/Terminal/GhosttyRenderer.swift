@@ -101,6 +101,11 @@ final class GhosttyRenderer: TerminalRenderer {
         feed(Data(content.utf8))
     }
 
+    func setFocused(_ focused: Bool) {
+        guard let surface else { return }
+        ghostty_surface_set_focus(surface, focused)
+    }
+
     func setOccluded(_ occluded: Bool) {
         guard let surface else { return }
         ghostty_surface_set_occlusion(surface, occluded)

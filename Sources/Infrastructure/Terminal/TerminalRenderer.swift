@@ -8,6 +8,7 @@ protocol TerminalRenderer: AnyObject {
     var view: NSView { get }
     func feed(_ data: Data)
     func feedScrollback(_ content: String)
+    func setFocused(_ focused: Bool)
     var onInput: ((Data) -> Void)? { get set }
     var onResize: ((Int, Int) -> Void)? { get set }
 }

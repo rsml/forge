@@ -371,7 +371,7 @@ extension WorkspaceController {
         switch tree {
         case .leaf:
             leafPaneIds.append(currentPaneId)
-        case .split(let direction, let children):
+        case .split(let direction, let children, _):
             var childPaneIds = [currentPaneId]
             for _ in children.dropFirst() {
                 if let newId = await adapter.restoreSplit(targetPane: currentPaneId, direction: direction) {
