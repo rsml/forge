@@ -84,9 +84,16 @@ extension WorkspaceController {
             guard let self, let adapter = self.tmux as? TmuxAdapter else { return }
             ForgeLog.log("[debug] Renderer \(paneId) resize: \(cols)x\(rows)")
 
-            // Set control mode client size so the tmux window is large enough
-            // for all panes. Derive total cols/rows from the terminal area frame
-            // and the cell size (computed from this renderer's grid vs pixel dims).
+            // During divider drag, store pending sizes instead of flooding tmux.
+            if self.suppressPaneResize {
+                self.pendingResizes[paneId] = (cols, rows)
+                return
+            }
+
+            // Ensure the tmux window is large enough for the pane.
+            // refresh-client -C sets the client size (for future windows).
+            // resize-window directly sizes the current window (avoids race
+            // where resize-pane arrives before window recalculates from client).
             let viewFrame = renderer.view.frame
             if cols > 0, rows > 0, viewFrame.width > 0, viewFrame.height > 0 {
                 let cellW = viewFrame.width / CGFloat(cols)
@@ -97,6 +104,7 @@ extension WorkspaceController {
                 let totalCols = max(Int(refWidth / cellW), cols)
                 let totalRows = max(Int(refHeight / cellH), rows)
                 adapter.controlModeSend("refresh-client -C \(totalCols),\(totalRows)")
+                adapter.controlModeSend("resize-window -t \(paneId) -x \(totalCols) -y \(totalRows)")
             }
 
             adapter.controlModeSend("resize-pane -t \(paneId) -x \(cols) -y \(rows)")
@@ -140,6 +148,29 @@ extension WorkspaceController {
         for (id, renderer) in paneRenderers {
             renderer.setFocused(id == activePaneId)
         }
+    }
+
+    /// Send stored resize commands after a divider drag ends.
+    func flushPendingResizes() {
+        guard !pendingResizes.isEmpty, let adapter = tmux as? TmuxAdapter else { return }
+        // Compute total window size from any pane's cell metrics
+        if let (firstId, firstSize) = pendingResizes.first,
+           let renderer = paneRenderers[firstId] {
+            let frame = renderer.view.frame
+            if firstSize.cols > 0, firstSize.rows > 0, frame.width > 0, frame.height > 0 {
+                let cellW = frame.width / CGFloat(firstSize.cols)
+                let cellH = frame.height / CGFloat(firstSize.rows)
+                let ref = terminalAreaSize.width > 0 ? terminalAreaSize : frame.size
+                let totalCols = max(Int(ref.width / cellW), firstSize.cols)
+                let totalRows = max(Int(ref.height / cellH), firstSize.rows)
+                adapter.controlModeSend("refresh-client -C \(totalCols),\(totalRows)")
+                adapter.controlModeSend("resize-window -t \(firstId) -x \(totalCols) -y \(totalRows)")
+            }
+        }
+        for (paneId, size) in pendingResizes {
+            adapter.controlModeSend("resize-pane -t \(paneId) -x \(size.cols) -y \(size.rows)")
+        }
+        pendingResizes.removeAll()
     }
 
     // MARK: - Private Helpers

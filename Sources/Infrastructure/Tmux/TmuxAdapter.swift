@@ -145,6 +145,18 @@ final class TmuxAdapter: TmuxQueryPort, TmuxCommandPort, TmuxControlPort {
         controlMode.stop()
     }
 
+    /// Detach all existing tmux clients before starting a fresh control mode session.
+    /// Stale clients (from previous ForgeTerminalView attach or old control mode)
+    /// constrain window sizes via the `window-size` option.
+    func detachAllClients() async {
+        guard let output = await runner.run("list-clients", "-F", "#{client_name}") else { return }
+        for line in output.split(separator: "\n") {
+            let name = line.trimmingCharacters(in: .whitespaces)
+            guard !name.isEmpty else { continue }
+            _ = await runner.run("detach-client", "-t", name)
+        }
+    }
+
     // MARK: - Control Mode Pass-Through
 
     /// Direct pass-through to control mode for sub-ms latency commands (send-keys, resize-pane).

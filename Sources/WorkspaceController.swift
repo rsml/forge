@@ -24,6 +24,10 @@ final class WorkspaceController {
     var paneRenderers: [String: any TerminalRenderer] = [:]
     /// Total terminal area frame size (set by TerminalArea via GeometryReader).
     var terminalAreaSize: CGSize = .zero
+    /// When true, onResize handlers store commands instead of sending them.
+    /// Set by PaneSplitView during divider drag to prevent tmux redraws.
+    var suppressPaneResize = false
+    var pendingResizes: [String: (cols: Int, rows: Int)] = [:]
     /// Ghostty app instance for native rendering. Nil when using SwiftTerm fallback.
     var ghosttyApp: GhosttyApp?
 
@@ -72,6 +76,14 @@ final class WorkspaceController {
             uiState.restore(workspace: workspace, tmux: tmux)
             let allUUIDs = Set(workspace.projects.flatMap { $0.tabs.map(\.uuid) })
             attentionManager?.pruneStaleHiddenEntries(validUUIDs: allUUIDs)
+
+            // Detach stale tmux clients before starting control mode.
+            // Old clients (from previous sessions or ForgeTerminalView attach)
+            // constrain window sizes via window-size option, preventing
+            // panes from expanding to the full renderer width.
+            if let adapter = tmux as? TmuxAdapter {
+                await adapter.detachAllClients()
+            }
 
             if workspace.projects.isEmpty {
                 expectingDisconnect = true

@@ -41,11 +41,10 @@ private struct SplitContainer: View {
     let tmuxProportions: [CGFloat]
     let panes: ArraySlice<Pane>
     let renderers: [String: any TerminalRenderer]
+    @Environment(WorkspaceController.self) private var controller
 
     @State private var proportions: [CGFloat]
     @State private var dragStartProportions: [CGFloat]?
-    @State private var isDragging = false
-    @State private var dragEndTime: Date?
 
     private let dividerSize: CGFloat = 8
     private let minProportion: CGFloat = 0.05
@@ -98,13 +97,11 @@ private struct SplitContainer: View {
                 }
             }
         }
-        .onChange(of: tmuxProportions) { _, newProportions in
-            if isDragging { return }
-            // Cooldown: ignore tmux updates for 1s after drag ends so the
-            // resize-pane command can propagate and tmux's layout can settle.
-            if let endTime = dragEndTime, Date().timeIntervalSince(endTime) < 1.0 { return }
-            proportions = newProportions
-        }
+        // No onChange: local proportions are authoritative.
+        // tmux is told to match via resize-pane, but its layout response
+        // (which rounds to cell boundaries) never overwrites local state.
+        // Proportions reinitialize from tmux only when the tree structure
+        // changes (pane added/removed), which recreates this view.
     }
 
     // MARK: - Drag Handling
@@ -112,7 +109,7 @@ private struct SplitContainer: View {
     private func handleDrag(at index: Int, delta: CGFloat, available: CGFloat) {
         if dragStartProportions == nil {
             dragStartProportions = proportions
-            isDragging = true
+            controller.suppressPaneResize = true
         }
         guard let start = dragStartProportions else { return }
         let proportionDelta = delta / available
@@ -125,8 +122,8 @@ private struct SplitContainer: View {
 
     private func endDrag() {
         dragStartProportions = nil
-        isDragging = false
-        dragEndTime = Date()
+        controller.suppressPaneResize = false
+        controller.flushPendingResizes()
     }
 
     // MARK: - Pane Distribution
