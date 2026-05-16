@@ -11,7 +11,8 @@ struct TerminalArea: View {
             PaneTerminalView(renderer: renderer)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .ignoresSafeArea(edges: [.bottom, .trailing])
-                .id(renderer.view) // recreate when renderer changes
+                .id(ObjectIdentifier(renderer))
+                .border(Color.blue.opacity(0.5), width: 1) // DEBUG: ghostty renderer active
                 .background(Color(red: 0.1, green: 0.1, blue: 0.1))
         } else {
             // Legacy path: tmux attach rendered by SwiftTerm LocalProcessTerminalView
