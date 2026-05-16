@@ -61,6 +61,9 @@ final class WorkspaceController {
                         self.sendAttentionNotification(tabUUID: tabUUID)
                     }
                 }
+                // Sync renderers with current pane state — creates renderers for
+                // new panes (splits), removes stale ones (closed panes).
+                self.updateRenderers()
             }
             await syncEngine.refresh()
             uiState.seedRecentDirectories(from: workspace)

@@ -110,15 +110,9 @@ extension WorkspaceController {
         for pane in tab.panes where paneRenderers[pane.id] == nil {
             let renderer = createRenderer(for: pane)
             paneRenderers[pane.id] = renderer
-
-            // Seed scrollback for new renderers
-            let paneId = pane.id
-            Task {
-                if let content = await tmux.capturePaneContent(id: paneId, lastN: 2000),
-                   !content.isEmpty {
-                    renderer.feedScrollback(content)
-                }
-            }
+            // No scrollback seeding here — new panes get live %output immediately.
+            // For existing panes on project switch, the %output stream resumes
+            // and the shell redraws on the next keystroke or prompt.
         }
     }
 
