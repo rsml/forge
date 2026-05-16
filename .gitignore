@@ -7,3 +7,7 @@ DerivedData/
 .tmux-build/
 .worktrees/
 .superpowers/
+GhosttyKit.xcframework
+vendor/ghostty/zig-out/
+vendor/ghostty/zig-cache/
+vendor/ghostty/.zig-cache/
