@@ -35,10 +35,6 @@ final class SwiftTermRenderer: NSObject, TerminalRenderer, @preconcurrency Termi
         terminalView.feed(text: content)
     }
 
-    func resize(cols: Int, rows: Int) {
-        terminalView.resize(cols: cols, rows: rows)
-    }
-
     // MARK: - TerminalViewDelegate
 
     func send(source: TerminalView, data: ArraySlice<UInt8>) {

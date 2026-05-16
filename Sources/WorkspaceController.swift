@@ -2,7 +2,6 @@ import AppKit
 import Foundation
 import Observation
 import ForgeCore
-import SwiftTerm
 
 /// Orchestrates domain state, routes events, delegates commands to ports.
 /// Views consume this via @Environment. Action methods live in WorkspaceController+Actions.
@@ -22,7 +21,7 @@ final class WorkspaceController {
     var expectingDisconnect = false
     let outputRouter = OutputRouter()
     /// Currently active renderer for native pane rendering. Triggers SwiftUI updates.
-    var activeRenderer: SwiftTermRenderer?
+    var activeRenderer: (any TerminalRenderer)?
 
     var gitBranch: String? { syncEngine.gitBranch }
 

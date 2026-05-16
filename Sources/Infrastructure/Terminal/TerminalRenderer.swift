@@ -8,5 +8,6 @@ protocol TerminalRenderer: AnyObject {
     var view: NSView { get }
     func feed(_ data: Data)
     func feedScrollback(_ content: String)
-    func resize(cols: Int, rows: Int)
+    var onInput: ((Data) -> Void)? { get set }
+    var onResize: ((Int, Int) -> Void)? { get set }
 }

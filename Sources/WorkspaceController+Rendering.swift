@@ -7,7 +7,9 @@ extension WorkspaceController {
 
     /// Creates a SwiftTermRenderer for the given pane, wires input/resize callbacks,
     /// and registers it with the output router.
-    func createRenderer(for paneId: String) -> SwiftTermRenderer {
+    /// Do NOT pre-resize or feed data — SwiftTerm calculates its own dimensions
+    /// from the view frame when laid out, then sizeChanged fires, then we resize tmux.
+    func createRenderer(for pane: Pane) -> any TerminalRenderer {
         let font = resolvedTerminalFont
         let (foreground, background, palette) = resolvedTerminalColors
 
@@ -18,6 +20,8 @@ extension WorkspaceController {
             colors: palette
         )
 
+        let paneId = pane.id
+
         // Wire keyboard input to tmux via control mode (sub-ms latency)
         renderer.onInput = { [weak self] data in
             guard let self, let adapter = self.tmux as? TmuxAdapter else { return }
@@ -25,9 +29,12 @@ extension WorkspaceController {
             adapter.controlModeSend("send-keys -H -t \(paneId) \(hex)")
         }
 
-        // Wire resize to tmux via control mode
+        // Wire resize to tmux — fires when SwiftTerm calculates cols/rows from frame.
+        // This is the critical path: SwiftTerm determines the real terminal size,
+        // we tell tmux, tmux redraws output at the correct width.
         renderer.onResize = { [weak self] cols, rows in
             guard let self, let adapter = self.tmux as? TmuxAdapter else { return }
+            ForgeLog.log("[debug] Renderer \(paneId) resize: \(cols)x\(rows)")
             adapter.controlModeSend("resize-pane -t \(paneId) -x \(cols) -y \(rows)")
         }
 
@@ -55,19 +62,13 @@ extension WorkspaceController {
             return
         }
 
-        let renderer = createRenderer(for: pane.id)
+        let renderer = createRenderer(for: pane)
         activeRenderer = renderer
-
-        // Seed scrollback from tmux capture
-        Task {
-            if let content = await tmux.capturePaneContent(id: pane.id, lastN: 2000),
-               !content.isEmpty {
-                renderer.feedScrollback(content)
-            }
-        }
+        // Scrollback seeding deferred — SwiftTerm needs to be laid out first
+        // so cols/rows are correct. TODO: seed after first sizeChanged callback.
     }
 
-    /// Seeds renderers for all panes in the active project after initial connect.
+    /// Creates renderers for panes in the active project after initial connect.
     func seedActiveRenderers() {
         guard let project = workspace.activeProject,
               let tabId = workspace.activeTabId,
@@ -75,15 +76,8 @@ extension WorkspaceController {
               let pane = tab.panes.first(where: { $0.active }) ?? tab.panes.first
         else { return }
 
-        let renderer = createRenderer(for: pane.id)
+        let renderer = createRenderer(for: pane)
         activeRenderer = renderer
-
-        Task {
-            if let content = await tmux.capturePaneContent(id: pane.id, lastN: 2000),
-               !content.isEmpty {
-                renderer.feedScrollback(content)
-            }
-        }
     }
 
     // MARK: - Private Helpers
