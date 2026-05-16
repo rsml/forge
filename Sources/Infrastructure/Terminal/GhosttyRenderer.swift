@@ -58,6 +58,12 @@ final class GhosttyRenderer: TerminalRenderer {
             self?.onResize?(cols, rows)
         }
 
+        // Wire keyboard input: bypass ghostty's key encoder (Kitty protocol),
+        // send raw terminal bytes directly to tmux
+        nsView.onKeyInput = { [weak self] data in
+            self?.onInput?(data)
+        }
+
         if let surface {
             ghostty_surface_set_content_scale(surface, 2.0, 2.0)
             ForgeLog.log("[ghostty] Surface created successfully")

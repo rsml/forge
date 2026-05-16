@@ -100,64 +100,95 @@ final class GhosttyNSView: NSView {
     }
 
     // MARK: - Keyboard Input
+    //
+    // We bypass ghostty's key encoder (ghostty_surface_key) entirely.
+    // Ghostty uses Kitty keyboard protocol which encodes Ctrl+C as ESC[3;5u —
+    // tmux's shell doesn't expect that. Instead, we convert NSEvent → raw
+    // terminal bytes and send directly to tmux via onKeyInput.
+
+    /// Callback for raw terminal bytes from keyboard input.
+    /// Wired by GhosttyRenderer to send to tmux via send-keys -H.
+    var onKeyInput: ((Data) -> Void)?
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard event.type == .keyDown else { return false }
-        guard let surface else { return false }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        guard flags.contains(.command) || flags.contains(.control) else { return false }
-        let keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
-        let isBinding = ghostty_surface_key_is_binding(surface, keyEvent, nil)
-        if isBinding {
-            _ = ghostty_surface_key(surface, keyEvent)
+        // Let Cmd+key propagate to Forge's menu/shortcuts
+        if flags.contains(.command) { return false }
+        // Ctrl+key: handle ourselves
+        if flags.contains(.control) {
+            sendKeyEvent(event)
             return true
         }
         return false
     }
 
     override func keyDown(with event: NSEvent) {
-        guard let surface else { return }
-        var keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
-        if let text = event.characters, !text.isEmpty {
-            text.withCString { ptr in
-                keyEvent.text = ptr
-                _ = ghostty_surface_key(surface, keyEvent)
-            }
-        } else {
-            _ = ghostty_surface_key(surface, keyEvent)
-        }
+        sendKeyEvent(event)
     }
 
     override func keyUp(with event: NSEvent) {
-        guard let surface else { return }
-        let keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_RELEASE)
-        _ = ghostty_surface_key(surface, keyEvent)
+        // No action needed — tmux doesn't use key-up events
     }
 
     override func flagsChanged(with event: NSEvent) {
-        guard let surface else { return }
-        var keyEvent = ghostty_input_key_s()
-        keyEvent.action = GHOSTTY_ACTION_PRESS
-        keyEvent.keycode = UInt32(event.keyCode)
-        keyEvent.mods = modsFromFlags(event.modifierFlags)
-        keyEvent.consumed_mods = GHOSTTY_MODS_NONE
-        keyEvent.text = nil
-        keyEvent.composing = false
-        keyEvent.unshifted_codepoint = 0
-        _ = ghostty_surface_key(surface, keyEvent)
+        // No action needed — modifier-only events don't produce terminal bytes
     }
 
-    // MARK: - Text Input (NSResponder override for committed text)
-
     override func insertText(_ insertString: Any) {
-        guard let surface else { return }
+        // Called by the input manager for composed text (e.g., accented characters)
         let text: String
         if let s = insertString as? String { text = s }
         else if let s = insertString as? NSAttributedString { text = s.string }
         else { return }
         guard !text.isEmpty else { return }
-        text.withCString { ptr in
-            ghostty_surface_text(surface, ptr, UInt(text.utf8.count))
+        onKeyInput?(Data(text.utf8))
+    }
+
+    private func sendKeyEvent(_ event: NSEvent) {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+        // Ctrl+key → control byte (0x01-0x1A)
+        if flags.contains(.control), let chars = event.charactersIgnoringModifiers, let scalar = chars.unicodeScalars.first {
+            let code = scalar.value
+            if code >= UInt32(Character("a").asciiValue!), code <= UInt32(Character("z").asciiValue!) {
+                let controlByte = UInt8(code - UInt32(Character("a").asciiValue!) + 1)
+                onKeyInput?(Data([controlByte]))
+                return
+            }
+            // Ctrl+[ = ESC, Ctrl+] = 0x1D, Ctrl+\ = 0x1C, etc.
+            switch scalar {
+            case "[": onKeyInput?(Data([0x1B])); return
+            case "]": onKeyInput?(Data([0x1D])); return
+            case "\\": onKeyInput?(Data([0x1C])); return
+            case "^": onKeyInput?(Data([0x1E])); return
+            case "_": onKeyInput?(Data([0x1F])); return
+            case "@": onKeyInput?(Data([0x00])); return
+            default: break
+            }
+        }
+
+        // Special keys → VT escape sequences
+        switch Int(event.keyCode) {
+        case 126: onKeyInput?(Data([0x1B, 0x5B, 0x41])); return // Up
+        case 125: onKeyInput?(Data([0x1B, 0x5B, 0x42])); return // Down
+        case 124: onKeyInput?(Data([0x1B, 0x5B, 0x43])); return // Right
+        case 123: onKeyInput?(Data([0x1B, 0x5B, 0x44])); return // Left
+        case 115: onKeyInput?(Data([0x1B, 0x5B, 0x48])); return // Home
+        case 119: onKeyInput?(Data([0x1B, 0x5B, 0x46])); return // End
+        case 116: onKeyInput?(Data([0x1B, 0x5B, 0x35, 0x7E])); return // PageUp
+        case 121: onKeyInput?(Data([0x1B, 0x5B, 0x36, 0x7E])); return // PageDown
+        case 117: onKeyInput?(Data([0x1B, 0x5B, 0x33, 0x7E])); return // Delete (forward)
+        case 51: onKeyInput?(Data([0x7F])); return // Backspace
+        case 36: onKeyInput?(Data([0x0D])); return // Return
+        case 48: onKeyInput?(Data([0x09])); return // Tab
+        case 53: onKeyInput?(Data([0x1B])); return // Escape
+        default: break
+        }
+
+        // Regular characters → UTF-8
+        if let text = event.characters, !text.isEmpty {
+            onKeyInput?(Data(text.utf8))
         }
     }
 
