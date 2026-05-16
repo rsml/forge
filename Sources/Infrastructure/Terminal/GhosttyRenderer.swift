@@ -15,7 +15,7 @@ final class GhosttyRenderer: TerminalRenderer {
     var onResize: ((Int, Int) -> Void)?
     /// Debounce resize to avoid sending intermediate sizes during SwiftUI layout.
     private var pendingResize: DispatchWorkItem?
-    private var lastReportedSize: (cols: Int, rows: Int)?
+    var lastReportedSize: (cols: Int, rows: Int)?
 
     var view: NSView { nsView }
 
@@ -104,6 +104,19 @@ final class GhosttyRenderer: TerminalRenderer {
     func setFocused(_ focused: Bool) {
         guard let surface else { return }
         ghostty_surface_set_focus(surface, focused)
+    }
+
+    /// Exact cell size in points from ghostty's font metrics.
+    /// This is the authoritative cell size — not derived from frame/cols math.
+    var exactCellSize: CGSize {
+        guard let surface else { return .zero }
+        let s = ghostty_surface_size(surface)
+        guard s.cell_width_px > 0, s.cell_height_px > 0 else { return .zero }
+        let scale = nsView.window?.backingScaleFactor ?? 2.0
+        return CGSize(
+            width: CGFloat(s.cell_width_px) / scale,
+            height: CGFloat(s.cell_height_px) / scale
+        )
     }
 
     func setOccluded(_ occluded: Bool) {

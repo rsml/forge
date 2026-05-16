@@ -81,14 +81,12 @@ final class WorkspaceController {
             }
             await syncEngine.refresh()
             uiState.seedRecentDirectories(from: workspace)
-            uiState.restore(workspace: workspace, tmux: tmux)
             let allUUIDs = Set(workspace.projects.flatMap { $0.tabs.map(\.uuid) })
             attentionManager?.pruneStaleHiddenEntries(validUUIDs: allUUIDs)
 
-            // Detach stale tmux clients before starting control mode.
-            // Old clients (from previous sessions or ForgeTerminalView attach)
-            // constrain window sizes via window-size option, preventing
-            // panes from expanding to the full renderer width.
+            // Detach stale clients BEFORE starting control mode.
+            // Must happen before any controlModeSend calls (including
+            // uiState.restore which sends select-tab/switch-client).
             if let adapter = tmux as? TmuxAdapter {
                 await adapter.detachAllClients()
             }
@@ -98,6 +96,9 @@ final class WorkspaceController {
             } else {
                 startControlMode()
             }
+
+            // Restore UI state AFTER control mode is running so commands aren't dropped.
+            uiState.restore(workspace: workspace, tmux: tmux)
 
             NotificationCenter.default.addObserver(
                 forName: .forgeNavigateToTab, object: nil, queue: .main
@@ -142,6 +143,7 @@ final class WorkspaceController {
         var outputHandler: (@Sendable (String, Data) -> Void)?
         if config.isNativePaneRendering {
             outputHandler = { [weak self] paneId, data in
+                ForgeLog.log("[debug] %output \(paneId): \(data.count) bytes")
                 Task { @MainActor in
                     self?.outputRouter.route(paneId: paneId, data: data)
                 }

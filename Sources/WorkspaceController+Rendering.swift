@@ -70,10 +70,12 @@ extension WorkspaceController {
             }
 
             // Printable text → send-keys -l (literal, proper PTY handling)
+            // Must be quoted — bare spaces/special chars are stripped by tmux's parser.
             if let text = String(data: data, encoding: .utf8) {
-                // Escape semicolons and other tmux-special chars in literal mode
-                let escaped = text.replacingOccurrences(of: ";", with: "\\;")
-                adapter.controlModeSend("send-keys -l -t \(paneId) \(escaped)")
+                var escaped = text.replacingOccurrences(of: "\\", with: "\\\\")
+                escaped = escaped.replacingOccurrences(of: "\"", with: "\\\"")
+                escaped = escaped.replacingOccurrences(of: ";", with: "\\;")
+                adapter.controlModeSend("send-keys -l -t \(paneId) \"\(escaped)\"")
             }
         }
 
@@ -84,15 +86,16 @@ extension WorkspaceController {
             guard let self, let adapter = self.tmux as? TmuxAdapter else { return }
             ForgeLog.log("[debug] Renderer \(paneId) resize: \(cols)x\(rows)")
 
-            // Compute cell size (once) — used by PaneSplitView dividers so
-            // SwiftUI's pixel layout matches tmux's cell-based layout exactly.
-            let viewFrame = renderer.view.frame
-            if self.terminalCellSize == .zero, cols > 0, rows > 0,
-               viewFrame.width > 0, viewFrame.height > 0 {
-                self.terminalCellSize = CGSize(
-                    width: viewFrame.width / CGFloat(cols),
-                    height: viewFrame.height / CGFloat(rows)
-                )
+            // Get exact cell size from ghostty's font metrics (once).
+            // This is authoritative — not derived from frame/cols math,
+            // which varies per pane due to integer truncation.
+            if self.terminalCellSize == .zero,
+               let ghostty = renderer as? GhosttyRenderer {
+                let exact = ghostty.exactCellSize
+                if exact.width > 0, exact.height > 0 {
+                    self.terminalCellSize = exact
+                    ForgeLog.log("[debug] Cell size from ghostty: \(exact.width)x\(exact.height)")
+                }
             }
 
             // Store every pane's latest size and schedule a batched flush.
@@ -156,25 +159,32 @@ extension WorkspaceController {
     /// resize-window first (sets total), then resize-pane for each pane.
     func flushPendingResizes() {
         guard !pendingResizes.isEmpty, let adapter = tmux as? TmuxAdapter else { return }
+        ForgeLog.log("[debug] Flushing \(pendingResizes.count) pending resizes (cellSize=\(terminalCellSize))")
 
-        // Compute total window size from any pane's cell metrics
-        if let (firstId, firstSize) = pendingResizes.first,
+        // Compute total window size. Prefer the exact ghostty cell size;
+        // fall back to deriving from any pane's frame/cols if not yet available.
+        var cellW = terminalCellSize.width
+        var cellH = terminalCellSize.height
+        if cellW <= 0 || cellH <= 0, let (firstId, firstSize) = pendingResizes.first,
            let renderer = paneRenderers[firstId] {
             let frame = renderer.view.frame
             if firstSize.cols > 0, firstSize.rows > 0, frame.width > 0, frame.height > 0 {
-                let cellW = frame.width / CGFloat(firstSize.cols)
-                let cellH = frame.height / CGFloat(firstSize.rows)
-                let ref = terminalAreaSize.width > 0 ? terminalAreaSize : frame.size
-                let totalCols = max(Int(ref.width / cellW), firstSize.cols)
-                let totalRows = max(Int(ref.height / cellH), firstSize.rows)
-                adapter.controlModeSend("refresh-client -C \(totalCols),\(totalRows)")
-                // Toggle window size to force tmux to redraw all panes.
-                // If the window is already the target size, resize-window is a
-                // no-op and tmux won't send %output. The +1/-1 toggle guarantees
-                // a real resize → tmux redraws → %output populates all surfaces.
-                adapter.controlModeSend("resize-window -t \(firstId) -x \(totalCols + 1) -y \(totalRows)")
-                adapter.controlModeSend("resize-window -t \(firstId) -x \(totalCols) -y \(totalRows)")
+                cellW = frame.width / CGFloat(firstSize.cols)
+                cellH = frame.height / CGFloat(firstSize.rows)
             }
+        }
+        let area = terminalAreaSize
+        if let firstId = pendingResizes.keys.first,
+           cellW > 0, cellH > 0, area.width > 0, area.height > 0 {
+            let totalCols = Int(area.width / cellW)
+            let totalRows = Int(area.height / cellH)
+            adapter.controlModeSend("refresh-client -C \(totalCols)x\(totalRows)")
+            // Toggle window size to force tmux to redraw all panes.
+            // If the window is already the target size, resize-window is a
+            // no-op and tmux won't send %output. The +1/-1 toggle guarantees
+            // a real resize → tmux redraws → %output populates all surfaces.
+            adapter.controlModeSend("resize-window -t \(firstId) -x \(totalCols + 1) -y \(totalRows)")
+            adapter.controlModeSend("resize-window -t \(firstId) -x \(totalCols) -y \(totalRows)")
         }
 
         // Only send resize-pane after drag (user explicitly set proportions).

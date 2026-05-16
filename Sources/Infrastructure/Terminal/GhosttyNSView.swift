@@ -115,6 +115,9 @@ final class GhosttyNSView: NSView {
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard event.type == .keyDown else { return false }
+        // performKeyEquivalent traverses the view hierarchy, not the responder
+        // chain. Only the focused pane (first responder) should handle keys.
+        guard window?.firstResponder === self else { return false }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         // Let Cmd+key propagate to Forge's menu/shortcuts
         if flags.contains(.command) { return false }

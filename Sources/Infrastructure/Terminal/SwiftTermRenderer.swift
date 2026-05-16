@@ -39,6 +39,12 @@ final class SwiftTermRenderer: NSObject, TerminalRenderer, @preconcurrency Termi
         // SwiftTerm doesn't have a cursor focus API — no-op.
     }
 
+    /// Current grid dimensions reported by the terminal emulator.
+    var lastReportedSize: (cols: Int, rows: Int)? {
+        let t = terminalView.getTerminal()
+        return t.cols > 0 && t.rows > 0 ? (t.cols, t.rows) : nil
+    }
+
     // MARK: - TerminalViewDelegate
 
     func send(source: TerminalView, data: ArraySlice<UInt8>) {

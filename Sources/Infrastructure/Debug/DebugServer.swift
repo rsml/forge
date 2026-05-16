@@ -12,6 +12,7 @@ import ForgeCore
 ///   POST /action        — execute an action (body: {"action": "...", "args": {...}})
 ///   GET  /logs          — recent log lines
 ///   GET  /ping          — health check
+///   GET  /pane-sizes    — sizing diagnostics: tmux pane dims, ghostty surface grid, SwiftUI frame, cell size
 @MainActor
 final class DebugServer {
     private var listener: NWListener?
@@ -158,6 +159,9 @@ final class DebugServer {
 
         case ("POST", "/action"):
             return await actionResponse(body: body)
+
+        case ("GET", "/pane-sizes"):
+            return paneSizesResponse()
 
         case ("GET", "/titlebar"):
             return titlebarResponse()

@@ -217,6 +217,91 @@ extension DebugServer {
         return jsonResponse(dump)
     }
 
+    func paneSizesResponse() -> HTTPResponse {
+        guard let ctrl = controller else {
+            return jsonResponse(["error": "No controller"])
+        }
+
+        let ws = ctrl.workspace
+
+        // Collect per-pane sizing info across all panes in the active tab.
+        var paneEntries: [[String: Any]] = []
+        let activePanes: [Pane] = ws.activeProject.flatMap { project in
+            project.tabs.first(where: { $0.id == ws.activeTabId })?.panes
+        } ?? []
+
+        for pane in activePanes {
+            var entry: [String: Any] = [
+                "paneId": pane.id,
+                "tmux": [
+                    "cols": pane.width,
+                    "rows": pane.height
+                ]
+            ]
+
+            if let renderer = ctrl.paneRenderers[pane.id] {
+                let frame = renderer.view.frame
+                entry["swiftUIFrame"] = [
+                    "width": frame.width,
+                    "height": frame.height
+                ]
+
+                // Grid from the renderer's last reported resize (ghostty surface or SwiftTerm).
+                let gridSize: (cols: Int, rows: Int)?
+                if let ghostty = renderer as? GhosttyRenderer {
+                    gridSize = ghostty.lastReportedSize
+                } else if let swiftTerm = renderer as? SwiftTermRenderer {
+                    gridSize = swiftTerm.lastReportedSize
+                } else {
+                    gridSize = nil
+                }
+
+                if let grid = gridSize {
+                    entry["rendererGrid"] = ["cols": grid.cols, "rows": grid.rows]
+                    if grid.cols > 0, grid.rows > 0, frame.width > 0, frame.height > 0 {
+                        entry["computedCellSize"] = [
+                            "width": frame.width / CGFloat(grid.cols),
+                            "height": frame.height / CGFloat(grid.rows)
+                        ]
+                    }
+                } else {
+                    entry["rendererGrid"] = "not yet reported"
+                }
+
+                // Mismatch flag — makes it easy to grep the JSON output.
+                if let grid = gridSize {
+                    entry["mismatch"] = grid.cols != pane.width || grid.rows != pane.height
+                }
+            } else {
+                entry["renderer"] = "none"
+            }
+
+            paneEntries.append(entry)
+        }
+
+        var result: [String: Any] = [
+            "panes": paneEntries,
+            "terminalAreaSize": [
+                "width": ctrl.terminalAreaSize.width,
+                "height": ctrl.terminalAreaSize.height
+            ],
+            "terminalCellSize": [
+                "width": ctrl.terminalCellSize.width,
+                "height": ctrl.terminalCellSize.height
+            ],
+            "activeProjectId": ws.activeProjectId ?? "",
+            "activeTabId": ws.activeTabId ?? ""
+        ]
+
+        // Summary: are all panes matched?
+        let mismatches = paneEntries.filter { ($0["mismatch"] as? Bool) == true }
+        result["summary"] = mismatches.isEmpty
+            ? "ok — all renderer grids match tmux pane dimensions"
+            : "\(mismatches.count) pane(s) have renderer/tmux dimension mismatch"
+
+        return jsonResponse(result)
+    }
+
     func logsResponse() -> HTTPResponse {
         let path = ForgeLog.logFile
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),

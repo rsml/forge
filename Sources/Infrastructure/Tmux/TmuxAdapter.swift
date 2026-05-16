@@ -13,7 +13,7 @@ final class TmuxAdapter: TmuxQueryPort, TmuxCommandPort, TmuxControlPort {
         configPath: runner.configPath
     )
 
-    /// Set before starting control mode to skip `refresh-client -C 1,1` for native rendering.
+    /// Set before starting control mode to skip `refresh-client -C 1x1` for native rendering.
     var nativeRendering: Bool {
         get { controlMode.nativeRendering }
         set { controlMode.nativeRendering = newValue }

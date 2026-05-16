@@ -19,7 +19,7 @@ final class TmuxControlMode: @unchecked Sendable {
     private var wasDisconnected = false
     private let maxRetries = 5
     private let lock = NSLock()
-    /// When true, skips `refresh-client -C 1,1` (no tmux-rendered view to constrain).
+    /// When true, skips `refresh-client -C 1x1` (no tmux-rendered view to constrain).
     var nativeRendering = false
 
     init(tmuxPath: String, socketName: String = "forge", configPath: String? = nil) {
@@ -115,7 +115,7 @@ final class TmuxControlMode: @unchecked Sendable {
         // Subscribe to silence flags for push-based idle detection.
         var initCommands: [String] = []
         if !nativeRendering {
-            initCommands.append("refresh-client -C 1,1")
+            initCommands.append("refresh-client -C 1x1")
         }
         initCommands.append("refresh-client -B \"silence:@*:#{window_silence_flag}\"")
         for cmd in initCommands {
