@@ -5,22 +5,25 @@ import ForgeCore
 /// Native pane rendering: renderer creation, lifecycle, and scrollback seeding.
 extension WorkspaceController {
 
-    /// Creates a SwiftTermRenderer for the given pane, wires input/resize callbacks,
+    /// Creates a renderer for the given pane, wires input/resize callbacks,
     /// and registers it with the output router.
-    /// Do NOT pre-resize or feed data — SwiftTerm calculates its own dimensions
-    /// from the view frame when laid out, then sizeChanged fires, then we resize tmux.
+    /// Uses GhosttyRenderer when ghosttyApp is available, falls back to SwiftTermRenderer.
     func createRenderer(for pane: Pane) -> any TerminalRenderer {
-        let font = resolvedTerminalFont
-        let (foreground, background, palette) = resolvedTerminalColors
-
-        let renderer = SwiftTermRenderer(
-            font: font,
-            foreground: foreground,
-            background: background,
-            colors: palette
-        )
-
         let paneId = pane.id
+        let renderer: any TerminalRenderer
+
+        if let ghosttyApp {
+            renderer = GhosttyRenderer(ghosttyApp: ghosttyApp)
+        } else {
+            let font = resolvedTerminalFont
+            let (foreground, background, palette) = resolvedTerminalColors
+            renderer = SwiftTermRenderer(
+                font: font,
+                foreground: foreground,
+                background: background,
+                colors: palette
+            )
+        }
 
         // Wire keyboard input to tmux via control mode (sub-ms latency)
         renderer.onInput = { [weak self] data in
@@ -29,8 +32,8 @@ extension WorkspaceController {
             adapter.controlModeSend("send-keys -H -t \(paneId) \(hex)")
         }
 
-        // Wire resize to tmux — fires when SwiftTerm calculates cols/rows from frame.
-        // This is the critical path: SwiftTerm determines the real terminal size,
+        // Wire resize to tmux — fires when the renderer calculates cols/rows from frame.
+        // This is the critical path: the renderer determines the real terminal size,
         // we tell tmux, tmux redraws output at the correct width.
         renderer.onResize = { [weak self] cols, rows in
             guard let self, let adapter = self.tmux as? TmuxAdapter else { return }

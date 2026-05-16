@@ -62,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let commandRegistry = CommandRegistry()
     let modifierKeyMonitor = ModifierKeyMonitor()
     private(set) var attentionManager: AttentionManager!
+    private(set) var ghosttyApp: GhosttyApp?
     private let debugServer = DebugServer()
     private var mainWindow: NSWindow?
     private var titleBarManager: TitleBarManager?
@@ -81,6 +82,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         attentionManager = AttentionManager(notifier: notifier, config: configStore)
         controller.attentionManager = attentionManager
         controller.notifier = notifier
+
+        if configStore.isNativePaneRendering {
+            ghosttyApp = GhosttyApp()
+        }
+        controller.ghosttyApp = ghosttyApp
 
         createMainWindow()
         appState.bind(

@@ -22,6 +22,8 @@ final class WorkspaceController {
     let outputRouter = OutputRouter()
     /// Currently active renderer for native pane rendering. Triggers SwiftUI updates.
     var activeRenderer: (any TerminalRenderer)?
+    /// Ghostty app instance for native rendering. Nil when using SwiftTerm fallback.
+    var ghosttyApp: GhosttyApp?
 
     var gitBranch: String? { syncEngine.gitBranch }
 
