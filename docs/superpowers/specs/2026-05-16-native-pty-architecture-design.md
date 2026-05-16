@@ -205,7 +205,7 @@ For crash recovery (no scrollback dump): surfaces start blank, but SIGWINCH caus
 
 ### Workspace Persistence
 
-Saved to `~/.config/forge/workspace.json` on structural changes:
+Saved to `~/.config/forge/workspace.json` on every structural change (add/remove/rename project/tab/pane, split ratio change, active selection change). Written continuously, not just on quit — so crash-staleness is minimal (at most the last few seconds of changes):
 
 ```json
 {
