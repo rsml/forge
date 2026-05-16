@@ -84,49 +84,42 @@ extension WorkspaceController {
         return renderer
     }
 
-    /// Updates the active renderer when the active project/tab/pane changes.
-    /// For Phase 2, only renders the first pane of the active tab.
-    func updateActiveRenderer() {
+    /// Synchronizes renderers with the active tab's panes.
+    /// Creates renderers for new panes, removes stale ones.
+    func updateRenderers() {
         guard config.isNativePaneRendering else { return }
 
         guard let project = workspace.activeProject,
               let tabId = workspace.activeTabId,
-              let tab = project.tabs.first(where: { $0.id == tabId }),
-              let pane = tab.panes.first(where: { $0.active }) ?? tab.panes.first
+              let tab = project.tabs.first(where: { $0.id == tabId })
         else {
-            activeRenderer = nil
+            paneRenderers.removeAll()
+            outputRouter.unregisterAll()
             return
         }
 
-        // Already have a renderer for this pane — keep it
-        if let current = activeRenderer,
-           outputRouter.hasRenderer(for: pane.id, matching: current) {
-            return
+        let livePaneIds = Set(tab.panes.map(\.id))
+
+        // Remove stale renderers (panes that no longer exist)
+        for id in paneRenderers.keys where !livePaneIds.contains(id) {
+            paneRenderers.removeValue(forKey: id)
+            outputRouter.unregister(paneId: id)
         }
 
-        let renderer = createRenderer(for: pane)
-        activeRenderer = renderer
+        // Create renderers for new panes
+        for pane in tab.panes where paneRenderers[pane.id] == nil {
+            let renderer = createRenderer(for: pane)
+            paneRenderers[pane.id] = renderer
 
-        // Seed scrollback so the terminal isn't blank on project/tab switch
-        let paneId = pane.id
-        Task {
-            if let content = await tmux.capturePaneContent(id: paneId, lastN: 2000),
-               !content.isEmpty {
-                renderer.feedScrollback(content)
+            // Seed scrollback for new renderers
+            let paneId = pane.id
+            Task {
+                if let content = await tmux.capturePaneContent(id: paneId, lastN: 2000),
+                   !content.isEmpty {
+                    renderer.feedScrollback(content)
+                }
             }
         }
-    }
-
-    /// Creates renderers for panes in the active project after initial connect.
-    func seedActiveRenderers() {
-        guard let project = workspace.activeProject,
-              let tabId = workspace.activeTabId,
-              let tab = project.tabs.first(where: { $0.id == tabId }),
-              let pane = tab.panes.first(where: { $0.active }) ?? tab.panes.first
-        else { return }
-
-        let renderer = createRenderer(for: pane)
-        activeRenderer = renderer
     }
 
     // MARK: - Private Helpers

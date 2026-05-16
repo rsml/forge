@@ -41,14 +41,14 @@ extension WorkspaceController {
 
         Task { await tmux.switchClient(project: project.name) }
         saveUIState()
-        updateActiveRenderer()
+        updateRenderers()
     }
 
     func selectTab(_ tab: Tab) {
         workspace.activeTabId = tab.id
         Task { await tmux.selectTab(id: tab.id) }
         saveUIState()
-        updateActiveRenderer()
+        updateRenderers()
     }
 
     /// Navigate to a specific project + tab in one atomic update.
@@ -62,7 +62,7 @@ extension WorkspaceController {
         Task { await tmux.switchClient(project: project.name) }
         Task { await tmux.selectTab(id: tab.id) }
         saveUIState()
-        updateActiveRenderer()
+        updateRenderers()
     }
 
     /// Switch tmux to a different window without updating workspace state.

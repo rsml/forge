@@ -20,8 +20,8 @@ final class WorkspaceController {
     /// Set before intentionally stopping control mode (e.g. removing last project) to suppress reconnect toast.
     var expectingDisconnect = false
     let outputRouter = OutputRouter()
-    /// Currently active renderer for native pane rendering. Triggers SwiftUI updates.
-    var activeRenderer: (any TerminalRenderer)?
+    /// One renderer per live pane. Keyed by pane ID. Triggers SwiftUI updates.
+    var paneRenderers: [String: any TerminalRenderer] = [:]
     /// Ghostty app instance for native rendering. Nil when using SwiftTerm fallback.
     var ghosttyApp: GhosttyApp?
 
@@ -89,7 +89,7 @@ final class WorkspaceController {
 
             // Seed native renderers for the active project's panes after initial sync
             if config.isNativePaneRendering {
-                seedActiveRenderers()
+                updateRenderers()
             }
 
             syncEngine.start()
