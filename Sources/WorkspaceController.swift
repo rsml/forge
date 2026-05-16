@@ -22,6 +22,8 @@ final class WorkspaceController {
     let outputRouter = OutputRouter()
     /// One renderer per live pane. Keyed by pane ID. Triggers SwiftUI updates.
     var paneRenderers: [String: any TerminalRenderer] = [:]
+    /// Total terminal area frame size (set by TerminalArea via GeometryReader).
+    var terminalAreaSize: CGSize = .zero
     /// Ghostty app instance for native rendering. Nil when using SwiftTerm fallback.
     var ghosttyApp: GhosttyApp?
 

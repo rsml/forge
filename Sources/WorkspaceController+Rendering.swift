@@ -72,11 +72,27 @@ extension WorkspaceController {
         }
 
         // Wire resize to tmux — fires when the renderer calculates cols/rows from frame.
-        // This is the critical path: the renderer determines the real terminal size,
-        // we tell tmux, tmux redraws output at the correct width.
+        // Two-step: first set the control mode client size (so the tmux window is large
+        // enough), then resize the individual pane within that window.
         renderer.onResize = { [weak self] cols, rows in
             guard let self, let adapter = self.tmux as? TmuxAdapter else { return }
             ForgeLog.log("[debug] Renderer \(paneId) resize: \(cols)x\(rows)")
+
+            // Set control mode client size so the tmux window is large enough
+            // for all panes. Derive total cols/rows from the terminal area frame
+            // and the cell size (computed from this renderer's grid vs pixel dims).
+            let viewFrame = renderer.view.frame
+            if cols > 0, rows > 0, viewFrame.width > 0, viewFrame.height > 0 {
+                let cellW = viewFrame.width / CGFloat(cols)
+                let cellH = viewFrame.height / CGFloat(rows)
+                let areaSize = self.terminalAreaSize
+                let refWidth = areaSize.width > 0 ? areaSize.width : viewFrame.width
+                let refHeight = areaSize.height > 0 ? areaSize.height : viewFrame.height
+                let totalCols = max(Int(refWidth / cellW), cols)
+                let totalRows = max(Int(refHeight / cellH), rows)
+                adapter.controlModeSend("refresh-client -C \(totalCols),\(totalRows)")
+            }
+
             adapter.controlModeSend("resize-pane -t \(paneId) -x \(cols) -y \(rows)")
         }
 

@@ -13,6 +13,9 @@ final class GhosttyRenderer: TerminalRenderer {
     nonisolated(unsafe) private var callbackContext: Unmanaged<GhosttyCallbackContext>?
     var onInput: ((Data) -> Void)?
     var onResize: ((Int, Int) -> Void)?
+    /// Debounce resize to avoid sending intermediate sizes during SwiftUI layout.
+    private var pendingResize: DispatchWorkItem?
+    private var lastReportedSize: (cols: Int, rows: Int)?
 
     var view: NSView { nsView }
 
@@ -53,9 +56,19 @@ final class GhosttyRenderer: TerminalRenderer {
         surface = ghostty_surface_new(app, &config)
         nsView.surface = surface
 
-        // Wire resize: GhosttyNSView queries ghostty_surface_size after set_size
+        // Wire resize: debounce to avoid sending intermediate sizes during
+        // SwiftUI layout (e.g. full-width → split-width transition).
         nsView.onSurfaceResize = { [weak self] cols, rows in
-            self?.onResize?(cols, rows)
+            guard let self else { return }
+            if let last = self.lastReportedSize, last.cols == cols, last.rows == rows { return }
+            self.pendingResize?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.lastReportedSize = (cols, rows)
+                self.onResize?(cols, rows)
+            }
+            self.pendingResize = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: work)
         }
 
         // Wire keyboard input: bypass ghostty's key encoder (Kitty protocol),

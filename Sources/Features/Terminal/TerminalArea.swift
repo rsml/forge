@@ -22,20 +22,24 @@ struct TerminalArea: View {
 
     @ViewBuilder
     private func nativeTerminal(tab: ForgeCore.Tab) -> some View {
-        if tab.panes.count > 1, let layout = tab.layout {
-            // Multi-pane: parse layout tree and render split view
-            let tree = LayoutParser.parse(layout)
-            PaneSplitView(node: tree, panes: tab.panes[...], renderers: controller.paneRenderers)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .ignoresSafeArea(edges: [.bottom, .trailing])
-                .background(Color(red: 0.1, green: 0.1, blue: 0.1))
-        } else if let pane = tab.panes.first, let renderer = controller.paneRenderers[pane.id] {
-            // Single pane: direct render
-            PaneTerminalView(renderer: renderer)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .ignoresSafeArea(edges: [.bottom, .trailing])
-                .id(pane.id)
-                .background(Color(red: 0.1, green: 0.1, blue: 0.1))
+        Group {
+            if tab.panes.count > 1, let layout = tab.layout {
+                let tree = LayoutParser.parse(layout)
+                PaneSplitView(node: tree, panes: tab.panes[...], renderers: controller.paneRenderers)
+            } else if let pane = tab.panes.first, let renderer = controller.paneRenderers[pane.id] {
+                PaneTerminalView(renderer: renderer).id(pane.id)
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea(edges: [.bottom, .trailing])
+        .background(Color(red: 0.1, green: 0.1, blue: 0.1))
+        .background(
+            GeometryReader { geo in
+                Color.clear.onChange(of: geo.size) { _, size in
+                    controller.terminalAreaSize = size
+                }
+                .onAppear { controller.terminalAreaSize = geo.size }
+            }
+        )
     }
 }
