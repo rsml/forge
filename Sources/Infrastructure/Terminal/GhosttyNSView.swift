@@ -108,12 +108,17 @@ final class GhosttyNSView: NSView {
 
     // MARK: - Keyboard Input
     //
-    // We bypass ghostty's key encoder (ghostty_surface_key) entirely.
-    // Ghostty uses Kitty keyboard protocol which encodes Ctrl+C as ESC[3;5u —
-    // tmux's shell doesn't expect that. Instead, we convert NSEvent → raw
-    // terminal bytes and send directly to tmux via onKeyInput.
+    // Two modes:
+    //
+    // EXEC mode (execMode == true): Ghostty owns the PTY. Key events are routed
+    // through ghostty_surface_key / ghostty_surface_text so Ghostty's full
+    // encoder (Kitty protocol, bindings, IME) handles them natively.
+    //
+    // MANUAL IO mode (execMode == false): tmux owns the PTY. We bypass
+    // ghostty_surface_key entirely and convert NSEvents to raw terminal bytes,
+    // because tmux's shell doesn't understand Kitty keyboard protocol.
 
-    /// Callback for raw terminal bytes from keyboard input.
+    /// Callback for raw terminal bytes from keyboard input (MANUAL IO mode only).
     /// Wired by GhosttyRenderer to send to tmux via send-keys -H.
     var onKeyInput: ((Data) -> Void)?
 
@@ -125,7 +130,18 @@ final class GhosttyNSView: NSView {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         // Let Cmd+key propagate to Forge's menu/shortcuts
         if flags.contains(.command) { return false }
-        // Ctrl+key: handle ourselves
+
+        if execMode {
+            // EXEC mode: route Ctrl+key through Ghostty's encoder
+            if flags.contains(.control) {
+                let keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
+                if let surface { _ = ghostty_surface_key(surface, keyEvent) }
+                return true
+            }
+            return false
+        }
+
+        // MANUAL IO mode: handle Ctrl+key as raw terminal bytes
         if flags.contains(.control) {
             sendKeyEvent(event)
             return true
@@ -134,24 +150,49 @@ final class GhosttyNSView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
-        sendKeyEvent(event)
+        if execMode {
+            let keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
+            if let surface { _ = ghostty_surface_key(surface, keyEvent) }
+        } else {
+            sendKeyEvent(event)
+        }
     }
 
     override func keyUp(with event: NSEvent) {
-        // No action needed — tmux doesn't use key-up events
+        if execMode {
+            // Ghostty needs key-up events for Kitty keyboard protocol
+            let keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_RELEASE)
+            if let surface { _ = ghostty_surface_key(surface, keyEvent) }
+        }
+        // MANUAL IO mode: tmux doesn't use key-up events — no action needed
     }
 
     override func flagsChanged(with event: NSEvent) {
-        // No action needed — modifier-only events don't produce terminal bytes
+        if execMode {
+            // Forward modifier changes so Ghostty can track shift/ctrl/alt state
+            let keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
+            if let surface { _ = ghostty_surface_key(surface, keyEvent) }
+        }
+        // MANUAL IO mode: modifier-only events don't produce terminal bytes — no action needed
     }
 
     override func insertText(_ insertString: Any) {
-        // Called by the input manager for composed text (e.g., accented characters)
+        // Called by the input manager for composed text (e.g., accented characters, IME)
         let text: String
         if let s = insertString as? String { text = s }
         else if let s = insertString as? NSAttributedString { text = s.string }
         else { return }
         guard !text.isEmpty else { return }
+
+        if execMode {
+            // EXEC mode: delegate to Ghostty for proper encoding
+            text.withCString { cStr in
+                if let surface { ghostty_surface_text(surface, cStr, UInt(text.utf8.count)) }
+            }
+            return
+        }
+
+        // MANUAL IO mode: send raw UTF-8 bytes directly
         onKeyInput?(Data(text.utf8))
     }
 
