@@ -4,7 +4,7 @@ import ForgeCore
 /// Parses tmux format string output into domain info structs
 enum TmuxStateParser {
     static let projectFormat = "#{session_id}\t#{session_name}\t#{session_windows}\t#{session_attached}\t#{session_path}"
-    static let tabFormat = "#{window_id}\t#{session_id}\t#{window_index}\t#{window_name}\t#{window_active}\t#{window_panes}\t#{window_silence_flag}\t#{window_activity}"
+    static let tabFormat = "#{window_id}\t#{session_id}\t#{window_index}\t#{window_name}\t#{window_active}\t#{window_panes}\t#{window_silence_flag}\t#{window_activity}\t#{window_layout}"
     static let paneFormat = "#{pane_id}\t#{window_id}\t#{pane_index}\t#{pane_active}\t#{pane_current_command}\t#{pane_current_path}\t#{pane_width}\t#{pane_height}\t#{pane_pid}"
 
     static func parseProjects(_ output: String) -> [ProjectInfo] {
@@ -21,14 +21,15 @@ enum TmuxStateParser {
 
     static func parseTabs(_ output: String) -> [TabInfo] {
         output.split(separator: "\n").compactMap { line in
-            let p = line.split(separator: "\t", maxSplits: 7, omittingEmptySubsequences: false).map(String.init)
-            guard p.count >= 8 else {
+            let p = line.split(separator: "\t", maxSplits: 8, omittingEmptySubsequences: false).map(String.init)
+            guard p.count >= 9 else {
                 ForgeLog.log("[tmux] Failed to parse tab line: \(line)")
                 return nil
             }
             return TabInfo(id: p[0], projectId: p[1], index: Int(p[2]) ?? 0,
                             name: p[3], active: p[4] != "0", paneCount: Int(p[5]) ?? 0,
-                            hasBell: p[6] == "1", lastActivity: TimeInterval(p[7]) ?? 0)
+                            hasBell: p[6] == "1", lastActivity: TimeInterval(p[7]) ?? 0,
+                            layout: p[8].isEmpty ? nil : p[8])
         }
     }
 

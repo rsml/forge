@@ -68,6 +68,7 @@ public enum StateMerger {
                 tab.index = info.index
                 tab.name = info.name
                 tab.active = info.active
+                tab.layout = info.layout
             }
         }
 

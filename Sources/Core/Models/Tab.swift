@@ -11,6 +11,7 @@ public final class Tab: Identifiable {
     public var index: Int
     public var name: String
     public var active: Bool
+    public var layout: String?
     public var panes: [Pane] = []
 
     public var needsAttention: Bool {
