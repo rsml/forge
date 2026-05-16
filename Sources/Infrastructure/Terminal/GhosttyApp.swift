@@ -37,7 +37,11 @@ final class GhosttyApp {
     // MARK: - Config Update
 
     /// Applies font and color overrides from Forge config.
-    func applyConfig(fontFamily: String?, fontSize: Int, foreground: String?, background: String?) {
+    func applyConfig(
+        fontFamily: String?, fontSize: Int,
+        foreground: String?, background: String?,
+        ansiColors: [String]? = nil
+    ) {
         guard let app else { return }
 
         guard let newConfig = ghostty_config_new() else {
@@ -55,6 +59,12 @@ final class GhosttyApp {
         }
         if let bg = background {
             lines.append("background=\(bg)")
+        }
+        // Ghostty palette config: palette=N=#RRGGBB
+        if let colors = ansiColors {
+            for (i, hex) in colors.prefix(16).enumerated() {
+                lines.append("palette=\(i)=\(hex)")
+            }
         }
 
         let configString = lines.joined(separator: "\n")
@@ -108,6 +118,7 @@ final class GhosttyApp {
             "confirm-close-surface=false",
             "scrollback-limit=10000",
             "cursor-style=bar",
+            "input-default-bindings=false",
         ].joined(separator: "\n")
         loadConfigString(defaults, into: cfg, label: "defaults")
         ghostty_config_finalize(cfg)

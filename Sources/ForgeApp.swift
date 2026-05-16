@@ -104,7 +104,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     Int(theme.background.green * 255),
                     Int(theme.background.blue * 255))
             }
-            ga.applyConfig(fontFamily: fontFamily, fontSize: fontSize, foreground: fgHex, background: bgHex)
+            var ansiHex: [String]?
+            if let theme = configStore.resolvedTheme {
+                ansiHex = theme.ansiColors.prefix(16).map { c in
+                    String(format: "#%02x%02x%02x", Int(c.red * 255), Int(c.green * 255), Int(c.blue * 255))
+                }
+            }
+            ga.applyConfig(fontFamily: fontFamily, fontSize: fontSize, foreground: fgHex, background: bgHex, ansiColors: ansiHex)
             ghosttyApp = ga
         }
         controller.ghosttyApp = ghosttyApp

@@ -67,8 +67,15 @@ extension WorkspaceController {
 
         let renderer = createRenderer(for: pane)
         activeRenderer = renderer
-        // Scrollback seeding deferred — SwiftTerm needs to be laid out first
-        // so cols/rows are correct. TODO: seed after first sizeChanged callback.
+
+        // Seed scrollback so the terminal isn't blank on project/tab switch
+        let paneId = pane.id
+        Task {
+            if let content = await tmux.capturePaneContent(id: paneId, lastN: 2000),
+               !content.isEmpty {
+                renderer.feedScrollback(content)
+            }
+        }
     }
 
     /// Creates renderers for panes in the active project after initial connect.
