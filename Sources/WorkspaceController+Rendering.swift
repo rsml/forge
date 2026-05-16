@@ -25,11 +25,50 @@ extension WorkspaceController {
             )
         }
 
-        // Wire keyboard input to tmux via control mode (sub-ms latency)
+        // Wire keyboard input to tmux via control mode (sub-ms latency).
+        // Use send-keys -l (literal) for printable text — it goes through the
+        // PTY line discipline properly. For control bytes and escape sequences,
+        // use send-keys with tmux key names or -H for raw bytes.
         renderer.onInput = { [weak self] data in
             guard let self, let adapter = self.tmux as? TmuxAdapter else { return }
-            let hex = data.map { String(format: "%02x", $0) }.joined(separator: " ")
-            adapter.controlModeSend("send-keys -H -t \(paneId) \(hex)")
+
+            // Single control byte (0x00-0x1F) → use tmux key names for proper PTY handling
+            if data.count == 1, let byte = data.first, byte <= 0x1F {
+                let keyName: String? = switch byte {
+                case 0x00: "C-Space"
+                case 0x01...0x1A: "C-\(Character(UnicodeScalar(byte + 0x60)))"
+                case 0x1B: "Escape"
+                case 0x1C: "C-\\"
+                case 0x1D: "C-]"
+                case 0x1E: "C-^"
+                case 0x1F: "C-_"
+                default: nil
+                }
+                if let keyName {
+                    adapter.controlModeSend("send-keys -t \(paneId) \(keyName)")
+                    return
+                }
+            }
+
+            // DEL (backspace on most terminals)
+            if data.count == 1, data.first == 0x7F {
+                adapter.controlModeSend("send-keys -t \(paneId) BSpace")
+                return
+            }
+
+            // Escape sequences (starts with 0x1B and has more bytes) → send-keys -H
+            if data.count > 1, data.first == 0x1B {
+                let hex = data.map { String(format: "%02x", $0) }.joined(separator: " ")
+                adapter.controlModeSend("send-keys -H -t \(paneId) \(hex)")
+                return
+            }
+
+            // Printable text → send-keys -l (literal, proper PTY handling)
+            if let text = String(data: data, encoding: .utf8) {
+                // Escape semicolons and other tmux-special chars in literal mode
+                let escaped = text.replacingOccurrences(of: ";", with: "\\;")
+                adapter.controlModeSend("send-keys -l -t \(paneId) \(escaped)")
+            }
         }
 
         // Wire resize to tmux — fires when the renderer calculates cols/rows from frame.
