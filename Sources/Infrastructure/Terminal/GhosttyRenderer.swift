@@ -22,6 +22,10 @@ final class GhosttyRenderer: TerminalRenderer {
 
     var view: NSView { nsView }
 
+    /// Read-only accessor for the underlying surface pointer.
+    /// Used by WorkspaceController.findPaneBySurface to map surface → domain model.
+    var surfaceHandle: ghostty_surface_t? { surface }
+
     init(ghosttyApp: GhosttyApp) {
         nsView = GhosttyNSView(frame: .zero)
 

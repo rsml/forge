@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import GhosttyKit
 import Observation
 import ForgeCore
 
@@ -195,6 +196,26 @@ final class WorkspaceController {
 
     func saveUIState(sidebarVisible: Bool? = nil, expandedProjectNames: [String]? = nil) {
         uiState.save(workspace: workspace, sidebarVisible: sidebarVisible, expandedProjectNames: expandedProjectNames)
+    }
+
+    // MARK: - Surface Lookup
+
+    /// Maps a Ghostty surface pointer back to the domain model.
+    /// Used by GhosttyApp action callbacks to find which pane/tab fired an event.
+    func findPaneBySurface(_ surface: ghostty_surface_t?) -> (Pane, Tab)? {
+        guard let surface else { return nil }
+        for (paneId, renderer) in paneRenderers {
+            guard let ghostty = renderer as? GhosttyRenderer else { continue }
+            guard ghostty.surfaceHandle == surface else { continue }
+            for project in workspace.projects {
+                for tab in project.tabs {
+                    if let pane = tab.panes.first(where: { $0.id == paneId }) {
+                        return (pane, tab)
+                    }
+                }
+            }
+        }
+        return nil
     }
 
     // MARK: - Private
