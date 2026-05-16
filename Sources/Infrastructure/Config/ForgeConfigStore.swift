@@ -14,6 +14,10 @@ extension ForgeConfigStore {
         config.general?.nativePaneRendering ?? false
     }
 
+    var isNativePTY: Bool {
+        config.general?.nativePTY ?? false
+    }
+
     var primaryFont: Font {
         (config.primaryFont ?? ForgeConfig.FontConfig()).resolved(defaultSize: 13)
     }
