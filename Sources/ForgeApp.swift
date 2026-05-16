@@ -84,7 +84,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.notifier = notifier
 
         if configStore.isNativePaneRendering {
-            ghosttyApp = GhosttyApp()
+            let ga = GhosttyApp()
+            // Apply Forge's font and theme to ghostty
+            let fontFamily = configStore.config.terminalFont?.family
+                ?? configStore.config.terminal?.fontFamily
+                ?? configStore.config.appearance?.fontFamily
+            let fontSize = configStore.config.terminalFont?.size
+                ?? configStore.config.terminal?.fontSize
+                ?? configStore.config.appearance?.fontSize ?? 13
+            var fgHex: String?
+            var bgHex: String?
+            if let theme = configStore.resolvedTheme {
+                fgHex = String(format: "#%02x%02x%02x",
+                    Int(theme.foreground.red * 255),
+                    Int(theme.foreground.green * 255),
+                    Int(theme.foreground.blue * 255))
+                bgHex = String(format: "#%02x%02x%02x",
+                    Int(theme.background.red * 255),
+                    Int(theme.background.green * 255),
+                    Int(theme.background.blue * 255))
+            }
+            ga.applyConfig(fontFamily: fontFamily, fontSize: fontSize, foreground: fgHex, background: bgHex)
+            ghosttyApp = ga
         }
         controller.ghosttyApp = ghosttyApp
 
