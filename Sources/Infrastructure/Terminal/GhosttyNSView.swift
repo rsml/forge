@@ -12,6 +12,10 @@ final class GhosttyNSView: NSView {
     var onSurfaceResize: ((Int, Int) -> Void)?
     /// Called when this view becomes first responder (user clicked to focus).
     var onFocusGained: (() -> Void)?
+    /// True when this view was created in EXEC mode (Ghostty owns the PTY).
+    /// Used in Task 7 to route key events through ghostty_surface_key instead
+    /// of the manual terminal-byte encoder.
+    var execMode: Bool = false
 
     // MARK: - Layer Setup
 
