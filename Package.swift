@@ -16,9 +16,20 @@ let package = Package(
         ),
         .executableTarget(
             name: "Forge",
-            dependencies: ["SwiftTerm", "ForgeCore"],
+            dependencies: ["SwiftTerm", "ForgeCore", "GhosttyKit"],
             path: "Sources",
-            exclude: ["Core"]
+            exclude: ["Core"],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Metal"),
+                .linkedFramework("QuartzCore"),
+                .linkedFramework("IOSurface"),
+                .linkedFramework("Carbon"),
+            ]
+        ),
+        .binaryTarget(
+            name: "GhosttyKit",
+            path: "GhosttyKit.xcframework"
         ),
         .testTarget(
             name: "ForgeTests",

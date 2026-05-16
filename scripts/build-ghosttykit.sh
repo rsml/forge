@@ -36,21 +36,10 @@ else
         zig build -Demit-xcframework=true -Dxcframework-target=universal -Doptimize=ReleaseFast
     )
 
-    # Find the built artifact
-    BUILT=""
-    for candidate in \
-        "$GHOSTTY_DIR/zig-out/lib/GhosttyKit.xcframework" \
-        "$GHOSTTY_DIR/macos/GhosttyKit.xcframework" \
-        "$GHOSTTY_DIR/zig-out/GhosttyKit.xcframework"; do
-        if [[ -d "$candidate" ]]; then
-            BUILT="$candidate"
-            break
-        fi
-    done
-
-    if [[ -z "$BUILT" ]]; then
-        echo "Error: GhosttyKit.xcframework not found after build."
-        echo "Searching for it..."
+    BUILT="$GHOSTTY_DIR/macos/GhosttyKit.xcframework"
+    if [[ ! -d "$BUILT" ]]; then
+        echo "Error: GhosttyKit.xcframework not found at $BUILT"
+        echo "Searching..."
         find "$GHOSTTY_DIR" -name "GhosttyKit.xcframework" -type d 2>/dev/null
         exit 1
     fi
