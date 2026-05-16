@@ -46,8 +46,18 @@ private struct SplitContainer: View {
     @State private var proportions: [CGFloat]
     @State private var dragStartProportions: [CGFloat]?
 
-    private let dividerSize: CGFloat = 8
     private let minProportion: CGFloat = 0.05
+
+    /// Divider size matches tmux's 1-cell divider so pixel allocation is identical.
+    /// Falls back to 8px before cell size is known.
+    private var dividerSize: CGFloat {
+        let cell = controller.terminalCellSize
+        if direction == .horizontal {
+            return cell.width > 0 ? cell.width : 8
+        } else {
+            return cell.height > 0 ? cell.height : 8
+        }
+    }
 
     init(direction: SplitDirection, children: [SplitNode], tmuxProportions: [CGFloat],
          panes: ArraySlice<Pane>, renderers: [String: any TerminalRenderer]) {
@@ -73,7 +83,7 @@ private struct SplitContainer: View {
                         PaneSplitView(node: children[i], panes: slices[i], renderers: renderers)
                             .frame(width: sizes[i])
                         if i < children.count - 1 {
-                            PaneDivider(direction: direction) { delta in
+                            PaneDivider(direction: direction, size: dividerSize) { delta in
                                 handleDrag(at: i, delta: delta, available: available)
                             } onDragEnd: {
                                 endDrag()
@@ -87,7 +97,7 @@ private struct SplitContainer: View {
                         PaneSplitView(node: children[i], panes: slices[i], renderers: renderers)
                             .frame(height: sizes[i])
                         if i < children.count - 1 {
-                            PaneDivider(direction: direction) { delta in
+                            PaneDivider(direction: direction, size: dividerSize) { delta in
                                 handleDrag(at: i, delta: delta, available: available)
                             } onDragEnd: {
                                 endDrag()

@@ -84,9 +84,18 @@ extension WorkspaceController {
             guard let self, let adapter = self.tmux as? TmuxAdapter else { return }
             ForgeLog.log("[debug] Renderer \(paneId) resize: \(cols)x\(rows)")
 
+            // Compute cell size (once) — used by PaneSplitView dividers so
+            // SwiftUI's pixel layout matches tmux's cell-based layout exactly.
+            let viewFrame = renderer.view.frame
+            if self.terminalCellSize == .zero, cols > 0, rows > 0,
+               viewFrame.width > 0, viewFrame.height > 0 {
+                self.terminalCellSize = CGSize(
+                    width: viewFrame.width / CGFloat(cols),
+                    height: viewFrame.height / CGFloat(rows)
+                )
+            }
+
             // Store every pane's latest size and schedule a batched flush.
-            // This avoids conflicting resize-pane commands when multiple
-            // renderers fire independently — all panes are resized together.
             self.pendingResizes[paneId] = (cols, rows)
             self.scheduleResizeFlush()
         }
@@ -159,13 +168,19 @@ extension WorkspaceController {
                 let totalCols = max(Int(ref.width / cellW), firstSize.cols)
                 let totalRows = max(Int(ref.height / cellH), firstSize.rows)
                 adapter.controlModeSend("refresh-client -C \(totalCols),\(totalRows)")
+                // Toggle window size to force tmux to redraw all panes.
+                // If the window is already the target size, resize-window is a
+                // no-op and tmux won't send %output. The +1/-1 toggle guarantees
+                // a real resize → tmux redraws → %output populates all surfaces.
+                adapter.controlModeSend("resize-window -t \(firstId) -x \(totalCols + 1) -y \(totalRows)")
                 adapter.controlModeSend("resize-window -t \(firstId) -x \(totalCols) -y \(totalRows)")
             }
         }
 
-        // Only send individual resize-pane after a drag (user explicitly set proportions).
-        // On startup/window-resize, tmux proportionally scales its existing layout —
-        // sending resize-pane would override tmux's stored proportions.
+        // Only send resize-pane after drag (user explicitly set proportions).
+        // On startup, divider width matches tmux's cell dimensions, so
+        // resize-window alone produces matching cell counts — no resize-pane
+        // needed, and proportions are preserved.
         if sendResizePaneOnFlush {
             for (paneId, size) in pendingResizes {
                 adapter.controlModeSend("resize-pane -t \(paneId) -x \(size.cols) -y \(size.rows)")

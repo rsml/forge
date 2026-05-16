@@ -24,14 +24,17 @@ final class WorkspaceController {
     var paneRenderers: [String: any TerminalRenderer] = [:]
     /// Total terminal area frame size (set by TerminalArea via GeometryReader).
     var terminalAreaSize: CGSize = .zero
+    /// Terminal cell size in points (width, height). Computed from the first
+    /// renderer that reports cols/rows. Used by PaneSplitView for divider width
+    /// so SwiftUI's pixel allocation matches tmux's cell-based layout exactly.
+    var terminalCellSize: CGSize = .zero
     /// When true, resize flush is deferred until drag ends.
     var suppressPaneResize = false
     var pendingResizes: [String: (cols: Int, rows: Int)] = [:]
     var resizeFlushWork: DispatchWorkItem?
-    /// Set true after a divider drag — tells flushPendingResizes to send
-    /// individual resize-pane commands (applying user's proportions).
-    /// On startup/window-resize, only resize-window is sent so tmux
-    /// preserves its existing layout proportions.
+    /// Set true after divider drag — flushPendingResizes sends resize-pane
+    /// to apply the user's proportions. On startup, only resize-window is
+    /// sent (tmux proportionally scales, preserving stored ratios).
     var sendResizePaneOnFlush = false
     /// Ghostty app instance for native rendering. Nil when using SwiftTerm fallback.
     var ghosttyApp: GhosttyApp?

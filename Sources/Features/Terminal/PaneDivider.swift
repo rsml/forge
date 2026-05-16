@@ -2,15 +2,15 @@ import SwiftUI
 import ForgeCore
 
 /// Draggable divider between split panes.
-/// Visually 1px, with a wider invisible hit target for comfortable dragging.
-/// Changes cursor to resize arrow on hover.
+/// Width matches tmux's 1-cell divider for pixel-perfect layout alignment.
+/// Visually renders a 1px line centered in the cell-sized hit target.
 struct PaneDivider: View {
     let direction: SplitDirection
+    let size: CGFloat
     let onDrag: (CGFloat) -> Void
     let onDragEnd: () -> Void
 
     private let visualWidth: CGFloat = 1
-    private let hitWidth: CGFloat = 8
 
     var body: some View {
         ZStack {
@@ -23,8 +23,8 @@ struct PaneDivider: View {
                 )
         }
         .frame(
-            width: direction == .horizontal ? hitWidth : nil,
-            height: direction == .vertical ? hitWidth : nil
+            width: direction == .horizontal ? size : nil,
+            height: direction == .vertical ? size : nil
         )
         .contentShape(Rectangle())
         .gesture(
