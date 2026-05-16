@@ -12,12 +12,15 @@ Resources/AppIcon.icns: Assets/appicon.icon/icon.json Assets/appicon.icon/Assets
 	mv /tmp/forge-icon-build/appicon.icns Resources/AppIcon.icns && \
 	rm -rf /tmp/forge-icon-build
 
-run: tmux icon
+ghosttykit:
+	PATH="/opt/homebrew/opt/zig@0.15/bin:$$PATH" scripts/build-ghosttykit.sh
+
+run: tmux icon ghosttykit
 	swift build -c release && \
 	$(MAKE) bundle BUILD=.build/release && \
 	open .build/release/Forge.app
 
-dev: icon
+dev: icon ghosttykit
 	swift build && \
 	$(MAKE) bundle BUILD=.build/debug && \
 	open .build/debug/Forge.app
