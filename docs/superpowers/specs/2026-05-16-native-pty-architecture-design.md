@@ -34,16 +34,19 @@ NORMAL OPERATION:
   User types → Ghostty Termio thread → PTY write (direct)
   PTY output → Ghostty Termio thread → VT parse → Metal render (direct)
   Resize → Ghostty → ioctl(TIOCSWINSZ) on its own fd (direct)
+  fd is also dup'd to daemon (idle, not reading — just keeping alive)
 
 FORGE QUITS:
-  Forge sends each PTY master fd to daemon via sendmsg(SCM_RIGHTS)
-  Daemon holds fd duplicates → processes keep running
-  Forge exits
+  Forge dumps each surface's scrollback to ~/.config/forge/scrollback/<pane-id>
+  Forge exits — Ghostty surfaces close their fd copies
+  Daemon's dup'd fds keep PTYs alive → processes keep running
 
 FORGE RECONNECTS:
-  Daemon sends fds back to Forge
-  New Ghostty surfaces created with pre-existing fds
-  Surfaces resume reading/writing → terminal content reappears
+  Read workspace.json → connect to daemon → retrieve fds
+  Create Ghostty surfaces with EXTERNAL_FD mode (pre-existing PTY fd)
+  Feed saved scrollback into each surface (visual continuity)
+  Send SIGWINCH to each PTY (forces shell/TUI app to redraw at current size)
+  Surfaces resume reading/writing → live terminal content appears
 ```
 
 ### Port Protocols
@@ -52,22 +55,21 @@ Replace `TmuxQueryPort` (7 methods) + `TmuxCommandPort` (15 methods) + `TmuxCont
 
 ```swift
 /// Creates and manages terminal processes.
+/// Resize and status are NOT here — Ghostty handles resize internally
+/// via setFrameSize → ioctl(TIOCSWINSZ), and status arrives via
+/// GhosttyKit's action_cb (COMMAND_FINISHED, CHILD_EXITED, BELL).
 @MainActor
 public protocol ProcessPort {
     /// Spawn a new shell process in a PTY. Returns a handle for the surface.
-    func create(cwd: String, env: [String: String], cols: Int, rows: Int) -> PaneHandle
+    /// Size comes from the SwiftUI view frame, not the caller.
+    func create(cwd: String, env: [String: String]) -> PaneHandle
 
     /// Reconnect to an existing PTY fd (from daemon on app restart).
-    func reconnect(fd: Int32, cols: Int, rows: Int) -> PaneHandle
+    func reconnect(fd: Int32) -> PaneHandle
 
-    /// Kill the process and close the PTY.
+    /// Kill the process and release the daemon's fd. Order matters:
+    /// tell daemon to release first, then close the surface.
     func kill(_ handle: PaneHandle)
-
-    /// Resize the PTY (calls ioctl TIOCSWINSZ — instant, no round-trip).
-    func resize(_ handle: PaneHandle, cols: Int, rows: Int)
-
-    /// Current process info (command name, cwd, pid, running/idle).
-    func status(_ handle: PaneHandle) -> PaneStatus
 }
 
 /// Persists PTY file descriptors across app restarts.
@@ -86,59 +88,128 @@ public protocol PersistencePort {
 }
 ```
 
-7 methods total (down from 25). No terminal rendering concerns leak into the ports.
+7 methods total (down from 25). No resize, no status polling — those are event-driven from GhosttyKit's `action_cb`.
+
+### GhosttyKit action_cb (Event-Driven Status)
+
+Currently stubbed in GhosttyApp.swift. Must be fully implemented as a Phase 1 prerequisite. Ghostty delivers these events via the action callback:
+
+| Action | Maps to |
+|---|---|
+| `GHOSTTY_ACTION_BELL` | `AttentionManager.handleEvent(.bell)` |
+| `GHOSTTY_ACTION_CHILD_EXITED` | Pane cleanup, "[Process completed]" UI |
+| `GHOSTTY_ACTION_COMMAND_FINISHED` | `AttentionManager.handleEvent(.commandCompleted)` |
+| `GHOSTTY_ACTION_SET_TITLE` | Tab title update |
+| `GHOSTTY_ACTION_CELL_SIZE` | `terminalCellSize` for divider widths |
+| `GHOSTTY_ACTION_WRITE_CLIPBOARD` | NSPasteboard write (already wired) |
+| `GHOSTTY_ACTION_READ_CLIPBOARD` | NSPasteboard read (currently stubbed — must implement) |
+
+This replaces TmuxSyncEngine's poll-based attention detection with zero-latency push events.
 
 ### Domain Model Changes
 
-The domain model (`Workspace > Project > Tab > Pane`) is unchanged. What changes:
+The domain model (`Workspace > Project > Tab > Pane`) shape is unchanged. What changes:
 
-- `Pane.id` — currently a tmux pane ID (e.g., `%2`). Becomes a Forge-generated UUID.
-- `Project.id` — currently a tmux session ID (e.g., `$1`). Becomes a Forge-generated UUID.
-- `Tab.id` — currently a tmux window ID (e.g., `@1`). Becomes a Forge-generated UUID.
-- `Tab.layout` — currently a tmux layout string. Replaced by a Forge-owned `SplitNode` tree (already exists in the model).
-
-The model no longer mirrors external state. Forge IS the source of truth.
+- **IDs**: `Pane.id`, `Tab.id`, `Project.id` stay as `String` type but contain Forge-generated UUIDs instead of tmux IDs (`%2`, `@1`, `$1`). `Tab.uuid` (the existing stable UUID) becomes redundant — `Tab.id` is now the stable identifier.
+- **`Tab.layout`**: currently `String?` holding a raw tmux layout string. Add a new `Tab.splitTree: SplitNode?` property that Forge owns directly. `SplitNode` already exists but needs to be stored on the model, not just parsed transiently.
+- **`Workspace.findTab(byTmuxId:)`**: deleted. Only `findTab(byUUID:)` remains.
+- **`perProjectActiveTabId: [String: String]`**: unchanged in shape, just uses UUID strings.
 
 ### GhosttyKit Surface Modes
 
-Currently Forge uses `GHOSTTY_SURFACE_IO_MANUAL` (Ghostty is a dumb display). The new architecture needs:
+**For new panes:** `GHOSTTY_SURFACE_IO_EXEC` (default) — Ghostty calls `forkpty()`, spawns the shell, owns the PTY. Full native performance. All terminal features work.
 
-**For new panes:** Ghostty's default mode — it calls `forkpty()`, spawns the shell, owns the PTY. Full native performance. All terminal features work automatically.
-
-**For reconnected panes:** A new mode where Ghostty accepts a pre-existing PTY master fd instead of calling `forkpty()`. The Termio thread reads/writes this fd natively — same performance as default mode, but the fd came from the daemon instead of `forkpty()`.
-
-This requires adding an `io_fd` field to `ghostty_surface_config_s` in the GhosttyKit fork:
+**For reconnected panes:** `GHOSTTY_SURFACE_IO_EXTERNAL_FD` (new) — Ghostty accepts a pre-existing PTY master fd. The Termio thread reads/writes this fd natively — same performance as EXEC, but the fd came from the daemon instead of `forkpty()`.
 
 ```c
 typedef struct {
     // ...existing fields...
     ghostty_surface_io_e io_mode;  // EXEC (default), MANUAL, or EXTERNAL_FD
     int io_fd;                      // pre-existing PTY master fd (for EXTERNAL_FD mode)
-    // ...
 } ghostty_surface_config_s;
 ```
+
+### Resize and Divider Drag
+
+Ghostty handles resize natively: `setFrameSize` → `ghostty_surface_set_size` → `ioctl(TIOCSWINSZ)` → shell gets SIGWINCH.
+
+**Divider drag concern:** every drag frame changes the frame, triggering SIGWINCH. At 120Hz, TUI apps receive 120 SIGWINCH/sec and attempt to redraw each time — a redraw storm.
+
+**Solution:** Add `ghostty_surface_set_resize_paused(surface, bool)` to GhosttyKit. During divider drag:
+1. `ghostty_surface_set_resize_paused(surface, true)` — Ghostty processes `set_size` for rendering (Metal redraws at new dimensions) but does NOT call `ioctl(TIOCSWINSZ)`.
+2. On drag end: `ghostty_surface_set_resize_paused(surface, false)` — Ghostty sends one final SIGWINCH at the settled size.
+
+This replaces the current `suppressPaneResize` flag at the correct abstraction level.
 
 ### forged (Forge Daemon)
 
 A minimal process (~400 lines) bundled inside Forge.app:
 
-- **Listens** on a Unix domain socket (`/tmp/forge-daemon-<uid>.sock`)
-- **Protocol**: JSON control messages + fd passing via `sendmsg(SCM_RIGHTS)`
+- **Socket**: `$TMPDIR/forge-daemon.sock` (per-user, survives within boot session, cleaned on reboot)
+- **Protocol**: JSON control messages + fd passing via `sendmsg(SCM_RIGHTS)`. Protocol includes a version field for forward compatibility.
 - **Operations**:
-  - `store {pane_id, metadata}` + fd via ancillary data → daemon holds the fd
-  - `retrieve {pane_id}` → daemon sends fd back via ancillary data
-  - `list` → returns all stored panes with metadata (cwd, pid, alive status)
-  - `release {pane_id}` → daemon closes the fd (process gets SIGHUP)
-- **Lifecycle**: launched by Forge on first run, stays alive via launchd or self-daemonize
-- **State**: in-memory only (fd table + metadata). No disk persistence needed — the fds ARE the state.
-- **Crash resilience**: if daemon crashes, fds close → processes die. Acceptable for v1. Later: launchd `KeepAlive` for automatic restart.
+  - `{"op": "store", "pane_id": "...", "metadata": {...}}` + fd via ancillary data
+  - `{"op": "retrieve", "pane_id": "..."}` → daemon sends fd back via ancillary data
+  - `{"op": "list"}` → returns all stored panes with metadata (cwd, pid, alive status)
+  - `{"op": "release", "pane_id": "..."}` → daemon closes the fd, process gets SIGHUP
+- **Lifecycle**: launched by Forge on first run via `posix_spawn`, stays alive after Forge exits. Later: launchd plist with `KeepAlive` for crash resilience.
+- **State**: in-memory fd table + metadata. No disk persistence — the fds ARE the state.
+- **Ownership**: one Forge instance at a time. Second instance detects existing socket → shows error dialog: "Forge is already running. Force take over?" Force take over sends a `shutdown` command to the existing daemon connection, then reconnects.
+
+### fd Lifecycle (Ordering Matters)
+
+**Creating a pane:**
+1. Ghostty surface created (EXEC mode) → `forkpty()` → shell starts (async on Termio thread)
+2. Ghostty delivers `GHOSTTY_ACTION_CHILD_STARTED` via `action_cb` with the child PID — this signals the fd is ready
+3. Forge calls `ghostty_surface_pty_fd(surface)` to get the master fd. **Forge must NOT read/write/close this fd** — it is borrowed solely for `sendmsg` to the daemon.
+4. Forge sends fd to daemon via `sendmsg` → daemon holds a `dup`. This happens in the `action_cb` handler, minimizing the race window.
+5. Normal operation: Ghostty reads/writes fd, daemon holds idle dup
+
+**Closing a pane (intentional):**
+1. Forge sends `release` to daemon → daemon closes its dup
+2. Forge destroys Ghostty surface → Ghostty closes its fd → SIGHUP → process dies
+
+**Forge quits (persistence):**
+1. `applicationShouldTerminate` returns `.terminateLater` (blocks quit)
+2. Forge synchronously dumps scrollback for each surface (Ghostty terminal state access) — surfaces must still be alive
+3. Forge saves workspace.json (including window frame, split ratios, active selections)
+4. Forge calls `NSApp.reply(toApplicationShouldTerminate: true)` → app terminates
+5. Ghostty surfaces destroyed → Ghostty closes its fds
+6. Daemon's dups keep PTYs alive → processes keep running
+
+**Forge crashes (unclean exit):**
+1. Forge exits without sending fds — but daemon ALREADY has dups (from step 4 of creation)
+2. Scrollback dump didn't happen → reconnect shows blank until SIGWINCH redraw
+3. workspace.json may be stale → daemon's `list` is authoritative for which panes exist
+
+**Forge reconnects:**
+1. Read workspace.json for project/tab structure
+2. Connect to daemon → `list` → get alive pane IDs
+3. Reconcile: workspace.json structure + daemon's alive panes
+4. For each alive pane: `retrieve` fd → create Ghostty surface (EXTERNAL_FD mode)
+5. Set the surface size to match the SwiftUI frame BEFORE attaching the fd (ensures grid matches)
+6. Feed saved scrollback (if available) into surface for visual continuity
+7. Send `SIGWINCH` to PTY → shell/TUI redraws at current size. Note: SIGWINCH is best-effort — some processes may not redraw until the next user keystroke. This is a known limitation.
+8. Dead panes: show "[Process exited]" with option to close or restart
+
+### Scrollback Persistence
+
+On clean quit, before surfaces are destroyed:
+1. For each pane, access Ghostty's terminal screen state
+2. Serialize the visible screen + scrollback to `~/.config/forge/scrollback/<pane-id>`
+3. On reconnect, feed this content into the new surface before connecting the live fd
+
+This provides visual continuity: the user sees their previous terminal content immediately, then live output resumes on top of it.
+
+For crash recovery (no scrollback dump): surfaces start blank, but SIGWINCH causes shells to redraw their prompt. TUI apps (vim, htop) redraw their full UI. The gap is shell history/scrollback, which is lost.
 
 ### Workspace Persistence
 
-With tmux gone, Forge needs to persist the workspace structure to disk:
+Saved to `~/.config/forge/workspace.json` on structural changes:
 
 ```json
 {
+  "version": 1,
   "projects": [
     {
       "id": "uuid-1",
@@ -152,55 +223,91 @@ With tmux gone, Forge needs to persist the workspace structure to disk:
             { "id": "uuid-3", "cwd": "/Users/ross/Library/Assistants" },
             { "id": "uuid-4", "cwd": "/Users/ross/Library/Assistants" }
           ],
-          "splitLayout": { "direction": "horizontal", "ratio": 0.5 }
+          "splitTree": { "direction": "horizontal", "ratio": 0.5 }
         }
       ]
     }
-  ]
+  ],
+  "activeProjectId": "uuid-1",
+  "activeTabId": "uuid-2",
+  "windowFrame": { "x": 100, "y": 100, "width": 1400, "height": 900 }
 }
 ```
 
-Saved to `~/.config/forge/workspace.json` on every structural change (add/remove project/tab/pane, rename). Split ratios saved on divider drag end.
-
-On startup: read workspace.json → connect to daemon → retrieve fds → create Ghostty surfaces.
+Includes window frame, active selection, and per-tab split trees with ratios.
 
 ### Attention System
 
-Currently driven by tmux events (`%bell`, silence subscriptions, content scanning via `capture-pane`). Replacements:
+Event-driven replacements for tmux's poll-based detection:
 
-- **Bell**: Ghostty surfaces emit a bell callback when they receive `\a` (BEL). Wire this to AttentionManager.
-- **Command completion**: monitor each pane's foreground process via `tcgetpgrp()` on the PTY fd. When the foreground process changes from non-shell to shell, the command completed.
-- **Content scanning**: Ghostty has screen content access via `ghostty_surface_inspector`. Or: use the VT parser's output hook to scan lines as they arrive (zero-latency vs the current 5-second poll).
-- **Silence detection**: track the last `%output` timestamp per pane. If no output for 2 seconds and the pane was previously active, mark as needing attention.
+| Current (tmux) | New (native) |
+|---|---|
+| `%bell` control mode event | `GHOSTTY_ACTION_BELL` via `action_cb` |
+| Silence subscription (`window_silence_flag`) | Track last output timestamp per surface. Ghostty's read callback provides the timing. |
+| `capture-pane` content scanning (5s poll) | Ghostty's VT output hook — scan content as it arrives (zero latency) |
+| `pane_current_command` from tmux query | `GHOSTTY_ACTION_COMMAND_FINISHED` via `action_cb` |
+| `pane_current_path` from tmux query | `proc_pidinfo(PROC_PIDVNODEPATHINFO)` on the child PID |
+
+### Working Directory Tracking
+
+Currently from tmux's `pane_current_path`. Replaced by:
+```swift
+func currentWorkingDirectory(pid: pid_t) -> String? {
+    var pathInfo = proc_vnodepathinfo()
+    let size = MemoryLayout<proc_vnodepathinfo>.size
+    let ret = proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &pathInfo, Int32(size))
+    guard ret == size else { return nil }
+    return String(cString: &pathInfo.pvi_cdir.vip_path.0)
+}
+```
+
+Used for: title bar path display, "new tab in same directory" feature, workspace.json persistence.
 
 ### Input Handling
 
-**Deleted entirely.** No more `sendKeyEvent()`, no `send-keys` encoding, no `C-c` key name mapping, no hex encoding for escape sequences, no literal quoting for spaces/semicolons.
+**Deleted entirely.** No more `sendKeyEvent()`, `performKeyEquivalent` bypass, `send-keys` encoding, key name mapping, hex encoding, literal quoting.
 
-Ghostty's native key handling takes over:
-- `keyDown` → Ghostty's Termio thread → PTY write
-- Ctrl+C → Ghostty encodes as 0x03 → PTY write
-- All special keys (arrows, home, end, function keys) handled by Ghostty's key encoder
-- Kitty keyboard protocol works correctly (Ghostty supports it natively)
+Ghostty's native key handling takes over. In EXEC mode, Ghostty negotiates terminal capabilities with the shell via the PTY. If the shell requests Kitty keyboard protocol, Ghostty uses it. Otherwise, legacy encoding. This is automatic — no configuration needed.
 
-### Resize Handling
+**Validation step for Phase 1:** verify that Ghostty's default key encoding works correctly with zsh, bash, and Claude Code by testing Ctrl+C, Ctrl+D, Ctrl+Z, arrow keys, and space.
 
-**Deleted entirely.** No more `refresh-client -C`, `resize-window`, `resize-pane`, cell size computation, divider width matching, batched flush, suppress flags.
+### Split Pane Orchestration
 
-Ghostty handles resize:
-1. SwiftUI frame changes → `GhosttyNSView.setFrameSize` → `ghostty_surface_set_size`
-2. Ghostty internally computes new cols/rows from pixel dimensions
-3. Ghostty calls `ioctl(fd, TIOCSWINSZ, &size)` on its own PTY
-4. Shell receives SIGWINCH → redraws
-5. New output → Ghostty renders
+Without tmux, Forge owns split creation and removal:
 
-One source of truth. Zero mismatch possible.
+**Creating a split:**
+1. User triggers "Split Right" or "Split Down" from menu/shortcut
+2. WorkspaceController updates the domain model: inserts a new `Pane` into `Tab.panes`, updates `Tab.splitTree` (adds a new split node with 0.5 ratio)
+3. SwiftUI re-renders `PaneSplitView` with the updated tree → new `PaneTerminalView` appears
+4. The new view triggers Ghostty surface creation (via `ProcessPort.create`)
+5. Ghostty forks the shell → surface starts rendering → `action_cb` delivers child PID → fd sent to daemon
+6. The new pane's frame is determined by SwiftUI layout (the 0.5 ratio split) — Ghostty gets its size from `setFrameSize`, not from the create call
+
+**Removing a pane (exit or close):**
+1. Process exits → `GHOSTTY_ACTION_CHILD_EXITED` via `action_cb`
+2. WorkspaceController updates the domain model: removes the `Pane`, collapses the `SplitNode` tree (if a split has only one child remaining, replace it with that child)
+3. `ProcessPort.kill()` releases daemon fd and destroys surface
+4. SwiftUI re-renders → surviving pane expands to fill the space
+5. Surviving pane's `setFrameSize` fires → Ghostty resizes → shell gets SIGWINCH
+
+**Key difference from tmux:** tmux handled split topology internally (layout engine, resize redistribution). Now Forge's domain model (`SplitNode` tree) and SwiftUI's layout system handle it. The split tree is just data — SwiftUI does the pixel math.
+
+### Shell Environment
+
+New panes inherit from a defined environment:
+- `TERM`: set by Ghostty (typically `xterm-ghostty`)
+- `SHELL`: user's login shell (from `passwd`)
+- `HOME`, `USER`, `PATH`: inherited from Forge's process environment
+- `COLORTERM=truecolor`: set by Ghostty
+- `LANG`, `LC_*`: inherited from system
+
+New tabs/splits in the same project: inherit the project's `path` as initial `cwd`. Environment is NOT inherited from sibling panes (each pane is a fresh shell invocation, same as opening a new Terminal.app tab).
 
 ## What Gets Deleted
 
 | File | Lines | Why |
 |---|---|---|
-| TmuxAdapter.swift | ~250 | Replaced by ProcessAdapter (direct PTY) |
+| TmuxAdapter.swift | ~250 | Replaced by ProcessAdapter |
 | TmuxControlMode.swift | ~230 | No control mode |
 | TmuxCommandRunner.swift | ~100 | No tmux commands |
 | TmuxStateParser.swift | ~150 | No tmux state to parse |
@@ -212,61 +319,92 @@ One source of truth. Zero mismatch possible.
 | forge-tmux.conf | ~30 | No tmux |
 | Bundled tmux binary | ~2MB | No tmux |
 | GhosttyNSView input bypass | ~80 | Ghostty handles input natively |
-| WorkspaceController+Rendering resize logic | ~100 | Ghostty handles resize |
-| **Total** | **~1540 lines + 2MB binary** | |
+| WC+Rendering resize/input logic | ~180 | Ghostty handles both |
+| **Total** | **~1620 lines + 2MB binary** | |
 
 ## What Gets Added
 
 | Component | Lines | Purpose |
 |---|---|---|
 | forged daemon | ~400 | fd vault for persistence |
-| ProcessAdapter | ~150 | ProcessPort implementation (create/kill/resize via Ghostty) |
-| DaemonAdapter | ~150 | PersistencePort implementation (Unix socket + fd passing) |
-| WorkspacePersistence | ~100 | JSON save/load of project/tab/pane structure |
-| GhosttyKit io_fd mode | ~50 | Accept pre-existing PTY fd (Zig change in vendor/ghostty) |
-| Attention adapters | ~100 | Bell callback, process monitoring, content scanning |
-| **Total** | **~950 lines** | |
+| ProcessAdapter | ~100 | ProcessPort (create/reconnect/kill via GhosttyKit) |
+| DaemonAdapter | ~150 | PersistencePort (Unix socket + fd passing) |
+| WorkspacePersistence | ~150 | JSON save/load + scrollback dump/restore |
+| GhosttyKit EXTERNAL_FD mode | ~50 | Accept pre-existing PTY fd (Zig) |
+| GhosttyKit resize_paused API | ~20 | Suppress SIGWINCH during drag |
+| GhosttyKit pty_fd + child_pid accessors | ~15 | Get master fd for daemon, child PID for CWD tracking |
+| action_cb implementation | ~80 | Bell, child exit, command done, clipboard, title |
+| CWD tracker | ~30 | proc_pidinfo for working directory |
+| **Total** | **~990 lines** | |
 
-Net: **-590 lines, -2MB binary, and every rendering bug eliminated.**
+Net: **-630 lines, -2MB binary, and every rendering bug eliminated.**
 
 ## Migration Plan
 
-### Phase 1: Direct PTY mode (no persistence)
+### Phase 0: Prerequisites (in current tmux codebase)
 
-- Add `GHOSTTY_SURFACE_IO_EXEC` mode to GhosttyRenderer (Ghostty creates PTY, spawns shell)
-- Create `ProcessAdapter` implementing `ProcessPort`
-- Wire WorkspaceController to use ProcessPort instead of TmuxPort for pane creation
-- Remove all input bypass code from GhosttyNSView (let Ghostty handle keys)
-- Remove all resize logic from WorkspaceController+Rendering
-- Remove OutputRouter
-- Keep tmux code for fallback (feature flag: `nativePTY` in config)
-- **Result**: terminals work perfectly, but closing Forge kills all processes
+- Implement `action_cb` dispatch in GhosttyApp (bell, child exit, command finished, clipboard read, title, cell size)
+- Verify Ghostty EXEC mode key encoding works with zsh/bash/Claude Code
+- Add `ghostty_surface_set_resize_paused` API to GhosttyKit fork
+- Add `ghostty_surface_pty_fd` accessor to GhosttyKit fork
+- Add `ghostty_surface_child_pid` accessor to GhosttyKit fork (for CWD tracking via proc_pidinfo)
+- Add EXTERNAL_FD io mode to GhosttyKit fork
+- Add `GHOSTTY_ACTION_CHILD_STARTED` action (signals fd is ready after async fork)
+- These are all additive — no existing behavior changes
 
-### Phase 2: forged daemon
+### Phase 1: Native PTY mode (opt-in, no persistence)
 
-- Build forged binary (Unix socket server, fd storage, JSON protocol)
-- Create `DaemonAdapter` implementing `PersistencePort`
-- On pane creation: send fd to daemon for safekeeping
-- On app quit: daemon keeps fds → processes survive
-- On app restart: retrieve fds from daemon, create surfaces with `io_fd` mode
-- Add `WorkspacePersistence` for project/tab structure
-- **Result**: full persistence, tmux-equivalent experience
+- Feature flag: `nativePTY` in ForgeConfig (default false)
+- Create ProcessAdapter using GhosttyKit EXEC mode
+- When flag is on: new panes use ProcessPort instead of TmuxPort
+- Remove input bypass from GhosttyNSView (let Ghostty handle keys)
+- Wire action_cb events to AttentionManager
+- Wire resize_paused in PaneSplitView divider drag
+- Add CWD tracking via proc_pidinfo
+- tmux code path remains for flag=false (no deletions yet)
+- **Quit warning**: "Quitting will end all terminal sessions" (Phase 1 only)
+- **Result**: TUI apps work perfectly, all rendering bugs gone. No persistence.
+
+### Phase 2: forged daemon + persistence
+
+- Build forged binary (bundled in Forge.app)
+- Create DaemonAdapter implementing PersistencePort
+- On pane creation: get fd from Ghostty, send dup to daemon
+- On quit: dump scrollback, save workspace.json, exit cleanly
+- On crash: daemon already has fds (sent at creation time)
+- On reconnect: retrieve fds, create EXTERNAL_FD surfaces, restore scrollback, SIGWINCH
+- Add workspace.json persistence (projects, tabs, panes, splits, window frame)
+- Remove quit warning (persistence works)
+- **Result**: full persistence, tmux-equivalent UX
 
 ### Phase 3: Cleanup
 
-- Remove all tmux infrastructure files
+- Remove all tmux infrastructure files (~1620 lines)
 - Remove bundled tmux binary from Makefile
-- Update CONTEXT.md and domain glossary (remove tmux references)
 - Remove feature flag — native PTY is the only mode
-- Update CLAUDE.md architecture documentation
+- Update CONTEXT.md, CLAUDE.md, domain glossary
+- Delete TmuxPort protocols from Core/Ports
+- Add ProcessPort + PersistencePort to Core/Ports
 - **Result**: clean codebase, no tmux dependency
 
 ## Risks
 
 | Risk | Mitigation |
 |---|---|
-| GhosttyKit io_fd mode requires Zig changes | We own the fork. The change is ~50 lines in Termio. |
-| Daemon crash kills all processes | launchd KeepAlive for auto-restart. Daemon is ~400 lines with minimal failure modes. |
-| No remote/SSH session sharing | Out of scope. Forge is a local app. Add tmux-mode back as an optional feature later if needed. |
-| Attention system needs new backends | Bell is trivial (Ghostty callback). Process monitoring via tcgetpgrp is standard. Content scanning can use Ghostty's inspector API. |
-| Split layout persistence | Already solved — SplitNode tree + proportions stored in workspace.json. |
+| GhosttyKit changes (EXTERNAL_FD, resize_paused, pty_fd) | We own the fork. Changes are small and additive. |
+| Daemon crash kills processes | launchd KeepAlive plist. Daemon is ~400 lines — small failure surface. |
+| Scrollback lost on Forge crash | Accepted for v1. Shells redraw on SIGWINCH. TUI apps redraw fully. Only shell history is lost. |
+| Concurrent Forge instances | Daemon socket has single-owner semantics. Second instance shows error or takes over. |
+| fd exhaustion with many panes | Call `setrlimit(RLIMIT_NOFILE)` at daemon startup. Default 256 is low; raise to 10240. |
+| Shell env differs from tmux | Documented in "Shell Environment" section. TERM is `xterm-ghostty` instead of `tmux-256color`. Most tools handle both. |
+| No remote/SSH session sharing | Out of scope. Forge is a local app. tmux-mode can be re-added later as optional. |
+
+## Error States
+
+| Scenario | UX |
+|---|---|
+| Daemon socket missing on launch | Toast: "Starting forge daemon..." Auto-launch daemon. Retry connection. |
+| Daemon running but no fds (all processes died) | Show empty workspace. Toast: "Previous sessions ended." |
+| workspace.json exists but daemon has different panes | Reconcile: daemon's `list` is authoritative for which panes are alive. Dead panes removed from model. |
+| Daemon crashes mid-session | Terminals keep working (Ghostty holds its own fd copies). Toast: "Daemon lost — restarting..." Auto-relaunch daemon, re-send fds. What's lost: persistence safety net. If Forge ALSO quits before daemon recovers, processes die. |
+| Forge crashes mid-session | On next launch: daemon has fds, workspace.json may be stale. Reconcile and reconnect. Scrollback lost (no dump). |
