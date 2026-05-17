@@ -19,6 +19,9 @@ let package = Package(
             dependencies: ["SwiftTerm", "ForgeCore", "GhosttyKit"],
             path: "Sources",
             exclude: ["Core", "Daemon"],
+            swiftSettings: [
+                .define("GHOSTTY_HAS_IO_READ_CB"),
+            ],
             linkerSettings: [
                 .linkedLibrary("c++"),
                 .linkedFramework("Metal"),

@@ -167,6 +167,53 @@ final class GhosttyRenderer: TerminalRenderer {
     nonisolated(unsafe) private(set) var externalFD: Int32 = -1
     private var readThread: Thread?
 
+    /// Stored reconnection context for event-driven reconnection.
+    private var reconnectPaneId: String?
+    private var reconnectPid: Int32 = 0
+    private var reconnected = false
+
+    /// Configure this EXTERNAL_FD renderer for event-driven reconnection.
+    /// All reconnection work (scrollback, read loop, TIOCSWINSZ) is deferred
+    /// until the surface has a valid size from SwiftUI layout.
+    func configureForReconnect(paneId: String, pid: Int32) {
+        self.reconnectPaneId = paneId
+        self.reconnectPid = pid
+
+        nsView.onSurfaceResize = { [weak self] cols, rows in
+            guard let self, !self.reconnected else { return }
+            guard cols > 0, rows > 0 else { return }
+            self.reconnected = true
+
+            // 1. Surface has valid grid — load scrollback
+            self.loadScrollback(paneId: paneId)
+
+            // 2. Start read loop
+            if self.readThread == nil, self.externalFD >= 0 {
+                self.startReadLoop(fd: self.externalFD)
+            }
+
+            // 3. Send TIOCSWINSZ with actual size from ghostty
+            let frame = self.nsView.frame
+            var ws = winsize()
+            ws.ws_col = UInt16(cols)
+            ws.ws_row = UInt16(rows)
+            ws.ws_xpixel = UInt16(frame.width)
+            ws.ws_ypixel = UInt16(frame.height)
+            _ = ioctl(self.externalFD, TIOCSWINSZ, &ws)
+
+            // 4. SIGWINCH triggers shell redraw
+            if pid > 0 { kill(pid, SIGWINCH) }
+
+            // 5. Start logging for next reconnect
+            self.startScrollbackLog(paneId: paneId)
+
+            ForgeLog.log("[ghostty] Reconnected pane \(paneId): \(cols)x\(rows) (event-driven)")
+
+            // Clear callback
+            self.nsView.onSurfaceResize = nil
+        }
+    }
+
     /// Scrollback log file for this surface. PTY output is tee'd here
     /// during normal operation. On reconnect, fed into the new surface.
     private var scrollbackLogPath: String?
@@ -265,6 +312,10 @@ final class GhosttyRenderer: TerminalRenderer {
             return
         }
 
+        let context = GhosttyCallbackContext(renderer: self)
+        let retained = Unmanaged.passRetained(context)
+        self.callbackContext = retained
+
         var config = ghostty_surface_config_new()
         config.io_mode = GHOSTTY_SURFACE_IO_EXEC
         config.platform_tag = GHOSTTY_PLATFORM_MACOS
@@ -274,6 +325,19 @@ final class GhosttyRenderer: TerminalRenderer {
             )
         )
         config.context = GHOSTTY_SURFACE_CONTEXT_SPLIT
+
+        // Wire output callback for scrollback logging (fires on Ghostty's I/O thread)
+        #if GHOSTTY_HAS_IO_READ_CB
+        config.io_read_cb = { userdata, data, len in
+            guard let userdata, let data else { return }
+            let bytes = Data(bytes: data, count: Int(len))
+            let ctx = Unmanaged<GhosttyCallbackContext>
+                .fromOpaque(userdata)
+                .takeUnretainedValue()
+            ctx.renderer?.appendToScrollbackLog(bytes)
+        }
+        config.io_read_userdata = retained.toOpaque()
+        #endif
 
         // Build env var array — NSString keeps the UTF-8 pointers alive for the closure.
         var envVars: [ghostty_env_var_s] = env.map { key, value in

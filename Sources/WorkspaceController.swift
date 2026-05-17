@@ -124,6 +124,25 @@ final class WorkspaceController {
                 ForgeLog.log("[app] Created default project")
             }
 
+            // Pre-fetch daemon fds BEFORE creating renderers.
+            // This prevents the race where updateRenderers creates EXEC surfaces
+            // that get replaced by EXTERNAL_FD surfaces 40s later.
+            if let daemon = daemonAdapter {
+                let allPanes = workspace.projects.flatMap { $0.tabs.flatMap { $0.panes } }
+                for pane in allPanes {
+                    if let result = try? await daemon.retrieve(paneId: pane.id) {
+                        guard let ghosttyApp else { continue }
+                        let renderer = GhosttyRenderer(ghosttyApp: ghosttyApp, fd: result.fd)
+                        renderer.configureForReconnect(paneId: pane.id, pid: result.pid)
+                        renderer.nsView.onFocusGained = { [weak self] in
+                            self?.lastFocusedPaneId = pane.id
+                        }
+                        paneRenderers[pane.id] = renderer
+                        ForgeLog.log("[daemon] Pre-fetched pane \(pane.id) (fd=\(result.fd))")
+                    }
+                }
+            }
+
             updateRenderers()
             workspace.connected = true
             ForgeLog.log("[app] Connected (native PTY). \(workspace.projects.count) projects.")
