@@ -246,12 +246,10 @@ extension DebugServer {
                     "height": frame.height
                 ]
 
-                // Grid from the renderer's last reported resize (ghostty surface or SwiftTerm).
+                // Grid from the renderer's last reported resize.
                 let gridSize: (cols: Int, rows: Int)?
                 if let ghostty = renderer as? GhosttyRenderer {
                     gridSize = ghostty.lastReportedSize
-                } else if let swiftTerm = renderer as? SwiftTermRenderer {
-                    gridSize = swiftTerm.lastReportedSize
                 } else {
                     gridSize = nil
                 }

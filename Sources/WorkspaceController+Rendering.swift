@@ -1,5 +1,4 @@
 import AppKit
-import SwiftTerm
 import ForgeCore
 
 /// Native pane rendering: renderer creation, lifecycle, and scrollback seeding.
@@ -7,29 +6,17 @@ extension WorkspaceController {
 
     /// Creates a renderer for the given pane, wires input/resize callbacks,
     /// and registers it with the output router.
-    /// Uses GhosttyRenderer when ghosttyApp is available, falls back to SwiftTermRenderer.
     func createRenderer(for pane: Pane) -> any TerminalRenderer {
         let paneId = pane.id
-        let renderer: any TerminalRenderer
 
-        if let ghosttyApp {
-            let ghosttyRenderer = GhosttyRenderer(ghosttyApp: ghosttyApp)
-            // Click-to-focus: tell tmux which pane is active when the user clicks.
-            ghosttyRenderer.nsView.onFocusGained = { [weak self] in
-                guard let self, let adapter = self.tmux as? TmuxAdapter else { return }
-                adapter.controlModeSend("select-pane -t \(paneId)")
-            }
-            renderer = ghosttyRenderer
-        } else {
-            let font = resolvedTerminalFont
-            let (foreground, background, palette) = resolvedTerminalColors
-            renderer = SwiftTermRenderer(
-                font: font,
-                foreground: foreground,
-                background: background,
-                colors: palette
-            )
+        guard let ghosttyApp else { fatalError("createRenderer requires ghosttyApp") }
+        let ghosttyRenderer = GhosttyRenderer(ghosttyApp: ghosttyApp)
+        // Click-to-focus: tell tmux which pane is active when the user clicks.
+        ghosttyRenderer.nsView.onFocusGained = { [weak self] in
+            guard let self, let adapter = self.tmux as? TmuxAdapter else { return }
+            adapter.controlModeSend("select-pane -t \(paneId)")
         }
+        let renderer: any TerminalRenderer = ghosttyRenderer
 
         // Wire keyboard input to tmux via control mode (sub-ms latency).
         // Use send-keys -l (literal) for printable text — it goes through the
@@ -239,27 +226,4 @@ extension WorkspaceController {
         pendingResizes.removeAll()
     }
 
-    // MARK: - Private Helpers
-
-    private var resolvedTerminalFont: NSFont {
-        let family = config.config.terminalFont?.family ??
-                     config.config.terminal?.fontFamily ??
-                     config.config.appearance?.fontFamily
-        let size = config.config.terminalFont?.size ??
-                   config.config.terminal?.fontSize ??
-                   config.config.appearance?.fontSize ?? 13
-        return FontResolver.resolveTerminalFont(family: family, size: CGFloat(size))
-    }
-
-    private var resolvedTerminalColors: (foreground: NSColor, background: NSColor, palette: [SwiftTerm.Color]?) {
-        if let theme = config.resolvedTheme {
-            let fg = NSColor(theme.foreground.color)
-            let bg = NSColor(theme.background.color)
-            let palette = theme.ansiColors.prefix(16).map { ForgeTerminalView.themeColorToTermColor($0) }
-            return (fg, bg, palette.count == 16 ? palette : nil)
-        }
-        let fg = NSColor(red: 0.77, green: 0.78, blue: 0.78, alpha: 1.0)
-        let bg = NSColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1.0)
-        return (fg, bg, nil)
-    }
 }

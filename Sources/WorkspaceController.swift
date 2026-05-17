@@ -36,7 +36,7 @@ final class WorkspaceController {
     /// to apply the user's proportions. On startup, only resize-window is
     /// sent (tmux proportionally scales, preserving stored ratios).
     var sendResizePaneOnFlush = false
-    /// Ghostty app instance for native rendering. Nil when using SwiftTerm fallback.
+    /// Ghostty app instance for native rendering.
     var ghosttyApp: GhosttyApp?
     /// Process adapter for native PTY mode. Nil when using tmux IO.
     var processAdapter: ProcessAdapter?
