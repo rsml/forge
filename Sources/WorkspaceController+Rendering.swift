@@ -163,50 +163,70 @@ extension WorkspaceController {
             paneRenderers.removeValue(forKey: id)
         }
 
+        // Collect panes that need renderers — set a placeholder immediately
+        // to prevent duplicate creation from concurrent updateRenderers calls.
+        var panesToCreate: [(pane: Pane, cwd: String)] = []
         for pane in tab.panes where paneRenderers[pane.id] == nil {
             let cwd = pane.currentPath.isEmpty ? (project.path ?? NSHomeDirectory()) : pane.currentPath
+            panesToCreate.append((pane, cwd))
+        }
+        guard !panesToCreate.isEmpty else { return }
 
-            // Try to reconnect to an existing PTY from the daemon first.
-            // If the daemon has a stored fd for this pane, create an EXTERNAL_FD
-            // renderer (reconnect). Otherwise, create a fresh EXEC renderer.
-            if let daemon = daemonAdapter {
-                let paneId = pane.id
-                Task {
+        if let daemon = daemonAdapter {
+            // Try daemon reconnect for ALL panes in a single Task
+            // to avoid race conditions with concurrent updateRenderers calls.
+            let paneIds = panesToCreate.map { ($0.pane.id, $0.cwd) }
+            Task {
+                for (paneId, cwd) in paneIds {
+                    // Skip if another call already created this renderer
+                    if await MainActor.run(body: { paneRenderers[paneId] != nil }) { continue }
+
                     if let result = try? await daemon.retrieve(paneId: paneId) {
-                        // Reconnect to existing PTY
-                        guard let ghosttyApp else { return }
+                        guard let ghosttyApp else { continue }
                         let renderer = GhosttyRenderer(ghosttyApp: ghosttyApp, fd: result.fd)
+                        let fd = result.fd
+                        let pid = result.pid
                         await MainActor.run {
+                            guard paneRenderers[paneId] == nil else { return }
+                            // Load saved scrollback BEFORE the read loop starts
+                            renderer.loadScrollback(paneId: paneId)
+                            renderer.startScrollbackLog(paneId: paneId)
                             paneRenderers[paneId] = renderer
-                            ForgeLog.log("[daemon] Reconnected pane \(paneId) (fd=\(result.fd), pid=\(result.pid))")
-                            // Force shell redraw via TIOCSWINSZ + SIGWINCH.
-                            // Retry at increasing delays until the frame is valid.
-                            self.scheduleRedraw(fd: result.fd, pid: result.pid,
-                                                renderer: renderer, attempt: 1)
+                            renderer.nsView.onFocusGained = { [weak self] in
+                                self?.lastFocusedPaneId = paneId
+                            }
+                            ForgeLog.log("[daemon] Reconnected pane \(paneId) (fd=\(fd), pid=\(pid))")
+                            self.scheduleRedraw(fd: fd, pid: pid, renderer: renderer, attempt: 1)
                         }
-                        return
-                    }
-                    // No stored fd — create fresh EXEC surface
-                    await MainActor.run {
-                        let renderer = createExecRenderer(for: pane, cwd: cwd)
-                        paneRenderers[paneId] = renderer
-                        // Send fd to daemon after forkpty completes
-                        if let ghostty = renderer as? GhosttyRenderer {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                let fd = ghostty.ptyFD
-                                if fd >= 0 {
-                                    let pid = ghostty.foregroundPID
-                                    Task {
-                                        try? await daemon.store(paneId: paneId, fd: fd, pid: pid, cwd: cwd)
-                                        ForgeLog.log("[daemon] Stored fd=\(fd) for pane \(paneId)")
+                    } else {
+                        // No stored fd — create fresh EXEC surface
+                        await MainActor.run {
+                            guard paneRenderers[paneId] == nil else { return }
+                            guard let pane = tab.panes.first(where: { $0.id == paneId }) else { return }
+                            let renderer = createExecRenderer(for: pane, cwd: cwd)
+                            paneRenderers[paneId] = renderer
+                            // Start scrollback logging for fresh panes too
+                            if let ghostty = renderer as? GhosttyRenderer {
+                                ghostty.startScrollbackLog(paneId: paneId)
+                            }
+                            if let ghostty = renderer as? GhosttyRenderer {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    let fd = ghostty.ptyFD
+                                    if fd >= 0 {
+                                        let pid = ghostty.foregroundPID
+                                        Task {
+                                            try? await daemon.store(paneId: paneId, fd: fd, pid: pid, cwd: cwd)
+                                            ForgeLog.log("[daemon] Stored fd=\(fd) for pane \(paneId)")
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            } else {
-                // No daemon — just create EXEC renderer
+            }
+        } else {
+            for (pane, cwd) in panesToCreate {
                 let renderer = createExecRenderer(for: pane, cwd: cwd)
                 paneRenderers[pane.id] = renderer
             }

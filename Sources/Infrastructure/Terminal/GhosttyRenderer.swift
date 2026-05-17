@@ -143,11 +143,21 @@ final class GhosttyRenderer: TerminalRenderer {
 
         self.externalFD = fd
 
-        // Start reading from the fd on a background thread
-        startReadLoop(fd: fd)
+        // DON'T start reading yet — the surface has no size (0x0 grid).
+        // Output read now would be processed at 0x0 and lost.
+        // The read loop starts when the view gets its first valid frame
+        // (via onSurfaceResize), which means the surface is in a window
+        // and sized. The PTY kernel buffer holds any pending output until then.
+        nsView.onSurfaceResize = { [weak self] _, _ in
+            guard let self, self.readThread == nil, self.externalFD >= 0 else { return }
+            self.startReadLoop(fd: self.externalFD)
+            ForgeLog.log("[ghostty] EXTERNAL_FD read loop started after surface sized (fd=\(self.externalFD))")
+            // Only need this once — clear the callback
+            self.nsView.onSurfaceResize = nil
+        }
 
         if let surface {
-            ForgeLog.log("[ghostty] EXTERNAL_FD surface created (fd=\(fd))")
+            ForgeLog.log("[ghostty] EXTERNAL_FD surface created, read deferred to sizing (fd=\(fd))")
         } else {
             ForgeLog.log("[ghostty] Failed to create EXTERNAL_FD surface")
         }
@@ -156,6 +166,47 @@ final class GhosttyRenderer: TerminalRenderer {
     /// The external PTY fd for reconnected surfaces. -1 if not applicable.
     nonisolated(unsafe) private(set) var externalFD: Int32 = -1
     private var readThread: Thread?
+
+    /// Scrollback log file for this surface. PTY output is tee'd here
+    /// during normal operation. On reconnect, fed into the new surface.
+    private var scrollbackLogPath: String?
+    private var scrollbackLogHandle: FileHandle?
+
+    /// Start logging PTY output to a file for scrollback persistence.
+    func startScrollbackLog(paneId: String) {
+        let dir = NSHomeDirectory() + "/.config/forge/scrollback"
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        let path = dir + "/\(paneId).log"
+        FileManager.default.createFile(atPath: path, contents: nil)
+        scrollbackLogPath = path
+        scrollbackLogHandle = FileHandle(forWritingAtPath: path)
+        scrollbackLogHandle?.seekToEndOfFile()
+    }
+
+    /// Append data to the scrollback log (called from the read thread).
+    private func appendToScrollbackLog(_ data: Data) {
+        scrollbackLogHandle?.write(data)
+        // Cap at 256KB — truncate from the beginning
+        if let path = scrollbackLogPath,
+           let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+           let size = attrs[.size] as? Int, size > 256 * 1024 {
+            if let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
+                let trimmed = data.suffix(128 * 1024) // keep last 128KB
+                try? trimmed.write(to: URL(fileURLWithPath: path))
+                scrollbackLogHandle = FileHandle(forWritingAtPath: path)
+                scrollbackLogHandle?.seekToEndOfFile()
+            }
+        }
+    }
+
+    /// Load and feed saved scrollback into this surface.
+    func loadScrollback(paneId: String) {
+        let path = NSHomeDirectory() + "/.config/forge/scrollback/\(paneId).log"
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              !data.isEmpty else { return }
+        feed(data)
+        ForgeLog.log("[ghostty] Fed \(data.count) bytes of scrollback for pane \(paneId)")
+    }
 
     private func startReadLoop(fd: Int32) {
         let thread = Thread {
@@ -191,6 +242,8 @@ final class GhosttyRenderer: TerminalRenderer {
                     break
                 }
                 let data = Data(bytes: buf, count: n)
+                // Tee to scrollback log (on read thread, non-blocking)
+                self.appendToScrollbackLog(data)
                 DispatchQueue.main.async { [weak self] in
                     self?.feed(data)
                 }
