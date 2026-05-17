@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import ForgeCore
 
@@ -12,6 +13,7 @@ enum WorkspacePersistence {
         var activeProjectId: String?
         var activeTabId: String?
         var windowFrame: WindowFrame?
+        var fullscreen: Bool?
     }
 
     struct PersistedProject: Codable {
@@ -69,11 +71,14 @@ enum WorkspacePersistence {
             WindowFrame(x: $0.origin.x, y: $0.origin.y, width: $0.size.width, height: $0.size.height)
         }
 
+        let isFullscreen = NSApp.mainWindow?.styleMask.contains(.fullScreen) ?? false
+
         let ws = PersistedWorkspace(
             projects: projects,
             activeProjectId: workspace.activeProjectId,
             activeTabId: workspace.activeTabId,
-            windowFrame: frame
+            windowFrame: frame,
+            fullscreen: isFullscreen
         )
 
         do {

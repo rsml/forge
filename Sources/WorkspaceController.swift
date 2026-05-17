@@ -93,11 +93,14 @@ final class WorkspaceController {
                 workspace.activeProjectId = persisted.activeProjectId
                 workspace.activeTabId = persisted.activeTabId
 
-                // Restore window frame
-                if let f = persisted.windowFrame {
-                    DispatchQueue.main.async {
-                        if let window = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible }) {
+                // Restore window frame and fullscreen state
+                DispatchQueue.main.async {
+                    if let window = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible }) {
+                        if let f = persisted.windowFrame {
                             window.setFrame(NSRect(x: f.x, y: f.y, width: f.width, height: f.height), display: true)
+                        }
+                        if persisted.fullscreen == true, !window.styleMask.contains(.fullScreen) {
+                            window.toggleFullScreen(nil)
                         }
                     }
                 }

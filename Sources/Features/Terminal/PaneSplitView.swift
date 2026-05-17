@@ -134,6 +134,10 @@ private struct SplitContainer: View {
         dragStartProportions = nil
         controller.suppressPaneResize = false
 
+        // Write dragged proportions back to the split tree on the Tab model
+        // so they persist to workspace.json.
+        updateSplitTreeProportions()
+
         // Compute target cell counts from the NEW proportions and write them
         // into pendingResizes. Without this, flushPendingResizes sends the
         // current renderer sizes (which haven't changed) — a no-op.
@@ -159,6 +163,49 @@ private struct SplitContainer: View {
 
         controller.sendResizePaneOnFlush = true
         controller.flushPendingResizes()
+    }
+
+    /// Write the current @State proportions back into the Tab's splitTree
+    /// so they persist to workspace.json. Finds this container's node in the
+    /// tree by matching the pane leaf indices.
+    private func updateSplitTreeProportions() {
+        guard let tab = controller.workspace.activeProject?.tabs.first(
+            where: { $0.id == controller.workspace.activeTabId }),
+              var tree = tab.splitTree else { return }
+
+        // Find the first pane ID in our slice — use its index in tab.panes
+        // to locate this node in the tree.
+        guard let firstPaneId = panes.first?.id,
+              let firstPaneIndex = tab.panes.firstIndex(where: { $0.id == firstPaneId }) else { return }
+
+        var leafIndex = 0
+        tree = updateProportionsAt(node: tree, targetLeaf: firstPaneIndex,
+                                    currentLeaf: &leafIndex,
+                                    newProportions: proportions.map { CGFloat($0) })
+        tab.splitTree = tree
+    }
+
+    /// Walk the tree to find the split node that contains targetLeaf as its
+    /// first child leaf, then update its proportions.
+    private func updateProportionsAt(node: SplitNode, targetLeaf: Int,
+                                      currentLeaf: inout Int,
+                                      newProportions: [CGFloat]) -> SplitNode {
+        switch node {
+        case .leaf:
+            currentLeaf += 1
+            return .leaf
+        case .split(let dir, let children, let oldProportions):
+            let startLeaf = currentLeaf
+            let newChildren = children.map { child in
+                updateProportionsAt(node: child, targetLeaf: targetLeaf,
+                                   currentLeaf: &currentLeaf, newProportions: newProportions)
+            }
+            // If this split starts at our target leaf, update its proportions
+            if startLeaf == targetLeaf && newProportions.count == children.count {
+                return .split(dir, newChildren, proportions: newProportions)
+            }
+            return .split(dir, newChildren, proportions: oldProportions)
+        }
     }
 
     // MARK: - Pane Distribution
