@@ -83,7 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.attentionManager = attentionManager
         controller.notifier = notifier
 
-        if configStore.isNativePaneRendering || configStore.isNativePTY {
+        if configStore.isNativePaneRendering {
             let ga = GhosttyApp()
             // Apply Forge's font and theme to ghostty
             let fontFamily = configStore.config.terminalFont?.family
@@ -114,12 +114,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ghosttyApp = ga
         }
         controller.ghosttyApp = ghosttyApp
-        if let ga = ghosttyApp {
-            wireGhosttyCallbacks(ga, controller: controller)
-        }
-        if configStore.isNativePTY, let ga = ghosttyApp {
-            controller.processAdapter = ProcessAdapter(ghosttyApp: ga)
-        }
 
         createMainWindow()
         appState.bind(
@@ -160,43 +154,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
             MainActor.assumeIsolated { self?.titleBarManager?.syncAppearance() }
-        }
-    }
-
-    private func wireGhosttyCallbacks(_ ghosttyApp: GhosttyApp, controller: WorkspaceController) {
-        ghosttyApp.onBell = { [weak controller] surface in
-            guard let controller, let (_, tab) = controller.findPaneBySurface(surface) else { return }
-            for pane in tab.panes { pane.hasBell = true }
-            controller.attentionManager?.handleEvent(.bell(tabUUID: tab.uuid))
-        }
-
-        ghosttyApp.onChildExited = { [weak controller] surface in
-            guard let controller, let (pane, _) = controller.findPaneBySurface(surface) else { return }
-            ForgeLog.log("[app] Child exited in pane \(pane.id)")
-            pane.status = .idle
-        }
-
-        ghosttyApp.onCommandFinished = { [weak controller] surface in
-            guard let controller, let (_, tab) = controller.findPaneBySurface(surface) else { return }
-            controller.attentionManager?.handleEvent(.commandCompleted(tabUUID: tab.uuid))
-        }
-
-        ghosttyApp.onCellSize = { [weak controller] surface, w, h in
-            guard let controller else { return }
-            let scale = NSScreen.main?.backingScaleFactor ?? 2.0
-            controller.terminalCellSize = CGSize(
-                width: CGFloat(w) / scale,
-                height: CGFloat(h) / scale
-            )
-        }
-
-        ghosttyApp.onSetTitle = { _, title in
-            ForgeLog.log("[app] Title set: \(title)")
-        }
-
-        ghosttyApp.onPwd = { [weak controller] surface, pwd in
-            guard let controller, let (pane, _) = controller.findPaneBySurface(surface) else { return }
-            pane.currentPath = pwd
         }
     }
 

@@ -107,30 +107,11 @@ extension WorkspaceController {
         return renderer
     }
 
-    /// Creates an EXEC mode renderer for the given pane. Ghostty owns the PTY
-    /// directly — no tmux IO wiring, no OutputRouter registration.
-    func createExecRenderer(for pane: Pane, cwd: String) -> any TerminalRenderer {
-        guard let ghosttyApp else {
-            fatalError("nativePTY requires ghosttyApp")
-        }
-        return GhosttyRenderer(ghosttyApp: ghosttyApp, cwd: cwd)
-    }
-
     /// Synchronizes renderers with the active tab's panes.
-    /// Dispatches to the appropriate path based on feature flags.
+    /// Creates renderers for new panes, removes stale ones.
     func updateRenderers() {
-        guard config.isNativePaneRendering || config.isNativePTY else { return }
+        guard config.isNativePaneRendering else { return }
 
-        if config.isNativePTY {
-            updateRenderersNativePTY()
-        } else {
-            updateRenderersLegacy()
-        }
-    }
-
-    /// Legacy renderer path: tmux control mode IO (MANUAL mode).
-    /// Wires onInput/onResize and registers with OutputRouter.
-    private func updateRenderersLegacy() {
         guard let project = workspace.activeProject,
               let tabId = workspace.activeTabId,
               let tab = project.tabs.first(where: { $0.id == tabId })
@@ -151,39 +132,6 @@ extension WorkspaceController {
         // Create renderers for new panes
         for pane in tab.panes where paneRenderers[pane.id] == nil {
             let renderer = createRenderer(for: pane)
-            paneRenderers[pane.id] = renderer
-        }
-
-        // Update cursor focus: only the active pane gets a blinking cursor,
-        // others show an outline (unfocused) cursor.
-        let activePaneId = tab.panes.first(where: \.active)?.id
-        for (id, renderer) in paneRenderers {
-            renderer.setFocused(id == activePaneId)
-        }
-    }
-
-    /// Native PTY renderer path: EXEC mode (Ghostty owns PTY directly).
-    /// No tmux IO wiring, no OutputRouter registration.
-    private func updateRenderersNativePTY() {
-        guard let project = workspace.activeProject,
-              let tabId = workspace.activeTabId,
-              let tab = project.tabs.first(where: { $0.id == tabId })
-        else {
-            paneRenderers.removeAll()
-            return
-        }
-
-        let livePaneIds = Set(tab.panes.map(\.id))
-
-        // Remove stale renderers (panes that no longer exist)
-        for id in paneRenderers.keys where !livePaneIds.contains(id) {
-            paneRenderers.removeValue(forKey: id)
-        }
-
-        // Create EXEC renderers for new panes
-        for pane in tab.panes where paneRenderers[pane.id] == nil {
-            let cwd = pane.currentPath.isEmpty ? (project.path ?? NSHomeDirectory()) : pane.currentPath
-            let renderer = createExecRenderer(for: pane, cwd: cwd)
             paneRenderers[pane.id] = renderer
         }
 

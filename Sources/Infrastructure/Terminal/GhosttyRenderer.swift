@@ -4,9 +4,6 @@ import GhosttyKit
 /// Ghostty-backed terminal renderer using MANUAL IO mode.
 /// The surface does not start a child process. Instead, data is pushed in via
 /// `feed(_:)` and user input arrives via the `io_write_cb` callback.
-///
-/// A second initializer `init(ghosttyApp:cwd:env:)` uses EXEC mode, where
-/// Ghostty forks a shell, owns the PTY, and handles all I/O natively.
 @MainActor
 final class GhosttyRenderer: TerminalRenderer {
     // nonisolated(unsafe): opaque pointers freed in deinit, which is
@@ -21,10 +18,6 @@ final class GhosttyRenderer: TerminalRenderer {
     var lastReportedSize: (cols: Int, rows: Int)?
 
     var view: NSView { nsView }
-
-    /// Read-only accessor for the underlying surface pointer.
-    /// Used by WorkspaceController.findPaneBySurface to map surface → domain model.
-    var surfaceHandle: ghostty_surface_t? { surface }
 
     init(ghosttyApp: GhosttyApp) {
         nsView = GhosttyNSView(frame: .zero)
@@ -89,66 +82,6 @@ final class GhosttyRenderer: TerminalRenderer {
             ForgeLog.log("[ghostty] Surface created successfully")
         } else {
             ForgeLog.log("[ghostty] Failed to create surface")
-        }
-    }
-
-    /// Creates a renderer in EXEC mode: Ghostty forks a shell, owns the PTY,
-    /// and handles all I/O natively. No `onInput`/`onResize` wiring is needed.
-    ///
-    /// - Parameters:
-    ///   - ghosttyApp: The shared Ghostty application instance.
-    ///   - cwd: Working directory for the spawned shell process.
-    ///   - env: Additional environment variables to set in the shell environment.
-    init(ghosttyApp: GhosttyApp, cwd: String, env: [String: String] = [:]) {
-        nsView = GhosttyNSView(frame: .zero)
-        nsView.execMode = true
-
-        guard let app = ghosttyApp.app else {
-            ForgeLog.log("[ghostty] Cannot create EXEC renderer — app not initialized")
-            return
-        }
-
-        var config = ghostty_surface_config_new()
-        // GHOSTTY_SURFACE_IO_EXEC = 0 is the default; set explicitly for clarity.
-        config.io_mode = GHOSTTY_SURFACE_IO_EXEC
-        config.platform_tag = GHOSTTY_PLATFORM_MACOS
-        config.platform = ghostty_platform_u(
-            macos: ghostty_platform_macos_s(
-                nsview: Unmanaged.passUnretained(nsView).toOpaque()
-            )
-        )
-        config.context = GHOSTTY_SURFACE_CONTEXT_SPLIT
-
-        // Build env var array. Keys/values are Swift strings whose storage must
-        // outlive ghostty_surface_new; withCString keeps them alive for the
-        // duration of the closure.
-        var envVars: [ghostty_env_var_s] = env.map { key, value in
-            ghostty_env_var_s(key: (key as NSString).utf8String, value: (value as NSString).utf8String)
-        }
-
-        cwd.withCString { cwdPtr in
-            config.working_directory = cwdPtr
-            if envVars.isEmpty {
-                config.env_vars = nil
-                config.env_var_count = 0
-            } else {
-                envVars.withUnsafeMutableBufferPointer { buf in
-                    config.env_vars = buf.baseAddress
-                    config.env_var_count = buf.count
-                    surface = ghostty_surface_new(app, &config)
-                }
-                return
-            }
-            surface = ghostty_surface_new(app, &config)
-        }
-
-        nsView.surface = surface
-
-        if let surface {
-            ghostty_surface_set_content_scale(surface, 2.0, 2.0)
-            ForgeLog.log("[ghostty] EXEC surface created successfully (cwd: \(cwd))")
-        } else {
-            ForgeLog.log("[ghostty] Failed to create EXEC surface")
         }
     }
 

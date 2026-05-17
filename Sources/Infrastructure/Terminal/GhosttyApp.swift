@@ -18,15 +18,6 @@ final class GhosttyApp {
     nonisolated(unsafe) private var tickScheduled = false
     private let tickLock = NSLock()
 
-    // Action callbacks — set by callers who need to observe Ghostty events.
-    // All callbacks are dispatched to the main thread before being invoked.
-    var onBell: ((ghostty_surface_t?) -> Void)?
-    var onSetTitle: ((ghostty_surface_t?, String) -> Void)?
-    var onCellSize: ((ghostty_surface_t?, UInt32, UInt32) -> Void)?
-    var onChildExited: ((ghostty_surface_t?) -> Void)?
-    var onCommandFinished: ((ghostty_surface_t?) -> Void)?
-    var onPwd: ((ghostty_surface_t?, String) -> Void)?
-
     nonisolated(unsafe) private var focusObservers: [NSObjectProtocol] = []
 
     init() {
@@ -143,55 +134,13 @@ final class GhosttyApp {
             app.handleWakeup()
         }
 
-        runtime.action_cb = { userdata, target, action in
-            guard let userdata else { return false }
-            let ghosttyApp = Unmanaged<GhosttyApp>.fromOpaque(userdata).takeUnretainedValue()
-
-            // Extract the surface from target (may be nil for app-level actions).
-            let surface: ghostty_surface_t? = target.tag == GHOSTTY_TARGET_SURFACE
-                ? target.target.surface
-                : nil
-
-            switch action.tag {
-            case GHOSTTY_ACTION_RING_BELL:
-                DispatchQueue.main.async { ghosttyApp.onBell?(surface) }
-                return true
-
-            case GHOSTTY_ACTION_SET_TITLE:
-                // Copy the title string immediately — the pointer is only valid during this callback.
-                let title = action.action.set_title.title.map { String(cString: $0) } ?? ""
-                DispatchQueue.main.async { ghosttyApp.onSetTitle?(surface, title) }
-                return true
-
-            case GHOSTTY_ACTION_CELL_SIZE:
-                let w = action.action.cell_size.width
-                let h = action.action.cell_size.height
-                DispatchQueue.main.async { ghosttyApp.onCellSize?(surface, w, h) }
-                return true
-
-            case GHOSTTY_ACTION_SHOW_CHILD_EXITED:
-                DispatchQueue.main.async { ghosttyApp.onChildExited?(surface) }
-                return true
-
-            case GHOSTTY_ACTION_COMMAND_FINISHED:
-                DispatchQueue.main.async { ghosttyApp.onCommandFinished?(surface) }
-                return true
-
-            case GHOSTTY_ACTION_PWD:
-                // Copy the pwd string immediately — the pointer is only valid during this callback.
-                let pwd = action.action.pwd.pwd.map { String(cString: $0) } ?? ""
-                DispatchQueue.main.async { ghosttyApp.onPwd?(surface, pwd) }
-                return true
-
-            default:
-                return false
-            }
+        runtime.action_cb = { _, _, _ in
+            // Stub: action dispatch handled in later tasks.
+            return false
         }
 
         runtime.read_clipboard_cb = { _, _, _ in
-            // Clipboard reads require a surface reference to complete the request,
-            // which is not available in this callback. Return false so Ghostty
-            // uses its own fallback path.
+            // Stub: clipboard read handled in later tasks.
             return false
         }
 
