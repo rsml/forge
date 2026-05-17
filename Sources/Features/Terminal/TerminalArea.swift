@@ -23,8 +23,14 @@ struct TerminalArea: View {
     @ViewBuilder
     private func nativeTerminal(tab: ForgeCore.Tab) -> some View {
         Group {
-            if tab.panes.count > 1, let layout = tab.layout {
-                let tree = LayoutParser.parse(layout)
+            if tab.panes.count > 1 {
+                let tree: SplitNode = if let layout = tab.layout {
+                    LayoutParser.parse(layout)
+                } else {
+                    .split(.vertical,
+                           [SplitNode](repeating: .leaf, count: tab.panes.count),
+                           proportions: [CGFloat](repeating: 1.0 / CGFloat(tab.panes.count), count: tab.panes.count))
+                }
                 PaneSplitView(node: tree, panes: tab.panes[...], renderers: controller.paneRenderers)
             } else if let pane = tab.panes.first, let renderer = controller.paneRenderers[pane.id] {
                 PaneTerminalView(renderer: renderer).id(pane.id)

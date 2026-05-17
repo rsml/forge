@@ -236,8 +236,35 @@ extension WorkspaceController {
     }
 
     func splitPane(direction: SplitDirection) {
+        if config.isNativePTY {
+            splitPaneNativePTY(direction: direction)
+            return
+        }
         guard let tabId = workspace.activeTabId else { return }
         Task { await tmux.splitWindow(id: tabId, direction: direction) }
+    }
+
+    private func splitPaneNativePTY(direction: SplitDirection) {
+        guard let project = workspace.activeProject,
+              let tabId = workspace.activeTabId,
+              let tab = project.tabs.first(where: { $0.id == tabId })
+        else { return }
+
+        // Create a new pane
+        let paneId = UUID().uuidString
+        let cwd = project.path ?? NSHomeDirectory()
+        let pane = Pane(id: paneId, tabId: tabId, currentPath: cwd)
+        tab.panes.append(pane)
+
+        // Update split tree — for now just track the pane count
+        // (PaneSplitView handles the layout from tab.layout / LayoutParser)
+        // In native PTY mode, we manage the split tree directly on the tab.
+
+        ForgeLog.log("[app] Split pane \(direction) → new pane \(paneId)")
+        updateRenderers()
+
+        // Save workspace after structural change
+        WorkspacePersistence.save(workspace: workspace, windowFrame: nil)
     }
 
     func reorderTab(in project: Project, from: Int, to: Int) {

@@ -149,6 +149,12 @@ extension DebugServer {
             await ctrl.syncEngine.refresh()
             return jsonResponse(["ok": true])
 
+        case "splitPane":
+            let dir = (args["direction"] as? String) == "horizontal"
+                ? SplitDirection.horizontal : SplitDirection.vertical
+            ctrl.splitPane(direction: dir)
+            return jsonResponse(["ok": true])
+
         default:
             return jsonResponse(["error": "Unknown action: \(action)"], status: "400 Bad Request")
         }
