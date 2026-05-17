@@ -56,6 +56,61 @@ final class WorkspaceController {
     // MARK: - Lifecycle
 
     func connect() {
+        if config.isNativePTY {
+            connectNativePTY()
+            return
+        }
+        connectTmux()
+    }
+
+    /// Native PTY connect: load workspace from JSON, no tmux.
+    private func connectNativePTY() {
+        Task {
+            ForgeLog.log("[app] Connecting (native PTY mode)...")
+
+            // Load workspace structure from disk
+            if let persisted = WorkspacePersistence.load() {
+                for pp in persisted.projects {
+                    let project = Project(id: pp.id, name: pp.name, path: pp.path)
+                    for pt in pp.tabs {
+                        let tab = Tab(id: pt.id, projectId: pp.id, index: project.tabs.count, name: pt.name)
+                        for pp in pt.panes {
+                            let pane = Pane(id: pp.id, tabId: pt.id, currentPath: pp.cwd)
+                            tab.panes.append(pane)
+                        }
+                        project.tabs.append(tab)
+                    }
+                    workspace.projects.append(project)
+                }
+                workspace.activeProjectId = persisted.activeProjectId
+                workspace.activeTabId = persisted.activeTabId
+                ForgeLog.log("[app] Loaded \(workspace.projects.count) projects from workspace.json")
+            }
+
+            // If no persisted workspace, create a default project
+            if workspace.projects.isEmpty {
+                let id = UUID().uuidString
+                let project = Project(id: id, name: "default", path: NSHomeDirectory())
+                let tabId = UUID().uuidString
+                let tab = Tab(id: tabId, projectId: id, index: 0, name: "zsh")
+                let paneId = UUID().uuidString
+                let pane = Pane(id: paneId, tabId: tabId, currentPath: NSHomeDirectory())
+                tab.panes.append(pane)
+                project.tabs.append(tab)
+                workspace.projects.append(project)
+                workspace.activeProjectId = id
+                workspace.activeTabId = tabId
+                ForgeLog.log("[app] Created default project")
+            }
+
+            updateRenderers()
+            workspace.connected = true
+            ForgeLog.log("[app] Connected (native PTY). \(workspace.projects.count) projects.")
+        }
+    }
+
+    /// Legacy tmux connect flow.
+    private func connectTmux() {
         Task {
             ForgeLog.log("[app] Connecting...")
             cleanStaleSocket()
