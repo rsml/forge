@@ -159,23 +159,48 @@ extension WorkspaceController {
 
         for pane in tab.panes where paneRenderers[pane.id] == nil {
             let cwd = pane.currentPath.isEmpty ? (project.path ?? NSHomeDirectory()) : pane.currentPath
-            let renderer = createExecRenderer(for: pane, cwd: cwd)
-            paneRenderers[pane.id] = renderer
 
-            // Send the PTY fd to daemon for persistence (after a short delay
-            // to let forkpty complete on the Termio thread).
-            if let daemon = daemonAdapter, let ghostty = renderer as? GhosttyRenderer {
+            // Try to reconnect to an existing PTY from the daemon first.
+            // If the daemon has a stored fd for this pane, create an EXTERNAL_FD
+            // renderer (reconnect). Otherwise, create a fresh EXEC renderer.
+            if let daemon = daemonAdapter {
                 let paneId = pane.id
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    let fd = ghostty.ptyFD
-                    if fd >= 0 {
-                        let pid = ghostty.foregroundPID
-                        Task {
-                            try? await daemon.store(paneId: paneId, fd: fd, pid: pid, cwd: cwd)
-                            ForgeLog.log("[daemon] Stored fd=\(fd) for pane \(paneId)")
+                Task {
+                    if let result = try? await daemon.retrieve(paneId: paneId) {
+                        // Reconnect to existing PTY
+                        guard let ghosttyApp else { return }
+                        let renderer = GhosttyRenderer(ghosttyApp: ghosttyApp, fd: result.fd)
+                        await MainActor.run {
+                            paneRenderers[paneId] = renderer
+                            ForgeLog.log("[daemon] Reconnected pane \(paneId) (fd=\(result.fd))")
+                            // Send SIGWINCH to force the shell to redraw
+                            kill(result.pid, SIGWINCH)
+                        }
+                        return
+                    }
+                    // No stored fd — create fresh EXEC surface
+                    await MainActor.run {
+                        let renderer = createExecRenderer(for: pane, cwd: cwd)
+                        paneRenderers[paneId] = renderer
+                        // Send fd to daemon after forkpty completes
+                        if let ghostty = renderer as? GhosttyRenderer {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                let fd = ghostty.ptyFD
+                                if fd >= 0 {
+                                    let pid = ghostty.foregroundPID
+                                    Task {
+                                        try? await daemon.store(paneId: paneId, fd: fd, pid: pid, cwd: cwd)
+                                        ForgeLog.log("[daemon] Stored fd=\(fd) for pane \(paneId)")
+                                    }
+                                }
+                            }
                         }
                     }
                 }
+            } else {
+                // No daemon — just create EXEC renderer
+                let renderer = createExecRenderer(for: pane, cwd: cwd)
+                paneRenderers[pane.id] = renderer
             }
         }
 
