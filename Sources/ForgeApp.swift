@@ -83,7 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.attentionManager = attentionManager
         controller.notifier = notifier
 
-        if configStore.isNativePaneRendering {
+        if configStore.isNativePaneRendering || configStore.isNativePTY {
             let ga = GhosttyApp()
             // Apply Forge's font and theme to ghostty
             let fontFamily = configStore.config.terminalFont?.family
@@ -114,6 +114,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ghosttyApp = ga
         }
         controller.ghosttyApp = ghosttyApp
+        if configStore.isNativePTY, let ga = ghosttyApp {
+            controller.processAdapter = ProcessAdapter(ghosttyApp: ga)
+        }
 
         createMainWindow()
         appState.bind(

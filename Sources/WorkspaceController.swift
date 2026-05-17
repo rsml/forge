@@ -38,6 +38,8 @@ final class WorkspaceController {
     var sendResizePaneOnFlush = false
     /// Ghostty app instance for native rendering. Nil when using SwiftTerm fallback.
     var ghosttyApp: GhosttyApp?
+    /// Process adapter for native PTY mode. Nil when using tmux IO.
+    var processAdapter: ProcessAdapter?
 
     var gitBranch: String? { syncEngine.gitBranch }
 
