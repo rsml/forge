@@ -231,9 +231,10 @@ extension WorkspaceController {
             }
         }
 
-        let activePaneId = tab.panes.first(where: \.active)?.id
+        // Use lastFocusedPaneId for cursor focus (\.active is tmux-only)
+        let focusId = lastFocusedPaneId ?? tab.panes.last?.id
         for (id, renderer) in paneRenderers {
-            renderer.setFocused(id == activePaneId)
+            renderer.setFocused(id == focusId)
         }
 
         // Save workspace structure after any renderer change (continuous persistence)

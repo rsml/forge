@@ -376,9 +376,19 @@ extension WorkspaceController {
             tab.splitTree = .split(direction, [.leaf, .leaf], proportions: [0.5, 0.5])
         }
 
+        // Set focus to the NEW pane (so subsequent splits target it)
+        lastFocusedPaneId = paneId
+
         ForgeLog.log("[app] Split \(direction) at pane[\(activePaneIndex)] → \(paneId) (tree: \(tab.splitTree?.leafCount ?? 0) leaves, panes: \(tab.panes.count))")
         updateRenderers()
         WorkspacePersistence.save(workspace: workspace, windowFrame: nil)
+
+        // Make the new pane's view first responder (visual focus)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            if let renderer = self?.paneRenderers[paneId] as? GhosttyRenderer {
+                renderer.nsView.window?.makeFirstResponder(renderer.nsView)
+            }
+        }
     }
 
     /// Recursively find the Nth leaf in the tree and replace it with a split.
