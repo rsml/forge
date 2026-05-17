@@ -97,7 +97,13 @@ extension WorkspaceController {
     /// Creates an EXEC mode renderer — Ghostty owns the PTY directly.
     func createExecRenderer(for pane: Pane, cwd: String) -> any TerminalRenderer {
         guard let ghosttyApp else { fatalError("nativePTY requires ghosttyApp") }
-        return GhosttyRenderer(ghosttyApp: ghosttyApp, cwd: cwd)
+        let renderer = GhosttyRenderer(ghosttyApp: ghosttyApp, cwd: cwd)
+        // Track which pane was last focused (for split targeting)
+        let paneId = pane.id
+        renderer.nsView.onFocusGained = { [weak self] in
+            self?.lastFocusedPaneId = paneId
+        }
+        return renderer
     }
 
     /// Synchronizes renderers with the active tab's panes.

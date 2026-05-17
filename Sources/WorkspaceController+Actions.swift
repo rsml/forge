@@ -177,6 +177,11 @@ extension WorkspaceController {
     }
 
     func closeCurrentPane() {
+        if config.isNativePTY {
+            closeCurrentPaneNativePTY()
+            return
+        }
+
         guard let project = workspace.activeProject,
               let tabId = workspace.activeTabId,
               let tab = project.tabs.first(where: { $0.id == tabId })
@@ -201,6 +206,100 @@ extension WorkspaceController {
             removeTab(tab, in: project)
         case .project(let project):
             Task { await removeProject(project) }
+        }
+    }
+
+    private func closeCurrentPaneNativePTY() {
+        guard let project = workspace.activeProject,
+              let tabId = workspace.activeTabId,
+              let tab = project.tabs.first(where: { $0.id == tabId })
+        else { return }
+
+        // Find the focused pane
+        let paneIndex: Int = {
+            if let focusedId = lastFocusedPaneId,
+               let idx = tab.panes.firstIndex(where: { $0.id == focusedId }) {
+                return idx
+            }
+            return max(tab.panes.count - 1, 0)
+        }()
+
+        guard paneIndex < tab.panes.count else { return }
+        let paneToClose = tab.panes[paneIndex]
+
+        // If it's the last pane, close the tab/project
+        if tab.panes.count <= 1 {
+            if project.tabs.count <= 1 {
+                // Last tab in project — remove project
+                workspace.projects.removeAll { $0.id == project.id }
+                if workspace.projects.isEmpty {
+                    // Create a fresh default project
+                    let id = UUID().uuidString
+                    let p = Project(id: id, name: "default", path: NSHomeDirectory())
+                    let t = Tab(id: UUID().uuidString, projectId: id, index: 0, name: "zsh")
+                    t.panes.append(Pane(id: UUID().uuidString, tabId: t.id, currentPath: NSHomeDirectory()))
+                    p.tabs.append(t)
+                    workspace.projects.append(p)
+                    workspace.activeProjectId = id
+                    workspace.activeTabId = t.id
+                }
+            }
+            // Just let the renderer be cleaned up by updateRenderers
+        } else {
+            // Remove the pane and update the split tree
+            tab.panes.remove(at: paneIndex)
+
+            // Collapse the split tree: remove the Nth leaf
+            if let tree = tab.splitTree {
+                var leafIndex = 0
+                tab.splitTree = removeLeafAt(node: tree, targetLeaf: paneIndex, currentLeaf: &leafIndex)
+            }
+
+            // If only 1 pane left, clear the tree
+            if tab.panes.count <= 1 {
+                tab.splitTree = nil
+            }
+
+            // Release daemon fd
+            if let daemon = daemonAdapter {
+                Task { try? await daemon.release(paneId: paneToClose.id) }
+            }
+        }
+
+        // Remove renderer
+        paneRenderers.removeValue(forKey: paneToClose.id)
+
+        ForgeLog.log("[app] Closed pane \(paneToClose.id)")
+        updateRenderers()
+        WorkspacePersistence.save(workspace: workspace, windowFrame: nil)
+    }
+
+    /// Remove the Nth leaf from the tree, collapsing its parent if only one child remains.
+    private func removeLeafAt(node: SplitNode, targetLeaf: Int, currentLeaf: inout Int) -> SplitNode? {
+        switch node {
+        case .leaf:
+            if currentLeaf == targetLeaf {
+                currentLeaf += 1
+                return nil // Remove this leaf
+            }
+            currentLeaf += 1
+            return .leaf
+        case .split(let dir, let children, let proportions):
+            var newChildren: [SplitNode] = []
+            var newProportions: [CGFloat] = []
+            for (i, child) in children.enumerated() {
+                if let kept = removeLeafAt(node: child, targetLeaf: targetLeaf, currentLeaf: &currentLeaf) {
+                    newChildren.append(kept)
+                    if i < proportions.count { newProportions.append(proportions[i]) }
+                }
+            }
+            if newChildren.count <= 1 {
+                return newChildren.first ?? .leaf
+            }
+            // Renormalize proportions
+            let sum = newProportions.reduce(0, +)
+            if sum > 0 { newProportions = newProportions.map { $0 / sum } }
+            return .split(dir, newChildren, proportions: newProportions)
         }
     }
 
@@ -254,20 +353,14 @@ extension WorkspaceController {
         let cwd = project.path ?? NSHomeDirectory()
         let pane = Pane(id: paneId, tabId: tabId, currentPath: cwd)
 
-        // Find which pane is active (focused). In native PTY, use the pane
-        // that has a renderer with first-responder focus, or fall back to last pane.
+        // Find which pane was last focused (clicked). Can't use firstResponder
+        // because clicking a toolbar button moves focus away from the terminal.
         let activePaneIndex: Int = {
-            // Check which renderer is first responder
-            for (i, p) in tab.panes.enumerated() {
-                if let r = paneRenderers[p.id] as? GhosttyRenderer,
-                   r.nsView.window?.firstResponder === r.nsView {
-                    return i
-                }
+            if let focusedId = lastFocusedPaneId,
+               let idx = tab.panes.firstIndex(where: { $0.id == focusedId }) {
+                return idx
             }
-            // Fall back to last pane with a renderer
-            for i in stride(from: tab.panes.count - 1, through: 0, by: -1) {
-                if paneRenderers[tab.panes[i].id] != nil { return i }
-            }
+            // Fall back to last pane
             return max(tab.panes.count - 1, 0)
         }()
 

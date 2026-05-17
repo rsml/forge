@@ -42,6 +42,10 @@ final class WorkspaceController {
     var processAdapter: ProcessAdapter?
     /// Daemon adapter for PTY fd persistence. Nil when using tmux.
     var daemonAdapter: DaemonAdapter?
+    /// Last focused pane ID — set by GhosttyNSView.onFocusGained.
+    /// Used by splitPane to know which pane to split (firstResponder
+    /// changes when clicking toolbar buttons).
+    var lastFocusedPaneId: String?
 
     var gitBranch: String? { syncEngine.gitBranch }
 
