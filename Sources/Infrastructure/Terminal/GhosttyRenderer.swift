@@ -88,6 +88,84 @@ final class GhosttyRenderer: TerminalRenderer {
     /// Public accessor for surface pointer (used by findPaneBySurface).
     var surfaceHandle: ghostty_surface_t? { surface }
 
+    /// Creates a renderer for reconnecting to a pre-existing PTY fd.
+    /// Uses MANUAL IO mode with a background read thread on the fd.
+    /// Input is written directly to the fd (no tmux send-keys).
+    init(ghosttyApp: GhosttyApp, fd: Int32) {
+        nsView = GhosttyNSView(frame: .zero)
+        nsView.execMode = true // native key handling
+
+        guard let app = ghosttyApp.app else {
+            ForgeLog.log("[ghostty] Cannot create EXTERNAL_FD renderer — app not initialized")
+            return
+        }
+
+        let context = GhosttyCallbackContext(renderer: self)
+        let retained = Unmanaged.passRetained(context)
+        self.callbackContext = retained
+
+        var config = ghostty_surface_config_new()
+        config.io_mode = GHOSTTY_SURFACE_IO_MANUAL
+        config.io_write_cb = { userdata, data, len in
+            guard let userdata, let data else { return }
+            // Write directly to the PTY fd
+            let ctx = Unmanaged<GhosttyCallbackContext>
+                .fromOpaque(userdata)
+                .takeUnretainedValue()
+            if let renderer = ctx.renderer, renderer.externalFD >= 0 {
+                _ = Darwin.write(renderer.externalFD, data, Int(len))
+            }
+        }
+        config.io_write_userdata = retained.toOpaque()
+        config.platform_tag = GHOSTTY_PLATFORM_MACOS
+        config.platform = ghostty_platform_u(
+            macos: ghostty_platform_macos_s(
+                nsview: Unmanaged.passUnretained(nsView).toOpaque()
+            )
+        )
+        config.context = GHOSTTY_SURFACE_CONTEXT_SPLIT
+
+        surface = ghostty_surface_new(app, &config)
+        nsView.pendingSurface = surface
+
+        self.externalFD = fd
+
+        // Start reading from the fd on a background thread
+        startReadLoop(fd: fd)
+
+        if let surface {
+            ForgeLog.log("[ghostty] EXTERNAL_FD surface created (fd=\(fd))")
+        } else {
+            ForgeLog.log("[ghostty] Failed to create EXTERNAL_FD surface")
+        }
+    }
+
+    /// The external PTY fd for reconnected surfaces. -1 if not applicable.
+    nonisolated(unsafe) private(set) var externalFD: Int32 = -1
+    private var readThread: Thread?
+
+    private func startReadLoop(fd: Int32) {
+        let thread = Thread {
+            let bufSize = 8192
+            let buf = UnsafeMutableRawPointer.allocate(byteCount: bufSize, alignment: 1)
+            defer { buf.deallocate() }
+            while true {
+                let n = Darwin.read(fd, buf, bufSize)
+                if n <= 0 { break } // fd closed or error
+                let data = Data(bytes: buf, count: n)
+                DispatchQueue.main.async { [weak self] in
+                    self?.feed(data)
+                }
+            }
+            DispatchQueue.main.async {
+                ForgeLog.log("[ghostty] EXTERNAL_FD read loop ended (fd=\(fd))")
+            }
+        }
+        thread.name = "forged-fd-\(fd)"
+        thread.start()
+        readThread = thread
+    }
+
     /// Creates a renderer in EXEC mode: Ghostty forks a shell, owns the PTY,
     /// and handles all I/O natively. No onInput/onResize wiring needed.
     init(ghosttyApp: GhosttyApp, cwd: String, env: [String: String] = [:]) {
