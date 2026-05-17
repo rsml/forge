@@ -179,29 +179,10 @@ extension WorkspaceController {
                         await MainActor.run {
                             paneRenderers[paneId] = renderer
                             ForgeLog.log("[daemon] Reconnected pane \(paneId) (fd=\(result.fd), pid=\(result.pid))")
-                            // Trigger shell redraw after surface is connected and sized.
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                let fd = result.fd
-                                let frame = renderer.view.frame
-                                guard frame.width > 0, frame.height > 0 else {
-                                    ForgeLog.log("[daemon] Skipping TIOCSWINSZ — frame is zero")
-                                    return
-                                }
-                                // Use exact cell size from ghostty, or estimate from font
-                                let cellSize = renderer.exactCellSize
-                                let cw = cellSize.width > 0 ? cellSize.width : 9.0
-                                let ch = cellSize.height > 0 ? cellSize.height : 19.0
-                                var ws = winsize()
-                                ws.ws_col = UInt16(frame.width / cw)
-                                ws.ws_row = UInt16(frame.height / ch)
-                                ws.ws_xpixel = UInt16(frame.width)
-                                ws.ws_ypixel = UInt16(frame.height)
-                                _ = ioctl(fd, TIOCSWINSZ, &ws)
-                                ForgeLog.log("[daemon] TIOCSWINSZ fd=\(fd) → \(ws.ws_col)x\(ws.ws_row)")
-                                if result.pid > 0 {
-                                    kill(result.pid, SIGWINCH)
-                                }
-                            }
+                            // Force shell redraw via TIOCSWINSZ + SIGWINCH.
+                            // Retry at increasing delays until the frame is valid.
+                            self.scheduleRedraw(fd: result.fd, pid: result.pid,
+                                                renderer: renderer, attempt: 1)
                         }
                         return
                     }
@@ -246,6 +227,35 @@ extension WorkspaceController {
 
     /// Schedule a batched resize flush after all renderers have reported sizes.
     /// During drag, the flush is deferred until drag ends.
+    /// Send TIOCSWINSZ + SIGWINCH to a reconnected PTY.
+    /// Retries at increasing delays until the view frame is valid.
+    private func scheduleRedraw(fd: Int32, pid: Int32, renderer: GhosttyRenderer, attempt: Int) {
+        guard attempt <= 5 else {
+            ForgeLog.log("[daemon] Gave up sending TIOCSWINSZ to fd=\(fd) after 5 attempts")
+            return
+        }
+        let delay = Double(attempt) * 0.5 // 0.5s, 1s, 1.5s, 2s, 2.5s
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            let frame = renderer.view.frame
+            guard frame.width > 0, frame.height > 0 else {
+                // View not yet laid out — retry
+                self?.scheduleRedraw(fd: fd, pid: pid, renderer: renderer, attempt: attempt + 1)
+                return
+            }
+            let cellSize = renderer.exactCellSize
+            let cw = cellSize.width > 0 ? cellSize.width : 9.0
+            let ch = cellSize.height > 0 ? cellSize.height : 19.0
+            var ws = winsize()
+            ws.ws_col = UInt16(frame.width / cw)
+            ws.ws_row = UInt16(frame.height / ch)
+            ws.ws_xpixel = UInt16(frame.width)
+            ws.ws_ypixel = UInt16(frame.height)
+            _ = ioctl(fd, TIOCSWINSZ, &ws)
+            if pid > 0 { kill(pid, SIGWINCH) }
+            ForgeLog.log("[daemon] TIOCSWINSZ fd=\(fd) → \(ws.ws_col)x\(ws.ws_row) (attempt \(attempt))")
+        }
+    }
+
     func scheduleResizeFlush() {
         if suppressPaneResize { return }
         resizeFlushWork?.cancel()
