@@ -33,7 +33,6 @@ enum WorkspacePersistence {
         var cwd: String
     }
 
-    // Recursive split tree
     indirect enum PersistedSplitNode: Codable {
         case leaf
         case split(direction: String, children: [PersistedSplitNode], proportions: [Double])
@@ -52,15 +51,16 @@ enum WorkspacePersistence {
         return dir + "/workspace.json"
     }()
 
-    /// Save current workspace state.
+    // MARK: - Save
+
     static func save(workspace: Workspace, windowFrame: NSRect?) {
         var projects: [PersistedProject] = []
         for project in workspace.projects {
             var tabs: [PersistedTab] = []
             for tab in project.tabs {
                 let panes = tab.panes.map { PersistedPane(id: $0.id, cwd: $0.currentPath) }
-                // TODO: persist split tree from tab.splitTree when available
-                tabs.append(PersistedTab(id: tab.id, name: tab.name, panes: panes, splitTree: nil))
+                let tree = tab.splitTree.map { encodeSplitNode($0) }
+                tabs.append(PersistedTab(id: tab.id, name: tab.name, panes: panes, splitTree: tree))
             }
             projects.append(PersistedProject(id: project.id, name: project.name, path: project.path, tabs: tabs))
         }
@@ -86,9 +86,40 @@ enum WorkspacePersistence {
         }
     }
 
-    /// Load persisted workspace state.
+    // MARK: - Load
+
     static func load() -> PersistedWorkspace? {
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: filePath)) else { return nil }
         return try? JSONDecoder().decode(PersistedWorkspace.self, from: data)
+    }
+
+    // MARK: - SplitNode ↔ PersistedSplitNode
+
+    static func encodeSplitNode(_ node: SplitNode) -> PersistedSplitNode {
+        switch node {
+        case .leaf:
+            return .leaf
+        case .split(let direction, let children, let proportions):
+            let dir = direction == .horizontal ? "horizontal" : "vertical"
+            return .split(
+                direction: dir,
+                children: children.map { encodeSplitNode($0) },
+                proportions: proportions.map { Double($0) }
+            )
+        }
+    }
+
+    static func decodeSplitNode(_ node: PersistedSplitNode) -> SplitNode {
+        switch node {
+        case .leaf:
+            return .leaf
+        case .split(let direction, let children, let proportions):
+            let dir: SplitDirection = direction == "horizontal" ? .horizontal : .vertical
+            return .split(
+                dir,
+                children.map { decodeSplitNode($0) },
+                proportions: proportions.map { CGFloat($0) }
+            )
+        }
     }
 }

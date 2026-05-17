@@ -78,9 +78,13 @@ final class WorkspaceController {
                     let project = Project(id: pp.id, name: pp.name, path: pp.path)
                     for pt in pp.tabs {
                         let tab = Tab(id: pt.id, projectId: pp.id, index: project.tabs.count, name: pt.name)
-                        for pp in pt.panes {
-                            let pane = Pane(id: pp.id, tabId: pt.id, currentPath: pp.cwd)
+                        for pPane in pt.panes {
+                            let pane = Pane(id: pPane.id, tabId: pt.id, currentPath: pPane.cwd)
                             tab.panes.append(pane)
+                        }
+                        // Restore split tree (directions, nesting, proportions)
+                        if let persistedTree = pt.splitTree {
+                            tab.splitTree = WorkspacePersistence.decodeSplitNode(persistedTree)
                         }
                         project.tabs.append(tab)
                     }
@@ -88,6 +92,16 @@ final class WorkspaceController {
                 }
                 workspace.activeProjectId = persisted.activeProjectId
                 workspace.activeTabId = persisted.activeTabId
+
+                // Restore window frame
+                if let f = persisted.windowFrame {
+                    DispatchQueue.main.async {
+                        if let window = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible }) {
+                            window.setFrame(NSRect(x: f.x, y: f.y, width: f.width, height: f.height), display: true)
+                        }
+                    }
+                }
+
                 ForgeLog.log("[app] Loaded \(workspace.projects.count) projects from workspace.json")
             }
 

@@ -239,7 +239,8 @@ extension WorkspaceController {
 
         // Save workspace structure after any renderer change (continuous persistence)
         if config.isNativePTY {
-            WorkspacePersistence.save(workspace: workspace, windowFrame: nil)
+            let frame = NSApp.mainWindow?.frame
+            WorkspacePersistence.save(workspace: workspace, windowFrame: frame)
         }
     }
 
