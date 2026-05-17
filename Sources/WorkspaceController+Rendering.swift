@@ -167,6 +167,11 @@ extension WorkspaceController {
         for (id, renderer) in paneRenderers {
             renderer.setFocused(id == activePaneId)
         }
+
+        // Save workspace structure after any renderer change (continuous persistence)
+        if config.isNativePTY {
+            WorkspacePersistence.save(workspace: workspace, windowFrame: nil)
+        }
     }
 
     /// Schedule a batched resize flush after all renderers have reported sizes.

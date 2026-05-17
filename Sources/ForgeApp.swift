@@ -116,7 +116,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.ghosttyApp = ghosttyApp
         if configStore.isNativePTY, let ga = ghosttyApp {
             controller.processAdapter = ProcessAdapter(ghosttyApp: ga)
-            controller.daemonAdapter = DaemonAdapter()
+            let daemon = DaemonAdapter()
+            controller.daemonAdapter = daemon
+            // Launch and connect to daemon immediately
+            Task {
+                do {
+                    try daemon.ensureConnected()
+                    ForgeLog.log("[app] Connected to forged daemon")
+                } catch {
+                    ForgeLog.log("[app] Failed to connect to daemon: \(error)")
+                }
+            }
         }
 
         createMainWindow()
