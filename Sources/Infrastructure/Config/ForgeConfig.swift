@@ -48,6 +48,7 @@ struct ForgeConfig: Codable {
         var tabHighlightColorMode: String?  // "accent" (default), "theme", "custom"
         var tabHighlightCustomColor: String? // hex color string, e.g. "#FF0000"
         var nativePaneRendering: Bool?
+        var nativePTY: Bool?
         // Legacy — migrated to NotificationSettings on load
         var notificationsEnabled: Bool?
         var notificationSound: String?
