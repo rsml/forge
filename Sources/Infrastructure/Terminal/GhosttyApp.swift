@@ -20,7 +20,11 @@ final class GhosttyApp {
 
     // Action callbacks — set by callers who need to observe Ghostty events.
     var onBell: ((ghostty_surface_t?) -> Void)?
+    var onSetTitle: ((ghostty_surface_t?, String) -> Void)?
     var onCellSize: ((ghostty_surface_t?, UInt32, UInt32) -> Void)?
+    var onChildExited: ((ghostty_surface_t?) -> Void)?
+    var onCommandFinished: ((ghostty_surface_t?) -> Void)?
+    var onPwd: ((ghostty_surface_t?, String) -> Void)?
 
     nonisolated(unsafe) private var focusObservers: [NSObjectProtocol] = []
 
@@ -139,19 +143,39 @@ final class GhosttyApp {
         }
 
         runtime.action_cb = { app, target, action in
-            // Get our GhosttyApp from the runtime userdata (NOT the first param,
-            // which is ghostty_app_t, not void* userdata).
             guard let app, let ud = ghostty_app_userdata(app) else { return false }
             let ghosttyApp = Unmanaged<GhosttyApp>.fromOpaque(ud).takeUnretainedValue()
 
+            // Extract surface from target (nil for app-level actions).
+            let surface: ghostty_surface_t? = target.tag == GHOSTTY_TARGET_SURFACE
+                ? target.target.surface : nil
+
             switch action.tag {
             case GHOSTTY_ACTION_RING_BELL:
-                DispatchQueue.main.async { ghosttyApp.onBell?(nil) }
+                DispatchQueue.main.async { ghosttyApp.onBell?(surface) }
+                return true
+            case GHOSTTY_ACTION_SET_TITLE:
+                if let ptr = action.action.set_title.title {
+                    let title = String(cString: ptr)
+                    DispatchQueue.main.async { ghosttyApp.onSetTitle?(surface, title) }
+                }
                 return true
             case GHOSTTY_ACTION_CELL_SIZE:
                 let w = action.action.cell_size.width
                 let h = action.action.cell_size.height
-                DispatchQueue.main.async { ghosttyApp.onCellSize?(nil, w, h) }
+                DispatchQueue.main.async { ghosttyApp.onCellSize?(surface, w, h) }
+                return true
+            case GHOSTTY_ACTION_SHOW_CHILD_EXITED:
+                DispatchQueue.main.async { ghosttyApp.onChildExited?(surface) }
+                return true
+            case GHOSTTY_ACTION_COMMAND_FINISHED:
+                DispatchQueue.main.async { ghosttyApp.onCommandFinished?(surface) }
+                return true
+            case GHOSTTY_ACTION_PWD:
+                if let ptr = action.action.pwd.pwd {
+                    let pwd = String(cString: ptr)
+                    DispatchQueue.main.async { ghosttyApp.onPwd?(surface, pwd) }
+                }
                 return true
             default:
                 return false
