@@ -88,6 +88,19 @@ final class GhosttyRenderer: TerminalRenderer {
     /// Public accessor for surface pointer (used by findPaneBySurface).
     var surfaceHandle: ghostty_surface_t? { surface }
 
+    /// PTY master fd for EXEC mode surfaces. -1 if unavailable.
+    /// Used by DaemonAdapter to send fd for persistence.
+    var ptyFD: Int32 {
+        guard let surface else { return -1 }
+        return ghostty_surface_pty_fd(surface)
+    }
+
+    /// Foreground process PID.
+    var foregroundPID: Int32 {
+        guard let surface else { return 0 }
+        return Int32(ghostty_surface_foreground_pid(surface))
+    }
+
     /// Creates a renderer for reconnecting to a pre-existing PTY fd.
     /// Uses MANUAL IO mode with a background read thread on the fd.
     /// Input is written directly to the fd (no tmux send-keys).

@@ -161,6 +161,22 @@ extension WorkspaceController {
             let cwd = pane.currentPath.isEmpty ? (project.path ?? NSHomeDirectory()) : pane.currentPath
             let renderer = createExecRenderer(for: pane, cwd: cwd)
             paneRenderers[pane.id] = renderer
+
+            // Send the PTY fd to daemon for persistence (after a short delay
+            // to let forkpty complete on the Termio thread).
+            if let daemon = daemonAdapter, let ghostty = renderer as? GhosttyRenderer {
+                let paneId = pane.id
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    let fd = ghostty.ptyFD
+                    if fd >= 0 {
+                        let pid = ghostty.foregroundPID
+                        Task {
+                            try? await daemon.store(paneId: paneId, fd: fd, pid: pid, cwd: cwd)
+                            ForgeLog.log("[daemon] Stored fd=\(fd) for pane \(paneId)")
+                        }
+                    }
+                }
+            }
         }
 
         let activePaneId = tab.panes.first(where: \.active)?.id
