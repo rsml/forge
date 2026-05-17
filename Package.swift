@@ -18,7 +18,7 @@ let package = Package(
             name: "Forge",
             dependencies: ["SwiftTerm", "ForgeCore", "GhosttyKit"],
             path: "Sources",
-            exclude: ["Core"],
+            exclude: ["Core", "Daemon"],
             linkerSettings: [
                 .linkedLibrary("c++"),
                 .linkedFramework("Metal"),
@@ -26,6 +26,11 @@ let package = Package(
                 .linkedFramework("IOSurface"),
                 .linkedFramework("Carbon"),
             ]
+        ),
+        .executableTarget(
+            name: "forged",
+            dependencies: [],
+            path: "Sources/Daemon"
         ),
         .binaryTarget(
             name: "GhosttyKit",
