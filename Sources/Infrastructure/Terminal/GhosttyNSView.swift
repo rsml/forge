@@ -150,8 +150,19 @@ final class GhosttyNSView: NSView {
 
     override func keyDown(with event: NSEvent) {
         if execMode {
-            let keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
-            if let surface { _ = ghostty_surface_key(surface, keyEvent) }
+            // ghostty_surface_key needs the text from the event to know what
+            // character the key produces. Without it, only keycodes are sent
+            // and regular text input doesn't work.
+            if let text = event.characters, !text.isEmpty {
+                text.withCString { cStr in
+                    var keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
+                    keyEvent.text = cStr
+                    if let surface { _ = ghostty_surface_key(surface, keyEvent) }
+                }
+            } else {
+                let keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
+                if let surface { _ = ghostty_surface_key(surface, keyEvent) }
+            }
             return
         }
         sendKeyEvent(event)
