@@ -172,9 +172,14 @@ extension WorkspaceController {
                         let renderer = GhosttyRenderer(ghosttyApp: ghosttyApp, fd: result.fd)
                         await MainActor.run {
                             paneRenderers[paneId] = renderer
-                            ForgeLog.log("[daemon] Reconnected pane \(paneId) (fd=\(result.fd))")
-                            // Send SIGWINCH to force the shell to redraw
-                            kill(result.pid, SIGWINCH)
+                            ForgeLog.log("[daemon] Reconnected pane \(paneId) (fd=\(result.fd), pid=\(result.pid))")
+                            // Delay SIGWINCH to let the surface connect and size
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                if result.pid > 0 {
+                                    // Send to process group for TUI apps
+                                    kill(-result.pid, SIGWINCH)
+                                }
+                            }
                         }
                         return
                     }

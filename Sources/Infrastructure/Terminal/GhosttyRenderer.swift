@@ -159,19 +159,41 @@ final class GhosttyRenderer: TerminalRenderer {
 
     private func startReadLoop(fd: Int32) {
         let thread = Thread {
+            // Ensure fd is in blocking mode for the read loop
+            let flags = fcntl(fd, F_GETFL)
+            if flags == -1 {
+                let err = String(cString: strerror(errno))
+                DispatchQueue.main.async {
+                    ForgeLog.log("[ghostty] EXTERNAL_FD fd=\(fd) is INVALID: \(err)")
+                }
+                return
+            }
+            if flags & O_NONBLOCK != 0 {
+                _ = fcntl(fd, F_SETFL, flags & ~O_NONBLOCK)
+            }
+
             let bufSize = 8192
             let buf = UnsafeMutableRawPointer.allocate(byteCount: bufSize, alignment: 1)
             defer { buf.deallocate() }
             while true {
                 let n = Darwin.read(fd, buf, bufSize)
-                if n <= 0 { break } // fd closed or error
+                if n < 0 {
+                    let err = String(cString: strerror(errno))
+                    DispatchQueue.main.async {
+                        ForgeLog.log("[ghostty] EXTERNAL_FD read error on fd=\(fd): \(err)")
+                    }
+                    break
+                }
+                if n == 0 {
+                    DispatchQueue.main.async {
+                        ForgeLog.log("[ghostty] EXTERNAL_FD fd=\(fd) EOF (process exited)")
+                    }
+                    break
+                }
                 let data = Data(bytes: buf, count: n)
                 DispatchQueue.main.async { [weak self] in
                     self?.feed(data)
                 }
-            }
-            DispatchQueue.main.async {
-                ForgeLog.log("[ghostty] EXTERNAL_FD read loop ended (fd=\(fd))")
             }
         }
         thread.name = "forged-fd-\(fd)"

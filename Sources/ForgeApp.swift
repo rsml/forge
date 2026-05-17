@@ -226,7 +226,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let windowFrame = NSApp.mainWindow?.frame
             WorkspacePersistence.save(workspace: controller.workspace, windowFrame: windowFrame)
             ForgeLog.log("[app] Saved workspace for native PTY persistence")
-            return .terminateNow
+            // _exit() bypasses AppKit teardown which would destroy Ghostty surfaces
+            // and send SIGHUP to child processes. The daemon holds fd dups, so
+            // PTYs stay alive. Child processes keep running.
+            _exit(0)
         }
 
         guard configStore.config.general?.confirmBeforeClose ?? true else {
