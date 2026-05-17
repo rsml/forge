@@ -126,13 +126,21 @@ final class GhosttyNSView: NSView {
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard event.type == .keyDown else { return false }
-        // performKeyEquivalent traverses the view hierarchy, not the responder
-        // chain. Only the focused pane (first responder) should handle keys.
         guard window?.firstResponder === self else { return false }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        // Let Cmd+key propagate to Forge's menu/shortcuts
         if flags.contains(.command) { return false }
-        // Ctrl+key: handle ourselves
+
+        if execMode {
+            // EXEC mode: let Ghostty handle keys natively
+            if flags.contains(.control) {
+                let keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
+                if let surface { _ = ghostty_surface_key(surface, keyEvent) }
+                return true
+            }
+            return false
+        }
+
+        // MANUAL IO mode: bypass Ghostty's key encoder
         if flags.contains(.control) {
             sendKeyEvent(event)
             return true
@@ -141,24 +149,43 @@ final class GhosttyNSView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
+        if execMode {
+            let keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
+            if let surface { _ = ghostty_surface_key(surface, keyEvent) }
+            return
+        }
         sendKeyEvent(event)
     }
 
     override func keyUp(with event: NSEvent) {
-        // No action needed — tmux doesn't use key-up events
+        if execMode {
+            let keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_RELEASE)
+            if let surface { _ = ghostty_surface_key(surface, keyEvent) }
+            return
+        }
     }
 
     override func flagsChanged(with event: NSEvent) {
+        if execMode {
+            let keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
+            if let surface { _ = ghostty_surface_key(surface, keyEvent) }
+            return
+        }
         // No action needed — modifier-only events don't produce terminal bytes
     }
 
     override func insertText(_ insertString: Any) {
-        // Called by the input manager for composed text (e.g., accented characters)
         let text: String
         if let s = insertString as? String { text = s }
         else if let s = insertString as? NSAttributedString { text = s.string }
         else { return }
         guard !text.isEmpty else { return }
+        if execMode {
+            text.withCString { cStr in
+                if let surface { ghostty_surface_text(surface, cStr, UInt(text.utf8.count)) }
+            }
+            return
+        }
         onKeyInput?(Data(text.utf8))
     }
 
