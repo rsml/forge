@@ -24,7 +24,9 @@ struct TerminalArea: View {
     private func nativeTerminal(tab: ForgeCore.Tab) -> some View {
         Group {
             if tab.panes.count > 1 {
-                let tree: SplitNode = if let layout = tab.layout {
+                let tree: SplitNode = if let splitTree = tab.splitTree {
+                    splitTree
+                } else if let layout = tab.layout {
                     LayoutParser.parse(layout)
                 } else {
                     .split(.vertical,

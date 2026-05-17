@@ -12,6 +12,8 @@ public final class Tab: Identifiable {
     public var name: String
     public var active: Bool
     public var layout: String?
+    /// Native PTY split tree — owned by Forge, not derived from tmux.
+    public var splitTree: SplitNode?
     public var panes: [Pane] = []
 
     public var needsAttention: Bool {

@@ -250,21 +250,62 @@ extension WorkspaceController {
               let tab = project.tabs.first(where: { $0.id == tabId })
         else { return }
 
-        // Create a new pane
         let paneId = UUID().uuidString
         let cwd = project.path ?? NSHomeDirectory()
         let pane = Pane(id: paneId, tabId: tabId, currentPath: cwd)
-        tab.panes.append(pane)
 
-        // Update split tree — for now just track the pane count
-        // (PaneSplitView handles the layout from tab.layout / LayoutParser)
-        // In native PTY mode, we manage the split tree directly on the tab.
+        // Find which pane is active (focused). In native PTY, use the pane
+        // that has a renderer with first-responder focus, or fall back to last pane.
+        let activePaneIndex: Int = {
+            // Check which renderer is first responder
+            for (i, p) in tab.panes.enumerated() {
+                if let r = paneRenderers[p.id] as? GhosttyRenderer,
+                   r.nsView.window?.firstResponder === r.nsView {
+                    return i
+                }
+            }
+            // Fall back to last pane with a renderer
+            for i in stride(from: tab.panes.count - 1, through: 0, by: -1) {
+                if paneRenderers[tab.panes[i].id] != nil { return i }
+            }
+            return max(tab.panes.count - 1, 0)
+        }()
 
-        ForgeLog.log("[app] Split pane \(direction) → new pane \(paneId)")
+        // Insert after the active pane
+        tab.panes.insert(pane, at: activePaneIndex + 1)
+
+        // Update split tree: replace the active leaf with a split(direction, [leaf, leaf])
+        if let existing = tab.splitTree {
+            var leafIndex = 0
+            tab.splitTree = splitLeafAt(node: existing, targetLeaf: activePaneIndex,
+                                         currentLeaf: &leafIndex, direction: direction)
+        } else {
+            tab.splitTree = .split(direction, [.leaf, .leaf], proportions: [0.5, 0.5])
+        }
+
+        ForgeLog.log("[app] Split \(direction) at pane[\(activePaneIndex)] → \(paneId) (tree: \(tab.splitTree?.leafCount ?? 0) leaves, panes: \(tab.panes.count))")
         updateRenderers()
-
-        // Save workspace after structural change
         WorkspacePersistence.save(workspace: workspace, windowFrame: nil)
+    }
+
+    /// Recursively find the Nth leaf in the tree and replace it with a split.
+    private func splitLeafAt(node: SplitNode, targetLeaf: Int,
+                              currentLeaf: inout Int, direction: SplitDirection) -> SplitNode {
+        switch node {
+        case .leaf:
+            if currentLeaf == targetLeaf {
+                currentLeaf += 1
+                return .split(direction, [.leaf, .leaf], proportions: [0.5, 0.5])
+            }
+            currentLeaf += 1
+            return .leaf
+        case .split(let dir, let children, let proportions):
+            let newChildren = children.map { child in
+                splitLeafAt(node: child, targetLeaf: targetLeaf,
+                           currentLeaf: &currentLeaf, direction: direction)
+            }
+            return .split(dir, newChildren, proportions: proportions)
+        }
     }
 
     func reorderTab(in project: Project, from: Int, to: Int) {
