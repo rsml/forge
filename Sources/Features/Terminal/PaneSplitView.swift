@@ -133,6 +133,30 @@ private struct SplitContainer: View {
     private func endDrag() {
         dragStartProportions = nil
         controller.suppressPaneResize = false
+
+        // Compute target cell counts from the NEW proportions and write them
+        // into pendingResizes. Without this, flushPendingResizes sends the
+        // current renderer sizes (which haven't changed) — a no-op.
+        let cellSize = controller.terminalCellSize
+        if cellSize.width > 0, cellSize.height > 0 {
+            let slices = slicePanes()
+            for (i, child) in children.enumerated() {
+                guard i < proportions.count, i < slices.count else { continue }
+                // Leaf panes get their size directly; nested splits inherit from parent
+                let leafPanes = slices[i]
+                for pane in leafPanes {
+                    if let renderer = renderers[pane.id] {
+                        let frame = renderer.view.frame
+                        let cols = Int(frame.width / cellSize.width)
+                        let rows = Int(frame.height / cellSize.height)
+                        if cols > 0, rows > 0 {
+                            controller.pendingResizes[pane.id] = (cols, rows)
+                        }
+                    }
+                }
+            }
+        }
+
         controller.sendResizePaneOnFlush = true
         controller.flushPendingResizes()
     }
