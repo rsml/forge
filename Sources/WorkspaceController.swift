@@ -40,6 +40,8 @@ final class WorkspaceController {
     var ghosttyApp: GhosttyApp?
     /// Process adapter for native PTY mode. Nil when using tmux IO.
     var processAdapter: ProcessAdapter?
+    /// Daemon adapter for PTY fd persistence. Nil when using tmux.
+    var daemonAdapter: DaemonAdapter?
 
     var gitBranch: String? { syncEngine.gitBranch }
 

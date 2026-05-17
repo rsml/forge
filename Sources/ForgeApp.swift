@@ -116,6 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.ghosttyApp = ghosttyApp
         if configStore.isNativePTY, let ga = ghosttyApp {
             controller.processAdapter = ProcessAdapter(ghosttyApp: ga)
+            controller.daemonAdapter = DaemonAdapter()
         }
 
         createMainWindow()
@@ -209,6 +210,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // In native PTY mode, save workspace before quitting.
+        // Daemon keeps fds alive; workspace.json preserves structure.
+        if configStore.isNativePTY {
+            let windowFrame = NSApp.mainWindow?.frame
+            WorkspacePersistence.save(workspace: controller.workspace, windowFrame: windowFrame)
+            ForgeLog.log("[app] Saved workspace for native PTY persistence")
+            return .terminateNow
+        }
+
         guard configStore.config.general?.confirmBeforeClose ?? true else {
             return .terminateNow
         }
