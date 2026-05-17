@@ -129,6 +129,11 @@ struct Forged {
             }
             let pid = (json["pid"] as? Int).map { Int32($0) } ?? 0
             let cwd = json["cwd"] as? String ?? ""
+            // Close previous fd for this pane (if overwriting)
+            if let existing = storedFDs[paneId] {
+                close(existing.fd)
+                log("Replaced previous fd=\(existing.fd) for pane \(paneId)")
+            }
             storedFDs[paneId] = StoredPane(fd: fd, pid: pid, cwd: cwd, createdAt: Date())
             log("Stored fd=\(fd) for pane \(paneId) (pid=\(pid))")
             let response = try JSONSerialization.data(withJSONObject: ["status": "ok"])
@@ -139,16 +144,19 @@ struct Forged {
                 log("retrieve: missing pane_id")
                 return
             }
-            if let pane = storedFDs.removeValue(forKey: paneId) {
+            if let pane = storedFDs[paneId] {
                 // Check if process is still alive
                 if kill(pane.pid, 0) == 0 || pane.pid == 0 {
+                    // Send a dup of the fd — keep our copy for persistence
+                    let dupFd = Darwin.dup(pane.fd)
                     let response = try JSONSerialization.data(withJSONObject: [
                         "status": "ok", "pid": Int(pane.pid), "cwd": pane.cwd
                     ] as [String: Any])
-                    try FDSocket.send(fd: pane.fd, over: clientFD, message: response)
-                    close(pane.fd) // We sent the fd, close our copy
-                    log("Retrieved fd for pane \(paneId)")
+                    try FDSocket.send(fd: dupFd, over: clientFD, message: response)
+                    close(dupFd) // Close the dup we just sent
+                    log("Retrieved fd for pane \(paneId) (sent dup, keeping original)")
                 } else {
+                    storedFDs.removeValue(forKey: paneId)
                     close(pane.fd)
                     let response = try JSONSerialization.data(withJSONObject: ["status": "dead"])
                     try FDSocket.sendMessage(response, over: clientFD)
