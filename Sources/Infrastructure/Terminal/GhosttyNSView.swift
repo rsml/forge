@@ -8,10 +8,16 @@ import QuartzCore
 final class GhosttyNSView: NSView {
     // Set by GhosttyRenderer after surface creation.
     var surface: ghostty_surface_t?
+    /// In EXEC mode, the surface is created before the view is in a window.
+    /// Metal needs a valid window context. This holds the surface until
+    /// viewDidMoveToWindow connects it.
+    var pendingSurface: ghostty_surface_t?
     /// Called after ghostty_surface_set_size with the computed (cols, rows).
     var onSurfaceResize: ((Int, Int) -> Void)?
     /// Called when this view becomes first responder (user clicked to focus).
     var onFocusGained: (() -> Void)?
+    /// True when in EXEC mode — Ghostty handles keys natively.
+    var execMode: Bool = false
 
     // MARK: - Layer Setup
 
@@ -69,6 +75,11 @@ final class GhosttyNSView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        // EXEC mode: connect the deferred surface now that we have a window.
+        if let pending = pendingSurface, window != nil {
+            surface = pending
+            pendingSurface = nil
+        }
         guard let window, let surface else { return }
         let scale = window.backingScaleFactor
         layer?.contentsScale = scale

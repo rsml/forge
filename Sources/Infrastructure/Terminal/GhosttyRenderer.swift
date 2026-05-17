@@ -85,6 +85,63 @@ final class GhosttyRenderer: TerminalRenderer {
         }
     }
 
+    /// Public accessor for surface pointer (used by findPaneBySurface).
+    var surfaceHandle: ghostty_surface_t? { surface }
+
+    /// Creates a renderer in EXEC mode: Ghostty forks a shell, owns the PTY,
+    /// and handles all I/O natively. No onInput/onResize wiring needed.
+    init(ghosttyApp: GhosttyApp, cwd: String, env: [String: String] = [:]) {
+        nsView = GhosttyNSView(frame: .zero)
+        nsView.execMode = true
+
+        guard let app = ghosttyApp.app else {
+            ForgeLog.log("[ghostty] Cannot create EXEC renderer — app not initialized")
+            return
+        }
+
+        var config = ghostty_surface_config_new()
+        config.io_mode = GHOSTTY_SURFACE_IO_EXEC
+        config.platform_tag = GHOSTTY_PLATFORM_MACOS
+        config.platform = ghostty_platform_u(
+            macos: ghostty_platform_macos_s(
+                nsview: Unmanaged.passUnretained(nsView).toOpaque()
+            )
+        )
+        config.context = GHOSTTY_SURFACE_CONTEXT_SPLIT
+
+        // Build env var array — NSString keeps the UTF-8 pointers alive for the closure.
+        var envVars: [ghostty_env_var_s] = env.map { key, value in
+            ghostty_env_var_s(
+                key: (key as NSString).utf8String,
+                value: (value as NSString).utf8String
+            )
+        }
+
+        cwd.withCString { cwdPtr in
+            config.working_directory = cwdPtr
+            if envVars.isEmpty {
+                config.env_vars = nil
+                config.env_var_count = 0
+                surface = ghostty_surface_new(app, &config)
+            } else {
+                envVars.withUnsafeMutableBufferPointer { buf in
+                    config.env_vars = buf.baseAddress
+                    config.env_var_count = buf.count
+                    surface = ghostty_surface_new(app, &config)
+                }
+            }
+        }
+
+        // Defer surface connection until view is in a window (Metal needs it).
+        nsView.pendingSurface = surface
+
+        if let surface {
+            ForgeLog.log("[ghostty] EXEC surface created, deferred to window (cwd: \(cwd))")
+        } else {
+            ForgeLog.log("[ghostty] Failed to create EXEC surface")
+        }
+    }
+
     func feed(_ data: Data) {
         guard let surface else { return }
         data.withUnsafeBytes { buffer in
