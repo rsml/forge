@@ -18,6 +18,10 @@ final class GhosttyApp {
     nonisolated(unsafe) private var tickScheduled = false
     private let tickLock = NSLock()
 
+    // Action callbacks — set by callers who need to observe Ghostty events.
+    var onBell: ((ghostty_surface_t?) -> Void)?
+    var onCellSize: ((ghostty_surface_t?, UInt32, UInt32) -> Void)?
+
     nonisolated(unsafe) private var focusObservers: [NSObjectProtocol] = []
 
     init() {
@@ -134,9 +138,24 @@ final class GhosttyApp {
             app.handleWakeup()
         }
 
-        runtime.action_cb = { _, _, _ in
-            // Stub: action dispatch handled in later tasks.
-            return false
+        runtime.action_cb = { app, target, action in
+            // Get our GhosttyApp from the runtime userdata (NOT the first param,
+            // which is ghostty_app_t, not void* userdata).
+            guard let app, let ud = ghostty_app_userdata(app) else { return false }
+            let ghosttyApp = Unmanaged<GhosttyApp>.fromOpaque(ud).takeUnretainedValue()
+
+            switch action.tag {
+            case GHOSTTY_ACTION_RING_BELL:
+                DispatchQueue.main.async { ghosttyApp.onBell?(nil) }
+                return true
+            case GHOSTTY_ACTION_CELL_SIZE:
+                let w = action.action.cell_size.width
+                let h = action.action.cell_size.height
+                DispatchQueue.main.async { ghosttyApp.onCellSize?(nil, w, h) }
+                return true
+            default:
+                return false
+            }
         }
 
         runtime.read_clipboard_cb = { _, _, _ in
