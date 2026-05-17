@@ -173,11 +173,27 @@ extension WorkspaceController {
                         await MainActor.run {
                             paneRenderers[paneId] = renderer
                             ForgeLog.log("[daemon] Reconnected pane \(paneId) (fd=\(result.fd), pid=\(result.pid))")
-                            // Delay SIGWINCH to let the surface connect and size
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            // Trigger shell redraw after surface is connected and sized.
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                let fd = result.fd
+                                let frame = renderer.view.frame
+                                guard frame.width > 0, frame.height > 0 else {
+                                    ForgeLog.log("[daemon] Skipping TIOCSWINSZ — frame is zero")
+                                    return
+                                }
+                                // Use exact cell size from ghostty, or estimate from font
+                                let cellSize = renderer.exactCellSize
+                                let cw = cellSize.width > 0 ? cellSize.width : 9.0
+                                let ch = cellSize.height > 0 ? cellSize.height : 19.0
+                                var ws = winsize()
+                                ws.ws_col = UInt16(frame.width / cw)
+                                ws.ws_row = UInt16(frame.height / ch)
+                                ws.ws_xpixel = UInt16(frame.width)
+                                ws.ws_ypixel = UInt16(frame.height)
+                                _ = ioctl(fd, TIOCSWINSZ, &ws)
+                                ForgeLog.log("[daemon] TIOCSWINSZ fd=\(fd) → \(ws.ws_col)x\(ws.ws_row)")
                                 if result.pid > 0 {
-                                    // Send to process group for TUI apps
-                                    kill(-result.pid, SIGWINCH)
+                                    kill(result.pid, SIGWINCH)
                                 }
                             }
                         }
