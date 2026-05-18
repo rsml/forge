@@ -133,6 +133,7 @@ extension WorkspaceController {
         // Create renderer BEFORE selectProject triggers SwiftUI render — prevents flash
         let renderer = createExecRenderer(for: pane, cwd: path)
         paneRenderers[paneId] = renderer
+        scheduleDaemonRegister(paneId: paneId, cwd: path)
         selectProject(project)
         ForgeLog.log("[app] Added project \(name) (native PTY)")
     }
@@ -257,6 +258,7 @@ extension WorkspaceController {
         // Create renderer BEFORE selectTab triggers SwiftUI render — prevents flash
         let renderer = createExecRenderer(for: pane, cwd: cwd)
         paneRenderers[paneId] = renderer
+        scheduleDaemonRegister(paneId: paneId, cwd: cwd)
         selectTab(tab)
         ForgeLog.log("[app] Added tab in \(project.name) (native PTY)")
     }

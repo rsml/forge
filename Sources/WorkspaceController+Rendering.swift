@@ -106,6 +106,39 @@ extension WorkspaceController {
         return renderer
     }
 
+    /// Schedule a daemon registration for a freshly-created pane.
+    ///
+    /// The PTY master fd isn't available immediately after Ghostty surface
+    /// creation, so we wait briefly before reading `ptyFD` / `foregroundPID`
+    /// and calling `daemon.store`. After this completes, the daemon knows the
+    /// pane and `is_active` queries will work — required for close confirmation
+    /// to fire on tabs/projects added at runtime.
+    ///
+    /// Without this, splits register (they're created inside `updateRenderers`
+    /// which already does this) but new tabs / new projects don't — they create
+    /// the renderer directly in `addTabNativePTY` / `addProjectNativePTY` and
+    /// skip the registration path. That asymmetry was the cause of cmd+W
+    /// closing a new tab without prompting even when a process was running.
+    @MainActor
+    func scheduleDaemonRegister(paneId: String, cwd: String) {
+        guard config.isNativePTY, let daemon = daemonAdapter else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self,
+                  let ghostty = self.paneRenderers[paneId] as? GhosttyRenderer
+            else { return }
+            let fd = ghostty.ptyFD
+            guard fd >= 0 else {
+                ForgeLog.log("[daemon] Pane \(paneId) — ptyFD unavailable, skipping store")
+                return
+            }
+            let pid = ghostty.foregroundPID
+            Task {
+                try? await daemon.store(paneId: paneId, fd: fd, pid: pid, cwd: cwd)
+                ForgeLog.log("[daemon] Stored fd=\(fd) for pane \(paneId)")
+            }
+        }
+    }
+
     /// Synchronizes renderers with the active tab's panes.
     /// Dispatches to the appropriate path based on feature flags.
     func updateRenderers() {
