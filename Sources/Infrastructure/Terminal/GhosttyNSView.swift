@@ -75,6 +75,7 @@ final class GhosttyNSView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+
         // Connect deferred surface now that we have a window (Metal needs it).
         if let pending = pendingSurface, window != nil {
             surface = pending
@@ -104,6 +105,7 @@ final class GhosttyNSView: NSView {
 
     override func becomeFirstResponder() -> Bool {
         let result = super.becomeFirstResponder()
+
         if result, let surface {
             ghostty_surface_set_focus(surface, true)
             onFocusGained?()
@@ -155,6 +157,7 @@ final class GhosttyNSView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
+
         if execMode {
             // ghostty_surface_key needs the text from the event to know what
             // character the key produces. Without it, only keycodes are sent
@@ -256,6 +259,7 @@ final class GhosttyNSView: NSView {
     // MARK: - Mouse Input
 
     override func mouseDown(with event: NSEvent) {
+
         window?.makeFirstResponder(self)
         guard let surface else { return }
         let point = convert(event.locationInWindow, from: nil)

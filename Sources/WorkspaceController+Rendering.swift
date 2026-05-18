@@ -165,11 +165,7 @@ extension WorkspaceController {
             paneRenderers.removeValue(forKey: id)
         }
 
-        // Mark inactive renderers as occluded (pauses GPU rendering)
         let activePaneIds = Set(tab.panes.map(\.id))
-        for (id, renderer) in paneRenderers {
-            (renderer as? GhosttyRenderer)?.setOccluded(!activePaneIds.contains(id))
-        }
 
         let livePaneIds = activePaneIds
 
