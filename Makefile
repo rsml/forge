@@ -15,12 +15,16 @@ Resources/AppIcon.icns: Assets/appicon.icon/icon.json Assets/appicon.icon/Assets
 ghosttykit:
 	PATH="/opt/homebrew/opt/zig@0.15/bin:$$PATH" scripts/build-ghosttykit.sh
 
-run: tmux icon ghosttykit
+# All external dependencies (GhosttyKit, tmux, icon).
+# swift build handles SPM targets (Forge, forged, ForgeCore).
+prerequisites: ghosttykit tmux icon
+
+run: prerequisites
 	swift build -c release && \
 	$(MAKE) bundle BUILD=.build/release && \
 	open .build/release/Forge.app
 
-dev: icon ghosttykit
+dev: prerequisites
 	swift build && \
 	$(MAKE) bundle BUILD=.build/debug && \
 	open .build/debug/Forge.app
@@ -30,17 +34,17 @@ bundle:
 	@mkdir -p $(BUILD)/Forge.app/Contents/MacOS
 	@mkdir -p $(BUILD)/Forge.app/Contents/Resources
 	@cp $(BUILD)/Forge $(BUILD)/Forge.app/Contents/MacOS/Forge
-	@cp -f $(BUILD)/forged $(BUILD)/Forge.app/Contents/MacOS/forged 2>/dev/null || true
+	@cp $(BUILD)/forged $(BUILD)/Forge.app/Contents/MacOS/forged
 	@cp Resources/Info.plist $(BUILD)/Forge.app/Contents/
 	@cp -f Resources/tmux $(BUILD)/Forge.app/Contents/MacOS/ 2>/dev/null || true
 	@cp -f Resources/forge-tmux.conf $(BUILD)/Forge.app/Contents/Resources/ 2>/dev/null || true
 	@cp -f Resources/AppIcon.icns $(BUILD)/Forge.app/Contents/Resources/ 2>/dev/null || true
 	@cp -f Assets/appicon-transparent.png $(BUILD)/Forge.app/Contents/Resources/ 2>/dev/null || true
 	@codesign --force --sign - $(BUILD)/Forge.app/Contents/MacOS/tmux 2>/dev/null || true
-	@codesign --force --sign - $(BUILD)/Forge.app/Contents/MacOS/forged 2>/dev/null || true
+	@codesign --force --sign - $(BUILD)/Forge.app/Contents/MacOS/forged
 	@codesign --force --sign - $(BUILD)/Forge.app
 
-build:
+build: prerequisites
 	swift build -c release
 
 clean:
