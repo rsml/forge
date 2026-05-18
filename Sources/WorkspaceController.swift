@@ -166,6 +166,16 @@ final class WorkspaceController {
                         self.sendAttentionNotification(tabUUID: tabUUID)
                     }
                 }
+                // Prune queue items whose attention resolved (except front item)
+                if self.config.isStackMode {
+                    let activeUUIDs = Set(
+                        self.workspace.projects
+                            .flatMap(\.tabs)
+                            .filter(\.needsAttention)
+                            .map(\.uuid)
+                    )
+                    self.attentionManager?.pruneResolved(activeAttentionUUIDs: activeUUIDs)
+                }
                 // Sync renderers with current pane state — creates renderers for
                 // new panes (splits), removes stale ones (closed panes).
                 self.updateRenderers()

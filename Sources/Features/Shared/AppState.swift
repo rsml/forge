@@ -92,6 +92,7 @@ final class AppState {
         // Mode toggle — domain logic
         case .toggleMode:
             if config.isStackMode {
+                // Switching TO list mode — restore active project/tab from queue front
                 if let uuid = attentionManager?.currentTabUUID,
                    let (project, tab) = controller.workspace.findTab(byUUID: uuid) {
                     controller.workspace.activeProjectId = project.id
@@ -99,11 +100,28 @@ final class AppState {
                 }
                 config.isStackMode = false
             } else {
-                if let tabId = controller.workspace.activeTabId,
-                   let tab = controller.workspace.activeProject?.tabs.first(where: { $0.id == tabId }),
-                   tab.needsAttention {
-                    attentionManager?.promoteToFront(tab.uuid)
+                // Switching TO stack mode — seed the queue with all attention tabs
+                let frontUUID: UUID? = {
+                    if let tabId = controller.workspace.activeTabId,
+                       let tab = controller.workspace.activeProject?.tabs.first(where: { $0.id == tabId }) {
+                        return tab.uuid
+                    }
+                    return nil
+                }()
+
+                if let frontUUID, let attention = attentionManager {
+                    let orderingRaw = config.config.stackView?.ordering ?? "grouped"
+                    let mode = StackOrdering.Mode(rawValue: orderingRaw) ?? .grouped
+                    let ordered = StackOrdering.order(
+                        projects: controller.workspace.projects,
+                        frontUUID: frontUUID,
+                        mode: mode,
+                        timestamps: attention.timestamps,
+                        isHidden: { attention.isHidden($0) }
+                    )
+                    attention.seedQueue(ordered: ordered)
                 }
+
                 config.isStackMode = true
                 if let uuid = attentionManager?.currentTabUUID,
                    let (_, tab) = controller.workspace.findTab(byUUID: uuid) {
