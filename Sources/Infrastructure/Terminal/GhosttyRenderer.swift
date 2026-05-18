@@ -173,26 +173,29 @@ final class GhosttyRenderer: TerminalRenderer {
     private var reconnected = false
 
     /// Configure this EXTERNAL_FD renderer for event-driven reconnection.
-    /// All reconnection work (scrollback, read loop, TIOCSWINSZ) is deferred
-    /// until the surface has a valid size from SwiftUI layout.
+    /// Reconnection work (scrollback, read loop) fires once on first valid size.
+    /// TIOCSWINSZ is sent on every resize (MANUAL mode doesn't resize the PTY).
     func configureForReconnect(paneId: String, pid: Int32) {
         self.reconnectPaneId = paneId
         self.reconnectPid = pid
 
         nsView.onSurfaceResize = { [weak self] cols, rows in
-            guard let self, !self.reconnected else { return }
+            guard let self else { return }
             guard cols > 0, rows > 0 else { return }
-            self.reconnected = true
 
-            // 1. Surface has valid grid — load scrollback
-            self.loadScrollback(paneId: paneId)
-
-            // 2. Start read loop
-            if self.readThread == nil, self.externalFD >= 0 {
-                self.startReadLoop(fd: self.externalFD)
+            // One-time reconnection work
+            if !self.reconnected {
+                self.reconnected = true
+                self.loadScrollback(paneId: paneId)
+                if self.readThread == nil, self.externalFD >= 0 {
+                    self.startReadLoop(fd: self.externalFD)
+                }
+                self.startScrollbackLog(paneId: paneId)
+                ForgeLog.log("[ghostty] Reconnected pane \(paneId): \(cols)x\(rows) (event-driven)")
             }
 
-            // 3. Send TIOCSWINSZ with actual size from ghostty
+            // Send TIOCSWINSZ on every resize — MANUAL mode surfaces
+            // don't resize the PTY automatically (unlike EXEC mode).
             let frame = self.nsView.frame
             var ws = winsize()
             ws.ws_col = UInt16(cols)
@@ -200,17 +203,7 @@ final class GhosttyRenderer: TerminalRenderer {
             ws.ws_xpixel = UInt16(frame.width)
             ws.ws_ypixel = UInt16(frame.height)
             _ = ioctl(self.externalFD, TIOCSWINSZ, &ws)
-
-            // 4. SIGWINCH triggers shell redraw
             if pid > 0 { kill(pid, SIGWINCH) }
-
-            // 5. Start logging for next reconnect
-            self.startScrollbackLog(paneId: paneId)
-
-            ForgeLog.log("[ghostty] Reconnected pane \(paneId): \(cols)x\(rows) (event-driven)")
-
-            // Clear callback
-            self.nsView.onSurfaceResize = nil
         }
     }
 

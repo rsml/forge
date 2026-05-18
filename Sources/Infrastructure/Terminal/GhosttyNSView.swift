@@ -75,7 +75,7 @@ final class GhosttyNSView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        // EXEC mode: connect the deferred surface now that we have a window.
+        // Connect deferred surface now that we have a window (Metal needs it).
         if let pending = pendingSurface, window != nil {
             surface = pending
             pendingSurface = nil
@@ -91,6 +91,12 @@ final class GhosttyNSView: NSView {
         let h = UInt32(frame.height * scale)
         if w > 0, h > 0 {
             ghostty_surface_set_size(surface, w, h)
+            // Notify listeners — setFrameSize won't fire again if frame was
+            // already set before the surface connected (pendingSurface flow).
+            let size = ghostty_surface_size(surface)
+            if size.columns > 0, size.rows > 0 {
+                onSurfaceResize?(Int(size.columns), Int(size.rows))
+            }
         }
     }
 
