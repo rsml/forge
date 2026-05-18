@@ -140,7 +140,7 @@ Both adapters conform to `PaneActivityPort`. Composition root (`AppDelegate`) wi
 
 ### Failure mode
 
-**Fail-open.** If the daemon socket round-trip throws or returns garbage, `DaemonActivityAdapter.query` returns `[PaneActivity(paneId: x, isActive: false, command: nil) for each x]` and logs at `[daemon]`. Rationale: a flaky daemon must never block a close. The cost of a single missed warning during a daemon hiccup is lower than the cost of a phantom warning every time forged restarts.
+**Fail-open.** If the daemon socket round-trip throws, returns garbage, or exceeds a **200 ms timeout**, `DaemonActivityAdapter.query` returns `[PaneActivity(paneId: x, isActive: false, command: nil) for each x]` and logs at `[daemon]`. Rationale: a flaky daemon must never block a close. The cost of a single missed warning during a daemon hiccup is lower than the cost of a phantom warning every time forged restarts. The timeout exists so a wedged daemon cannot pin the UI thread.
 
 ## CloseConfirmation Changes
 
@@ -183,6 +183,8 @@ public enum CloseConfirmation {
 ```
 
 ### Target picking (unchanged)
+
+`activePane` continues to drive the pane-vs-tab distinction — multi-pane tabs close the focused pane first; single-pane tabs cascade to tab close.
 
 - `tab.panes.count > 1` and `activePane != nil` → `.pane`
 - else `project.tabs.count > 1` → `.tab`
@@ -240,10 +242,17 @@ Methods to convert (and their current line numbers):
 | `removeTab(_ tab:)` | 237 | tab X button entry; currently skips confirmation |
 | `removeTab(_ tab:in:)` | 249 | also skips |
 | `removeTabNativePTY` | 269 | called by `removeTab` and by `closeCurrentPaneNativePTY` cascade |
-| `removeProject` | (locate) | both tmux and native paths |
-| `removeProjectNativePTY` | (locate) | called by last-tab cascade |
+| `removeProject` | 140 | both tmux and native paths |
+| `removeProjectNativePTY` | 168 | called by last-tab cascade |
 
-Cascading closes (last pane → close tab → close project) currently route through these methods recursively. Each level re-evaluates with its own `confirmClose*` setting, *not* the deepest target's setting. Closing a pane that triggers tab close that triggers project close fires at most one prompt — whichever level matches the mode.
+Cascading closes (last pane → close tab → close project) route through these methods recursively. **Each level checks its own setting against its own activities. The first level whose setting fires wins, and the user's confirmation at that level carries through the cascade — no second prompt.**
+
+Worked example: a project with one tab, one pane, running `claude`. User triggers close on the pane.
+
+1. **Pane level**: `confirmClosePane` is implicit-`.whenActive`. Pane has an active process. Prompt fires: *"Closing this pane will terminate **claude**."*
+2. User clicks **Close Pane**. Cascade proceeds: pane → tab → project. No further prompts at the tab or project level — the user already confirmed the destructive action.
+
+Counter-example: same setup, but `confirmClosePane = .never` is the implicit semantics so… actually no: pane close on a single-pane tab is already a cascade to tab close, and the resolved target picked by `CloseConfirmation.evaluate` is `.tab` (since `tab.panes.count == 1`). The settings consulted are `confirmCloseTab` and `confirmCloseProject`. One target = one prompt = one decision.
 
 Implementation pattern at each call site:
 
