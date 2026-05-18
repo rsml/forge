@@ -42,6 +42,7 @@ struct ForgeConfig: Codable {
         var confirmBeforeClose: Bool?
         var warnOnCloseProject: Bool?           // LEGACY — migrated to confirmCloseProject on load
         var warnOnCloseTab: Bool?               // LEGACY — migrated to confirmCloseTab on load
+        var confirmClosePane: String?           // "never" | "whenActive" | "always"
         var confirmCloseTab: String?            // "never" | "whenActive" | "always"
         var confirmCloseProject: String?        // "never" | "whenActive" | "always"
         var warnOnMoveTab: Bool?
@@ -142,11 +143,15 @@ struct ForgeConfig: Codable {
     }
 
     /// One-time migration: translate legacy `warnOnCloseTab` / `warnOnCloseProject` booleans into
-    /// the new three-state `confirmCloseTab` / `confirmCloseProject` strings. `true` → `"always"`,
-    /// `false` / missing → `"whenActive"` (the new default).
+    /// the new three-state `confirmCloseTab` / `confirmCloseProject` strings, and seed
+    /// `confirmClosePane` with the new default. `true` → `"always"`, `false`/missing → `"whenActive"`.
     mutating func migrateCloseConfirmSettings() {
         guard var settings = general else { return }
         var didMigrate = false
+        if settings.confirmClosePane == nil {
+            settings.confirmClosePane = "whenActive"
+            didMigrate = true
+        }
         if settings.confirmCloseTab == nil {
             settings.confirmCloseTab = (settings.warnOnCloseTab == true) ? "always" : "whenActive"
             settings.warnOnCloseTab = nil

@@ -34,6 +34,12 @@ struct GeneralSettingsPane: View {
                     Text("Always").tag("always")
                 }
                 .padding(.vertical, -4)
+                Picker("Confirm pane close", selection: generalBinding(\.confirmClosePane, default: "whenActive")) {
+                    Text("Never").tag("never")
+                    Text("When a process is running").tag("whenActive")
+                    Text("Always").tag("always")
+                }
+                .padding(.vertical, -4)
             }
         }
         .formStyle(.grouped)
