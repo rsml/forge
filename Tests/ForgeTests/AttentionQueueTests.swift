@@ -183,4 +183,44 @@ struct AttentionQueueTests {
         _ = q.dequeue()
         #expect(q.count == 1)
     }
+
+    // MARK: - allItems
+
+    @Test("allItems returns items in queue order")
+    func testAllItems() {
+        var q = AttentionQueue()
+        let a = UUID(), b = UUID(), c = UUID()
+        q.enqueue(a)
+        q.enqueue(b)
+        q.enqueue(c)
+        #expect(q.allItems == [a, b, c])
+    }
+
+    @Test("allItems on empty queue returns empty array")
+    func testAllItemsEmpty() {
+        let q = AttentionQueue()
+        #expect(q.allItems.isEmpty)
+    }
+
+    // MARK: - replaceAll
+
+    @Test("replaceAll replaces entire queue contents")
+    func testReplaceAll() {
+        var q = AttentionQueue()
+        q.enqueue(UUID())
+        q.enqueue(UUID())
+        let a = UUID(), b = UUID()
+        q.replaceAll([a, b])
+        #expect(q.allItems == [a, b])
+        #expect(q.count == 2)
+        #expect(q.peek() == a)
+    }
+
+    @Test("replaceAll with empty array clears queue")
+    func testReplaceAllEmpty() {
+        var q = AttentionQueue()
+        q.enqueue(UUID())
+        q.replaceAll([])
+        #expect(q.isEmpty)
+    }
 }

@@ -56,6 +56,14 @@ public struct AttentionQueue {
         items.contains(id)
     }
 
+    /// Returns all items in queue order (front to back).
+    public var allItems: [UUID] { items }
+
+    /// Replaces the entire queue with the given items.
+    public mutating func replaceAll(_ newItems: [UUID]) {
+        items = newItems
+    }
+
     public var isEmpty: Bool { items.isEmpty }
     public var count: Int { items.count }
 }
