@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import ForgeCore
 
 /// forged — Forge PTY daemon.
 /// Holds PTY master file descriptors so terminal processes survive Forge restarts.
@@ -237,23 +238,88 @@ struct Forged {
         return entry
     }
 
-    /// Resolves the basename of a process's executable path via `proc_pidpath`.
-    /// Returns nil if the lookup fails (process gone, sandboxed, etc.).
-    /// Truncated comm fields (`proc_name`) are deliberately *not* used — they cap at 15 chars
-    /// and obscure longer binary names.
-    // TODO: enhance via KERN_PROCARGS2 to surface argv[1] for interpreter-fronted CLIs
-    //       (e.g. show "node script.js" instead of bare "node", "python3 manage.py" vs "python3").
+    /// Resolves a display name for a foreground process — what the user *thinks*
+    /// they ran, not what's on disk.
+    ///
+    /// Reads `KERN_PROCARGS2` for argv and `proc_pidpath` for the resolved
+    /// executable path, then delegates the interpretation to
+    /// `CommandNameResolver.resolve(argv:execPath:)` (a pure function in
+    /// ForgeCore — see its docs for the layered fallback strategy).
     static func procCommandName(pid: pid_t) -> String? {
-        // PROC_PIDPATHINFO_MAXSIZE = 4 * MAXPATHLEN = 4 * 1024 = 4096
+        let argv = procArgv(pid: pid)
+
+        var execPath = ""
         let bufSize: Int = 4096
         let buf = UnsafeMutablePointer<CChar>.allocate(capacity: bufSize)
         defer { buf.deallocate() }
-        let written = proc_pidpath(pid, buf, UInt32(bufSize))
-        guard written > 0 else { return nil }
-        let path = String(cString: buf)
-        guard !path.isEmpty else { return nil }
-        return (path as NSString).lastPathComponent
+        if proc_pidpath(pid, buf, UInt32(bufSize)) > 0 {
+            execPath = String(cString: buf)
+        }
+
+        return CommandNameResolver.resolve(argv: argv, execPath: execPath)
     }
+
+    /// Reads the command-line arguments of a process via `sysctl(KERN_PROCARGS2)`.
+    /// Returns an empty array if the lookup fails for any reason — callers fall
+    /// back to other signals.
+    ///
+    /// `KERN_PROCARGS2` layout (host byte order):
+    /// ```
+    /// [argc: Int32]
+    /// [exec_path: NUL-terminated C string]
+    /// [padding: zero or more NULs]
+    /// [argv[0]: NUL-terminated]
+    /// [argv[1]: NUL-terminated]
+    /// ...
+    /// [argv[argc-1]: NUL-terminated]
+    /// [envp: NUL-terminated strings...]
+    /// ```
+    static func procArgv(pid: pid_t) -> [String] {
+        // Determine kernel-imposed upper bound. `KERN_ARGMAX` is typically ~256 KB
+        // on modern macOS; the size needed for this proc is at most that.
+        var argMax: Int32 = 0
+        var argMaxLen = MemoryLayout<Int32>.size
+        var mibArgMax: [Int32] = [CTL_KERN, KERN_ARGMAX]
+        if sysctl(&mibArgMax, UInt32(mibArgMax.count), &argMax, &argMaxLen, nil, 0) != 0 || argMax <= 0 {
+            argMax = 262_144  // sane fallback
+        }
+
+        var size = Int(argMax)
+        let buf = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
+        defer { buf.deallocate() }
+
+        var mib: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
+        guard sysctl(&mib, UInt32(mib.count), buf, &size, nil, 0) == 0,
+              size >= MemoryLayout<Int32>.size else {
+            return []
+        }
+
+        // First 4 bytes: argc (host byte order).
+        let argc = buf.withMemoryRebound(to: Int32.self, capacity: 1) { $0.pointee }
+        guard argc > 0 else { return [] }
+
+        var i = MemoryLayout<Int32>.size
+
+        // Skip exec_path (NUL-terminated).
+        while i < size, buf[i] != 0 { i += 1 }
+        // Skip padding NULs between exec_path and argv[0].
+        while i < size, buf[i] == 0 { i += 1 }
+
+        var args: [String] = []
+        args.reserveCapacity(Int(argc))
+        for _ in 0..<argc {
+            guard i < size else { break }
+            let start = i
+            while i < size, buf[i] != 0 { i += 1 }
+            let bytes = UnsafeBufferPointer(start: buf.advanced(by: start), count: i - start)
+            if let s = String(bytes: bytes, encoding: .utf8) {
+                args.append(s)
+            }
+            i += 1  // skip terminating NUL
+        }
+        return args
+    }
+
 
     static func reapDeadProcesses() {
         var dead: [String] = []

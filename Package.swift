@@ -32,7 +32,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "forged",
-            dependencies: [],
+            dependencies: ["ForgeCore"],
             path: "Sources/Daemon"
         ),
         .binaryTarget(
