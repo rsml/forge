@@ -40,11 +40,16 @@ extension WorkspaceController {
         }
 
         saveUIState()
-        // switchClient must complete before updateRenderers — resize commands
-        // only work when the control mode client is attached to the correct session.
-        Task {
-            await tmux.switchClient(project: project.name)
+        if config.isNativePTY {
+            // Native PTY: no tmux switchClient needed. Just sync renderers.
             updateRenderers()
+        } else {
+            // switchClient must complete before updateRenderers — resize commands
+            // only work when the control mode client is attached to the correct session.
+            Task {
+                await tmux.switchClient(project: project.name)
+                updateRenderers()
+            }
         }
     }
 
@@ -65,9 +70,13 @@ extension WorkspaceController {
         workspace.activeTabId = tab.id
         Task { await tmux.selectTab(id: tab.id) }
         saveUIState()
-        Task {
-            await tmux.switchClient(project: project.name)
+        if config.isNativePTY {
             updateRenderers()
+        } else {
+            Task {
+                await tmux.switchClient(project: project.name)
+                updateRenderers()
+            }
         }
     }
 
@@ -108,6 +117,12 @@ extension WorkspaceController {
 
     func removeProject(_ project: Project) async {
         ForgeLog.log("[app] Removing project: \(project.name)")
+
+        if config.isNativePTY {
+            removeProjectNativePTY(project)
+            return
+        }
+
         // Killing any session may disconnect control mode (if it's attached to
         // that session). Set the flag so onDisconnect suppresses the toast.
         expectingDisconnect = true
@@ -126,6 +141,42 @@ extension WorkspaceController {
             }
         }
         Task { await tmux.killProject(name: project.name) }
+    }
+
+    private func removeProjectNativePTY(_ project: Project) {
+        // Release daemon fds and remove renderers for all panes
+        for tab in project.tabs {
+            for pane in tab.panes {
+                paneRenderers.removeValue(forKey: pane.id)
+                outputRouter.unregister(paneId: pane.id)
+                if let daemon = daemonAdapter {
+                    Task { try? await daemon.release(paneId: pane.id) }
+                }
+            }
+        }
+
+        // Switch to another project before removing
+        if let index = workspace.projects.firstIndex(where: { $0.id == project.id }) {
+            let nextIndex = index > 0 ? index - 1 : min(1, workspace.projects.count - 1)
+            if nextIndex != index, nextIndex < workspace.projects.count {
+                selectProject(workspace.projects[nextIndex])
+            }
+        }
+
+        // Remove from model
+        workspace.projects.removeAll { $0.id == project.id }
+
+        // Handle empty workspace
+        if workspace.projects.isEmpty {
+            workspace.activeProjectId = nil
+            workspace.activeTabId = nil
+            paneRenderers.removeAll()
+        }
+
+        // Persist immediately
+        let frame = NSApp.mainWindow?.frame
+        WorkspacePersistence.save(workspace: workspace, windowFrame: frame)
+        ForgeLog.log("[app] Removed project \(project.name) (native PTY)")
     }
 
     func addTab(in project: Project) {
