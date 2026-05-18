@@ -118,6 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller.processAdapter = ProcessAdapter(ghosttyApp: ga)
             let daemon = DaemonAdapter()
             controller.daemonAdapter = daemon
+            controller.activityPort = DaemonActivityAdapter(daemon: daemon)
             // Launch and connect to daemon immediately
             Task {
                 do {
@@ -127,6 +128,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     ForgeLog.log("[app] Failed to connect to daemon: \(error)")
                 }
             }
+        } else {
+            controller.activityPort = TmuxActivityAdapter(workspace: controller.workspace)
         }
 
         createMainWindow()

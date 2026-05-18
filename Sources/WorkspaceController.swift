@@ -47,6 +47,11 @@ final class WorkspaceController {
     /// changes when clicking toolbar buttons).
     var lastFocusedPaneId: String?
 
+    /// Foreground-process activity check for close-confirmation prompts.
+    /// Set by AppDelegate after the daemon adapter is created (native PTY)
+    /// or immediately (tmux mode).
+    var activityPort: (any PaneActivityPort)?
+
     var gitBranch: String? { syncEngine.gitBranch }
 
     init(tmux: any TmuxPort, config: ForgeConfigStore, toastState: NotificationToastState) {

@@ -140,6 +140,8 @@ extension WorkspaceController {
     func removeProject(_ project: Project) async {
         ForgeLog.log("[app] Removing project: \(project.name)")
 
+        guard await confirmProjectClose(project) else { return }
+
         if config.isNativePTY {
             removeProjectNativePTY(project)
             return
@@ -163,6 +165,49 @@ extension WorkspaceController {
             }
         }
         Task { await tmux.killProject(name: project.name) }
+    }
+
+    /// Project-scoped close confirmation. Returns true if the close should
+    /// proceed (no prompt, or user confirmed). Bypasses `CloseConfirmation.evaluate`
+    /// because the user explicitly chose to close the project — target picking
+    /// would otherwise pick `.tab` for multi-tab projects.
+    @MainActor
+    private func confirmProjectClose(_ project: Project) async -> Bool {
+        let general = config.config.general
+        let mode = CloseConfirmation.TabConfirmMode(rawValue: general?.confirmCloseProject ?? "")
+            ?? .whenActive
+        guard mode != .never else { return true }
+
+        let allPaneIds = project.tabs.flatMap { $0.panes.map(\.id) }
+        let activities: [PaneActivity] = await {
+            if let port = activityPort { return await port.query(paneIds: allPaneIds) }
+            return []
+        }()
+        let actives = activities.filter(\.isActive)
+
+        let alertInfo: CloseConfirmation.AlertInfo
+        if actives.isEmpty {
+            if mode == .whenActive { return true }
+            alertInfo = CloseConfirmation.AlertInfo(
+                message: "Closing \"\(project.name)\" will close all tabs and remove the project from Forge.",
+                info: "",
+                action: "Close Project"
+            )
+        } else {
+            let cmd = actives.first?.command ?? "a process"
+            let extras = actives.count - 1
+            let suffix = extras > 0
+                ? " (and \(extras) other process\(extras == 1 ? "" : "es"))"
+                : ""
+            alertInfo = CloseConfirmation.AlertInfo(
+                message: "Closing \"\(project.name)\" will terminate \"\(cmd)\"\(suffix).",
+                info: "",
+                action: "Close Project"
+            )
+        }
+
+        guard let window = NSApp.mainWindow else { return true }
+        return await CloseConfirmation.present(alertInfo, in: window)
     }
 
     private func removeProjectNativePTY(_ project: Project) {
@@ -235,24 +280,34 @@ extension WorkspaceController {
     }
 
     func removeTab(_ tab: Tab) {
-        ForgeLog.log("[app] Removing tab: \(tab.name) (\(tab.id))")
-        if config.isNativePTY {
-            removeTabNativePTY(tab, in: workspace.activeProject)
-            return
-        }
-        Task {
-            await tmux.killTab(id: tab.id)
-            await syncEngine.refresh()
-        }
+        guard let project = workspace.activeProject else { return }
+        removeTab(tab, in: project)
     }
 
     func removeTab(_ tab: Tab, in project: Project) {
         ForgeLog.log("[app] Removing tab: \(tab.name) from \(project.name)")
+        Task { @MainActor in
+            guard let decision = await evaluateClose(project: project, tab: tab, activePane: nil)
+            else { return }
+            switch decision.target {
+            case .pane:
+                // activePane:nil prevents .pane target — defensive only.
+                performRemoveTab(tab, in: project)
+            case .tab(let t, let p):
+                performRemoveTab(t, in: p)
+            case .project(let p):
+                await removeProjectAfterConfirm(p)
+            }
+        }
+    }
+
+    /// Inner removeTab path — no confirmation (caller already prompted).
+    @MainActor
+    private func performRemoveTab(_ tab: Tab, in project: Project) {
         if config.isNativePTY {
             removeTabNativePTY(tab, in: project)
             return
         }
-        // Compute neighbor before kill — refresh will remove the tab from the model.
         let neighborTab: Tab? = {
             guard let index = project.tabs.firstIndex(where: { $0.id == tab.id }) else { return nil }
             let nextIndex = index > 0 ? index - 1 : min(index + 1, project.tabs.count - 1)
@@ -264,6 +319,29 @@ extension WorkspaceController {
             await syncEngine.refresh()
             if let neighborTab { selectTab(neighborTab) }
         }
+    }
+
+    /// Project close path that skips re-prompting (caller already confirmed via
+    /// `evaluateClose` which resolved to `.project`).
+    @MainActor
+    private func removeProjectAfterConfirm(_ project: Project) async {
+        ForgeLog.log("[app] Removing project: \(project.name) (post-confirm)")
+        if config.isNativePTY {
+            removeProjectNativePTY(project)
+            return
+        }
+        expectingDisconnect = true
+        if let path = project.path,
+           let snapshot = await (tmux as? TmuxAdapter)?.captureSessionSnapshot(project: project.name, path: path) {
+            SessionSnapshotStore.save(snapshot)
+        }
+        if let index = workspace.projects.firstIndex(where: { $0.id == project.id }) {
+            let nextIndex = index > 0 ? index - 1 : min(1, workspace.projects.count - 1)
+            if nextIndex != index {
+                selectProject(workspace.projects[nextIndex])
+            }
+        }
+        Task { await tmux.killProject(name: project.name) }
     }
 
     private func removeTabNativePTY(_ tab: Tab, in project: Project?) {
@@ -317,65 +395,106 @@ extension WorkspaceController {
     }
 
     func closeCurrentPane() {
-        if config.isNativePTY {
-            closeCurrentPaneNativePTY()
-            return
-        }
-
-        guard let project = workspace.activeProject,
-              let tabId = workspace.activeTabId,
-              let tab = project.tabs.first(where: { $0.id == tabId })
-        else { return }
-
-        let activePane = tab.panes.first(where: { $0.active }) ?? tab.panes.first
-        let generalConfig = config.config.general
-        let decision = CloseConfirmation.evaluate(
-            project: project, tab: tab, activePane: activePane,
-            warnOnCloseProject: generalConfig?.warnOnCloseProject ?? true,
-            warnOnCloseTab: generalConfig?.warnOnCloseTab ?? false
-        )
-
-        if let alert = decision.alert {
-            guard CloseConfirmation.present(alert) else { return }
-        }
-
-        switch decision.target {
-        case .pane(let id):
-            Task { await tmux.killPane(id: id) }
-        case .tab(let tab, let project):
-            removeTab(tab, in: project)
-        case .project(let project):
-            Task { await removeProject(project) }
+        Task { @MainActor in
+            await closeCurrentPaneAsync()
         }
     }
 
-    private func closeCurrentPaneNativePTY() {
+    @MainActor
+    private func closeCurrentPaneAsync() async {
         guard let project = workspace.activeProject,
               let tabId = workspace.activeTabId,
               let tab = project.tabs.first(where: { $0.id == tabId })
         else { return }
 
-        // Find the focused pane
-        let paneIndex: Int = {
-            if let focusedId = lastFocusedPaneId,
-               let idx = tab.panes.firstIndex(where: { $0.id == focusedId }) {
-                return idx
+        // Pick the active/focused pane — tmux uses the model flag, native PTY
+        // uses lastFocusedPaneId set on focus gain.
+        let activePane: Pane? = {
+            if config.isNativePTY {
+                if let focusedId = lastFocusedPaneId,
+                   let p = tab.panes.first(where: { $0.id == focusedId }) {
+                    return p
+                }
+                return tab.panes.last
             }
-            return max(tab.panes.count - 1, 0)
+            return tab.panes.first(where: { $0.active }) ?? tab.panes.first
         }()
 
-        guard paneIndex < tab.panes.count else { return }
+        guard let decision = await evaluateClose(project: project, tab: tab, activePane: activePane)
+        else { return }
+
+        switch decision.target {
+        case .pane(let id):
+            if config.isNativePTY {
+                performClosePaneNativePTY(paneId: id, in: tab, project: project)
+            } else {
+                Task { await tmux.killPane(id: id) }
+            }
+        case .tab(let t, let p):
+            performRemoveTab(t, in: p)
+        case .project(let p):
+            await removeProjectAfterConfirm(p)
+        }
+    }
+
+    /// Runs activity query + alert. Returns `nil` if the user cancelled.
+    /// Returns the decision (possibly with no alert) if the caller should proceed.
+    @MainActor
+    private func evaluateClose(
+        project: Project, tab: Tab, activePane: Pane?
+    ) async -> CloseConfirmation.CloseDecision? {
+        let general = config.config.general
+        let tabMode = CloseConfirmation.TabConfirmMode(rawValue: general?.confirmCloseTab ?? "")
+            ?? .whenActive
+        let projectMode = CloseConfirmation.TabConfirmMode(rawValue: general?.confirmCloseProject ?? "")
+            ?? .whenActive
+
+        // Determine which pane IDs to query. Mirror CloseConfirmation's target picking
+        // so we only ask the daemon about panes that matter for the resolved target.
+        let targetPaneIds: [String]
+        let hasMultiplePanes = tab.panes.count > 1
+        let hasMultipleTabs = project.tabs.count > 1
+        if hasMultiplePanes, let activePane {
+            targetPaneIds = [activePane.id]
+        } else if hasMultipleTabs {
+            targetPaneIds = tab.panes.map(\.id)
+        } else {
+            targetPaneIds = project.tabs.flatMap { $0.panes.map(\.id) }
+        }
+
+        let activities: [PaneActivity] = await {
+            if let port = activityPort { return await port.query(paneIds: targetPaneIds) }
+            return []
+        }()
+
+        let decision = CloseConfirmation.evaluate(
+            project: project, tab: tab, activePane: activePane,
+            activities: activities,
+            confirmCloseTab: tabMode,
+            confirmCloseProject: projectMode
+        )
+
+        if let alert = decision.alert {
+            guard let window = NSApp.mainWindow else { return decision }
+            let confirmed = await CloseConfirmation.present(alert, in: window)
+            return confirmed ? decision : nil
+        }
+        return decision
+    }
+
+    /// Pane-close worker for native PTY. No confirmation (caller already prompted).
+    @MainActor
+    private func performClosePaneNativePTY(paneId: String, in tab: Tab, project: Project) {
+        guard let paneIndex = tab.panes.firstIndex(where: { $0.id == paneId }) else { return }
         let paneToClose = tab.panes[paneIndex]
 
-        // Last pane in tab → close the tab (which handles last-tab-in-project)
+        // Last pane → cascade to tab close (which cascades to project if needed)
         if tab.panes.count <= 1 {
             removeTabNativePTY(tab, in: project)
             return
         }
 
-        // Remove the pane and update the split tree
         tab.panes.remove(at: paneIndex)
-
         if let tree = tab.splitTree {
             var leafIndex = 0
             tab.splitTree = removeLeafAt(node: tree, targetLeaf: paneIndex, currentLeaf: &leafIndex)
@@ -384,12 +503,10 @@ extension WorkspaceController {
             tab.splitTree = nil
         }
 
-        // Release renderer and daemon fd
         paneRenderers.removeValue(forKey: paneToClose.id)
         if let daemon = daemonAdapter {
             Task { try? await daemon.release(paneId: paneToClose.id) }
         }
-
         ForgeLog.log("[app] Closed pane \(paneToClose.id)")
         updateRenderers()
         let frame = NSApp.mainWindow?.frame
