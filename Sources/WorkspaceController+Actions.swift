@@ -360,51 +360,33 @@ extension WorkspaceController {
         guard paneIndex < tab.panes.count else { return }
         let paneToClose = tab.panes[paneIndex]
 
-        // If it's the last pane, close the tab/project
+        // Last pane in tab → close the tab (which handles last-tab-in-project)
         if tab.panes.count <= 1 {
-            if project.tabs.count <= 1 {
-                // Last tab in project — remove project
-                workspace.projects.removeAll { $0.id == project.id }
-                if workspace.projects.isEmpty {
-                    // Create a fresh default project
-                    let id = UUID().uuidString
-                    let p = Project(id: id, name: "default", path: NSHomeDirectory())
-                    let t = Tab(id: UUID().uuidString, projectId: id, index: 0, name: "zsh")
-                    t.panes.append(Pane(id: UUID().uuidString, tabId: t.id, currentPath: NSHomeDirectory()))
-                    p.tabs.append(t)
-                    workspace.projects.append(p)
-                    workspace.activeProjectId = id
-                    workspace.activeTabId = t.id
-                }
-            }
-            // Just let the renderer be cleaned up by updateRenderers
-        } else {
-            // Remove the pane and update the split tree
-            tab.panes.remove(at: paneIndex)
-
-            // Collapse the split tree: remove the Nth leaf
-            if let tree = tab.splitTree {
-                var leafIndex = 0
-                tab.splitTree = removeLeafAt(node: tree, targetLeaf: paneIndex, currentLeaf: &leafIndex)
-            }
-
-            // If only 1 pane left, clear the tree
-            if tab.panes.count <= 1 {
-                tab.splitTree = nil
-            }
-
-            // Release daemon fd
-            if let daemon = daemonAdapter {
-                Task { try? await daemon.release(paneId: paneToClose.id) }
-            }
+            removeTabNativePTY(tab, in: project)
+            return
         }
 
-        // Remove renderer
+        // Remove the pane and update the split tree
+        tab.panes.remove(at: paneIndex)
+
+        if let tree = tab.splitTree {
+            var leafIndex = 0
+            tab.splitTree = removeLeafAt(node: tree, targetLeaf: paneIndex, currentLeaf: &leafIndex)
+        }
+        if tab.panes.count <= 1 {
+            tab.splitTree = nil
+        }
+
+        // Release renderer and daemon fd
         paneRenderers.removeValue(forKey: paneToClose.id)
+        if let daemon = daemonAdapter {
+            Task { try? await daemon.release(paneId: paneToClose.id) }
+        }
 
         ForgeLog.log("[app] Closed pane \(paneToClose.id)")
         updateRenderers()
-        WorkspacePersistence.save(workspace: workspace, windowFrame: nil)
+        let frame = NSApp.mainWindow?.frame
+        WorkspacePersistence.save(workspace: workspace, windowFrame: frame)
     }
 
     /// Remove the Nth leaf from the tree, collapsing its parent if only one child remains.

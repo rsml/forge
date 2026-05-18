@@ -108,21 +108,8 @@ final class WorkspaceController {
                 ForgeLog.log("[app] Loaded \(workspace.projects.count) projects from workspace.json")
             }
 
-            // If no persisted workspace, create a default project
-            if workspace.projects.isEmpty {
-                let id = UUID().uuidString
-                let project = Project(id: id, name: "default", path: NSHomeDirectory())
-                let tabId = UUID().uuidString
-                let tab = Tab(id: tabId, projectId: id, index: 0, name: "zsh")
-                let paneId = UUID().uuidString
-                let pane = Pane(id: paneId, tabId: tabId, currentPath: NSHomeDirectory())
-                tab.panes.append(pane)
-                project.tabs.append(tab)
-                workspace.projects.append(project)
-                workspace.activeProjectId = id
-                workspace.activeTabId = tabId
-                ForgeLog.log("[app] Created default project")
-            }
+            // Empty workspace — user can add projects via the UI.
+            // No default project created.
 
             // Pre-fetch daemon fds BEFORE creating renderers.
             // This prevents the race where updateRenderers creates EXEC surfaces
