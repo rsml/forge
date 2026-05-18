@@ -4,6 +4,21 @@ import ForgeCore
 struct StackModeSettingsPane: View {
     private var store: ForgeConfigStore { .shared }
 
+    private var orderingMode: String {
+        store.config.stackView?.ordering ?? "grouped"
+    }
+
+    private var orderingDescription: String {
+        switch orderingMode {
+        case "chronological":
+            return "Orders the stack by when each tab requested attention, earliest first."
+        case "simple":
+            return "Orders the stack by project and tab position — first project first, first tab first."
+        default:
+            return "Reduces context switching by grouping tabs from the same project together."
+        }
+    }
+
     var body: some View {
         Form {
             Section {
@@ -19,6 +34,20 @@ struct StackModeSettingsPane: View {
                 }
                 .pickerStyle(.segmented)
                 .padding(.vertical, -4)
+            }
+
+            Section("Ordering") {
+                Picker("Stack ordering", selection: stackBinding(\.ordering, default: "grouped")) {
+                    Text("Chronological").tag("chronological")
+                    Text("Grouped").tag("grouped")
+                    Text("Simple").tag("simple")
+                }
+                .padding(.vertical, -4)
+
+                Text(orderingDescription)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .animation(.none, value: orderingMode)
             }
 
             Section("Attention") {
