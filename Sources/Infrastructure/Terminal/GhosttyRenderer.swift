@@ -196,12 +196,17 @@ final class GhosttyRenderer: TerminalRenderer {
 
             // Send TIOCSWINSZ on every resize — MANUAL mode surfaces
             // don't resize the PTY automatically (unlike EXEC mode).
+            // Toggle size first: if the PTY already has this size (same as
+            // previous session), the shell won't redraw. A brief size change
+            // forces the shell to handle a genuine resize → redraw prompt.
             let frame = self.nsView.frame
             var ws = winsize()
-            ws.ws_col = UInt16(cols)
-            ws.ws_row = UInt16(rows)
             ws.ws_xpixel = UInt16(frame.width)
             ws.ws_ypixel = UInt16(frame.height)
+            ws.ws_col = UInt16(max(1, cols - 1))
+            ws.ws_row = UInt16(rows)
+            _ = ioctl(self.externalFD, TIOCSWINSZ, &ws)
+            ws.ws_col = UInt16(cols)
             _ = ioctl(self.externalFD, TIOCSWINSZ, &ws)
             if pid > 0 { kill(pid, SIGWINCH) }
         }
