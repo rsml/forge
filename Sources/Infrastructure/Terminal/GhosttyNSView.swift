@@ -141,8 +141,7 @@ final class GhosttyNSView: NSView {
         if execMode {
             // EXEC mode: let Ghostty handle keys natively
             if flags.contains(.control) {
-                let keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
-                if let surface { _ = ghostty_surface_key(surface, keyEvent) }
+                sendExecKey(event)
                 return true
             }
             return false
@@ -157,24 +156,26 @@ final class GhosttyNSView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
-
         if execMode {
-            // ghostty_surface_key needs the text from the event to know what
-            // character the key produces. Without it, only keycodes are sent
-            // and regular text input doesn't work.
-            if let text = event.characters, !text.isEmpty {
-                text.withCString { cStr in
-                    var keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
-                    keyEvent.text = cStr
-                    if let surface { _ = ghostty_surface_key(surface, keyEvent) }
-                }
-            } else {
-                let keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
-                if let surface { _ = ghostty_surface_key(surface, keyEvent) }
-            }
+            sendExecKey(event)
             return
         }
         sendKeyEvent(event)
+    }
+
+    /// Forwards an NSEvent to Ghostty in EXEC mode with both `text` and
+    /// `unshifted_codepoint` populated. The Kitty keyboard protocol encoder
+    /// (which Claude Code 2.1+ enables whenever TERM_PROGRAM=ghostty) silently
+    /// drops Ctrl+letter combos when unshifted_codepoint is zero — so it must
+    /// be set for every key, not just typed text.
+    private func sendExecKey(_ event: NSEvent) {
+        guard let surface else { return }
+        let text = event.characters ?? ""
+        text.withCString { cStr in
+            var keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
+            if !text.isEmpty { keyEvent.text = cStr }
+            _ = ghostty_surface_key(surface, keyEvent)
+        }
     }
 
     override func keyUp(with event: NSEvent) {
@@ -331,8 +332,21 @@ final class GhosttyNSView: NSView {
         keyEvent.consumed_mods = GHOSTTY_MODS_NONE
         keyEvent.text = nil
         keyEvent.composing = false
-        keyEvent.unshifted_codepoint = 0
+        keyEvent.unshifted_codepoint = unshiftedCodepoint(for: event)
         return keyEvent
+    }
+
+    /// The codepoint the key would produce with no modifiers (including Shift).
+    /// Required by Ghostty's Kitty keyboard protocol encoder: for Ctrl+letter
+    /// it builds `CSI <codepoint>;<mods> u` from this field. ASCII letters are
+    /// lowercased so Ctrl+Shift+C reports base 'c' the same as Ctrl+C does.
+    private func unshiftedCodepoint(for event: NSEvent) -> UInt32 {
+        guard let chars = event.charactersIgnoringModifiers,
+              let scalar = chars.unicodeScalars.first else { return 0 }
+        if scalar.value >= 0x41, scalar.value <= 0x5A {
+            return scalar.value + 0x20
+        }
+        return scalar.value
     }
 
     private func modsFromFlags(_ flags: NSEvent.ModifierFlags) -> ghostty_input_mods_e {
