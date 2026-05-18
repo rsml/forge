@@ -35,4 +35,14 @@ public protocol AttentionPort: AnyObject {
 
     /// Move the tab to the front of the queue.
     func promoteToFront(_ tabUUID: UUID)
+
+    /// Attention timestamps for ordering (read-only).
+    var timestamps: AttentionTimestamps { get }
+
+    /// Seed the queue with ordered UUIDs (e.g., on entering stack mode).
+    func seedQueue(ordered: [UUID])
+
+    /// Remove tabs from the queue whose attention has resolved,
+    /// except the front item (currently viewed).
+    func pruneResolved(activeAttentionUUIDs: Set<UUID>)
 }

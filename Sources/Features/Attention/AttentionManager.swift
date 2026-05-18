@@ -9,6 +9,7 @@ final class AttentionManager: AttentionPort {
     private(set) var hiddenSet: Set<UUID> = []
     private let notifier: any NotificationPort
     private let config: ForgeConfigStore
+    var timestamps = AttentionTimestamps()
 
     var currentTabUUID: UUID? { queue.peek() }
     var nextWindowUUID: UUID? { queue.peekSecond() }
@@ -18,6 +19,7 @@ final class AttentionManager: AttentionPort {
         self.notifier = notifier
         self.config = config
         self.hiddenSet = loadHiddenSet(from: config)
+        self.timestamps = loadTimestamps(from: config)
     }
 
     /// Call after initial tmux sync to prune stale UUIDs from a previous project.
@@ -27,11 +29,14 @@ final class AttentionManager: AttentionPort {
             hiddenSet.subtract(stale)
             persistHiddenSet()
         }
+        timestamps.prune(validUUIDs: validUUIDs)
+        persistTimestamps()
     }
 
     func handleEvent(_ event: AttentionEvent) {
         let uuid = event.tabUUID
         guard !hiddenSet.contains(uuid) else { return }
+        timestamps.record(uuid)
         queue.enqueue(uuid)
 
         if config.config.stackView?.bringToForeground == "always" {
@@ -41,6 +46,8 @@ final class AttentionManager: AttentionPort {
 
     func markDone(_ tabUUID: UUID) {
         queue.remove(tabUUID)
+        timestamps.remove(tabUUID)
+        persistTimestamps()
     }
 
     func hide(_ tabUUID: UUID) {
@@ -61,6 +68,7 @@ final class AttentionManager: AttentionPort {
     func removeTab(_ tabUUID: UUID) {
         queue.remove(tabUUID)
         hiddenSet.remove(tabUUID)
+        timestamps.remove(tabUUID)
     }
 
     func isHidden(_ tabUUID: UUID) -> Bool {
@@ -70,6 +78,37 @@ final class AttentionManager: AttentionPort {
     func promoteToFront(_ tabUUID: UUID) {
         queue.remove(tabUUID)
         queue.insertAtFront(tabUUID)
+    }
+
+    func seedQueue(ordered: [UUID]) {
+        queue.replaceAll(ordered)
+    }
+
+    func pruneResolved(activeAttentionUUIDs: Set<UUID>) {
+        let front = queue.peek()
+        let toRemove = queue.allItems.filter { $0 != front && !activeAttentionUUIDs.contains($0) }
+        for uuid in toRemove {
+            queue.remove(uuid)
+            timestamps.remove(uuid)
+        }
+        if !toRemove.isEmpty { persistTimestamps() }
+    }
+
+    private func persistTimestamps() {
+        let dict = timestamps.toDictionary()
+        config.update { config in
+            if config.stackView == nil {
+                config.stackView = ForgeConfig.StackViewSettings()
+            }
+            config.stackView?.attentionTimestamps = dict
+        }
+    }
+
+    private func loadTimestamps(from config: ForgeConfigStore) -> AttentionTimestamps {
+        guard let dict = config.config.stackView?.attentionTimestamps else {
+            return AttentionTimestamps()
+        }
+        return AttentionTimestamps(from: dict)
     }
 
     private func persistHiddenSet() {
