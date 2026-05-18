@@ -130,6 +130,9 @@ extension WorkspaceController {
         tab.panes.append(pane)
         project.tabs.append(tab)
         workspace.projects.append(project)
+        // Create renderer BEFORE selectProject triggers SwiftUI render — prevents flash
+        let renderer = createExecRenderer(for: pane, cwd: path)
+        paneRenderers[paneId] = renderer
         selectProject(project)
         ForgeLog.log("[app] Added project \(name) (native PTY)")
     }
@@ -220,9 +223,13 @@ extension WorkspaceController {
         let tabId = UUID().uuidString
         let tab = Tab(id: tabId, projectId: project.id, index: project.tabs.count, name: "zsh")
         let paneId = UUID().uuidString
-        let pane = Pane(id: paneId, tabId: tabId, currentPath: project.path ?? NSHomeDirectory())
+        let cwd = project.path ?? NSHomeDirectory()
+        let pane = Pane(id: paneId, tabId: tabId, currentPath: cwd)
         tab.panes.append(pane)
         project.tabs.append(tab)
+        // Create renderer BEFORE selectTab triggers SwiftUI render — prevents flash
+        let renderer = createExecRenderer(for: pane, cwd: cwd)
+        paneRenderers[paneId] = renderer
         selectTab(tab)
         ForgeLog.log("[app] Added tab in \(project.name) (native PTY)")
     }
