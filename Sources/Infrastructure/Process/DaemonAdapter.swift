@@ -155,6 +155,52 @@ final class DaemonAdapter: PersistencePort {
         }
     }
 
+    /// Query the daemon for foreground activity on the given panes.
+    ///
+    /// Subject to a hard 200 ms timeout — a wedged daemon must never pin the close path.
+    /// Callers fail-open (treat timeout/error as "no activity") to avoid phantom warnings
+    /// every time forged hiccups.
+    nonisolated func isActive(
+        paneIds: [String]
+    ) async throws -> [(paneId: String, isActive: Bool, command: String?)] {
+        let msg = try JSONSerialization.data(withJSONObject: [
+            "op": "is_active", "pane_ids": paneIds
+        ] as [String: Any])
+
+        return try await withThrowingTaskGroup(
+            of: [(paneId: String, isActive: Bool, command: String?)].self
+        ) { group in
+            group.addTask {
+                try await MainActor.run {
+                    try self.ensureConnected()
+                    try self.sendMessage(msg)
+                    let (_, response) = try self.receiveWithFD()
+                    guard let json = try JSONSerialization.jsonObject(with: response) as? [String: Any],
+                          let panes = json["panes"] as? [[String: Any]] else {
+                        return []
+                    }
+                    return panes.compactMap { entry in
+                        guard let id = entry["pane_id"] as? String else { return nil }
+                        let active = entry["active"] as? Bool ?? false
+                        let command = entry["command"] as? String
+                        return (paneId: id, isActive: active, command: command)
+                    }
+                }
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: 200_000_000)
+                throw DaemonError.timeout
+            }
+            // First task to finish wins. Cancel the loser.
+            guard let result = try await group.next() else {
+                group.cancelAll()
+                throw DaemonError.timeout
+            }
+            group.cancelAll()
+            return result
+        }
+    }
+
     // MARK: - Socket I/O
 
     private func sendMessage(_ data: Data) throws {
@@ -245,4 +291,5 @@ final class DaemonAdapter: PersistencePort {
 enum DaemonError: Error {
     case socketFailed, connectFailed, notConnected, sendFailed, receiveFailed
     case daemonNotFound, launchFailed(Int32)
+    case timeout
 }

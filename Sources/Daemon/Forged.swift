@@ -15,6 +15,7 @@ struct Forged {
     struct StoredPane {
         let fd: Int32
         let pid: Int32
+        let pgid: pid_t
         let cwd: String
         let createdAt: Date
     }
@@ -129,13 +130,15 @@ struct Forged {
             }
             let pid = (json["pid"] as? Int).map { Int32($0) } ?? 0
             let cwd = json["cwd"] as? String ?? ""
+            // Capture the pgid now — the shell is the foreground pgrp until a child grabs it.
+            let pgid = pid > 0 ? getpgid(pid) : pid_t(0)
             // Close previous fd for this pane (if overwriting)
             if let existing = storedFDs[paneId] {
                 close(existing.fd)
                 log("Replaced previous fd=\(existing.fd) for pane \(paneId)")
             }
-            storedFDs[paneId] = StoredPane(fd: fd, pid: pid, cwd: cwd, createdAt: Date())
-            log("Stored fd=\(fd) for pane \(paneId) (pid=\(pid))")
+            storedFDs[paneId] = StoredPane(fd: fd, pid: pid, pgid: pgid, cwd: cwd, createdAt: Date())
+            log("Stored fd=\(fd) for pane \(paneId) (pid=\(pid) pgid=\(pgid))")
             let response = try JSONSerialization.data(withJSONObject: ["status": "ok"])
             try FDSocket.sendMessage(response, over: clientFD)
 
@@ -192,6 +195,20 @@ struct Forged {
             let response = try JSONSerialization.data(withJSONObject: ["status": "ok"])
             try FDSocket.sendMessage(response, over: clientFD)
 
+        case "is_active":
+            guard let paneIds = json["pane_ids"] as? [String] else {
+                log("is_active: missing pane_ids")
+                return
+            }
+            var results: [[String: Any]] = []
+            for id in paneIds {
+                results.append(activityEntry(for: id))
+            }
+            let response = try JSONSerialization.data(withJSONObject: [
+                "status": "ok", "panes": results
+            ] as [String: Any])
+            try FDSocket.sendMessage(response, over: clientFD)
+
         case "shutdown":
             log("Shutdown requested by client")
             running = false
@@ -201,6 +218,41 @@ struct Forged {
         default:
             log("Unknown op: \(op)")
         }
+    }
+
+    /// Per-pane activity check. Returns a JSON-ready dict suitable for the `is_active` response.
+    /// Active iff the PTY's foreground process group differs from the shell's pgid — i.e. some
+    /// child (claude, vim, npm, ...) has grabbed the controlling terminal via tcsetpgrp.
+    static func activityEntry(for paneId: String) -> [String: Any] {
+        let inactive: [String: Any] = ["pane_id": paneId, "active": false]
+        guard let pane = storedFDs[paneId] else { return inactive }
+        // Reap stale entries — shell process exited. Also treat unknown pid (0) as inactive.
+        guard pane.pid > 0, kill(pane.pid, 0) == 0 else { return inactive }
+        let fg = tcgetpgrp(pane.fd)
+        guard fg > 0, fg != pane.pgid else { return inactive }
+        var entry: [String: Any] = ["pane_id": paneId, "active": true]
+        if let cmd = procCommandName(pid: fg) {
+            entry["command"] = cmd
+        }
+        return entry
+    }
+
+    /// Resolves the basename of a process's executable path via `proc_pidpath`.
+    /// Returns nil if the lookup fails (process gone, sandboxed, etc.).
+    /// Truncated comm fields (`proc_name`) are deliberately *not* used — they cap at 15 chars
+    /// and obscure longer binary names.
+    // TODO: enhance via KERN_PROCARGS2 to surface argv[1] for interpreter-fronted CLIs
+    //       (e.g. show "node script.js" instead of bare "node", "python3 manage.py" vs "python3").
+    static func procCommandName(pid: pid_t) -> String? {
+        // PROC_PIDPATHINFO_MAXSIZE = 4 * MAXPATHLEN = 4 * 1024 = 4096
+        let bufSize: Int = 4096
+        let buf = UnsafeMutablePointer<CChar>.allocate(capacity: bufSize)
+        defer { buf.deallocate() }
+        let written = proc_pidpath(pid, buf, UInt32(bufSize))
+        guard written > 0 else { return nil }
+        let path = String(cString: buf)
+        guard !path.isEmpty else { return nil }
+        return (path as NSString).lastPathComponent
     }
 
     static func reapDeadProcesses() {

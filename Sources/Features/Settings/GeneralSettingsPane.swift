@@ -22,10 +22,18 @@ struct GeneralSettingsPane: View {
             Section("Confirmations") {
                 Toggle("Warn before closing Forge", isOn: generalBinding(\.confirmBeforeClose, default: true))
                     .padding(.vertical, -4)
-                Toggle("Warn before closing a project", isOn: generalBinding(\.warnOnCloseProject, default: true))
-                    .padding(.vertical, -4)
-                Toggle("Warn before closing a tab", isOn: generalBinding(\.warnOnCloseTab, default: false))
-                    .padding(.vertical, -4)
+                Picker("Confirm project close", selection: generalBinding(\.confirmCloseProject, default: "whenActive")) {
+                    Text("Never").tag("never")
+                    Text("When a process is running").tag("whenActive")
+                    Text("Always").tag("always")
+                }
+                .padding(.vertical, -4)
+                Picker("Confirm tab close", selection: generalBinding(\.confirmCloseTab, default: "whenActive")) {
+                    Text("Never").tag("never")
+                    Text("When a process is running").tag("whenActive")
+                    Text("Always").tag("always")
+                }
+                .padding(.vertical, -4)
             }
         }
         .formStyle(.grouped)

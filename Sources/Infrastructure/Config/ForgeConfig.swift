@@ -40,8 +40,10 @@ struct ForgeConfig: Codable {
         var defaultProjectDir: String?
         var autoRestore: Bool?
         var confirmBeforeClose: Bool?
-        var warnOnCloseProject: Bool?
-        var warnOnCloseTab: Bool?
+        var warnOnCloseProject: Bool?           // LEGACY — migrated to confirmCloseProject on load
+        var warnOnCloseTab: Bool?               // LEGACY — migrated to confirmCloseTab on load
+        var confirmCloseTab: String?            // "never" | "whenActive" | "always"
+        var confirmCloseProject: String?        // "never" | "whenActive" | "always"
         var warnOnMoveTab: Bool?
         var sidebarPosition: String?    // "left" or "right"
         var tabBarPosition: String?     // "top" or "bottom"
@@ -120,6 +122,7 @@ struct ForgeConfig: Codable {
             return defaultConfig
         }
         config.migrateNotificationSettings()
+        config.migrateCloseConfirmSettings()
         return config
     }
 
@@ -136,6 +139,28 @@ struct ForgeConfig: Codable {
         general?.notificationsEnabled = nil
         general?.notificationSound = nil
         save()
+    }
+
+    /// One-time migration: translate legacy `warnOnCloseTab` / `warnOnCloseProject` booleans into
+    /// the new three-state `confirmCloseTab` / `confirmCloseProject` strings. `true` → `"always"`,
+    /// `false` / missing → `"whenActive"` (the new default).
+    mutating func migrateCloseConfirmSettings() {
+        guard var settings = general else { return }
+        var didMigrate = false
+        if settings.confirmCloseTab == nil {
+            settings.confirmCloseTab = (settings.warnOnCloseTab == true) ? "always" : "whenActive"
+            settings.warnOnCloseTab = nil
+            didMigrate = true
+        }
+        if settings.confirmCloseProject == nil {
+            settings.confirmCloseProject = (settings.warnOnCloseProject == true) ? "always" : "whenActive"
+            settings.warnOnCloseProject = nil
+            didMigrate = true
+        }
+        if didMigrate {
+            general = settings
+            save()
+        }
     }
 
     func save() {
