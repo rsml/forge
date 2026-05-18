@@ -173,16 +173,14 @@ extension WorkspaceController {
 
         let livePaneIds = activePaneIds
 
-        // Collect panes that need renderers — set a placeholder immediately
-        // to prevent duplicate creation from concurrent updateRenderers calls.
+        // Collect panes that need renderers.
         var panesToCreate: [(pane: Pane, cwd: String)] = []
         for pane in tab.panes where paneRenderers[pane.id] == nil {
             let cwd = pane.currentPath.isEmpty ? (project.path ?? NSHomeDirectory()) : pane.currentPath
             panesToCreate.append((pane, cwd))
         }
-        guard !panesToCreate.isEmpty else { return }
 
-        if let daemon = daemonAdapter {
+        if !panesToCreate.isEmpty, let daemon = daemonAdapter {
             // Try daemon reconnect for ALL panes in a single Task
             // to avoid race conditions with concurrent updateRenderers calls.
             let paneIds = panesToCreate.map { ($0.pane.id, $0.cwd) }
@@ -231,14 +229,17 @@ extension WorkspaceController {
                     }
                 }
             }
-        } else {
+        } else if !panesToCreate.isEmpty {
             for (pane, cwd) in panesToCreate {
                 let renderer = createExecRenderer(for: pane, cwd: cwd)
                 paneRenderers[pane.id] = renderer
             }
         }
 
-        // Use lastFocusedPaneId for cursor focus (\.active is tmux-only)
+        // Reset focus to a pane in the active tab (lastFocusedPaneId may be from another tab)
+        if let lfp = lastFocusedPaneId, !activePaneIds.contains(lfp) {
+            lastFocusedPaneId = tab.panes.first?.id
+        }
         let focusId = lastFocusedPaneId ?? tab.panes.last?.id
         for (id, renderer) in paneRenderers {
             renderer.setFocused(id == focusId)
