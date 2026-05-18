@@ -200,6 +200,10 @@ extension WorkspaceController {
 
     func addTab(in project: Project) {
         ForgeLog.log("[app] Adding tab in project: \(project.name)")
+        if config.isNativePTY {
+            addTabNativePTY(in: project)
+            return
+        }
         Task {
             guard let windowId = await tmux.newTab(project: project.id, path: project.path) else { return }
             await syncEngine.refresh()
@@ -212,8 +216,23 @@ extension WorkspaceController {
         }
     }
 
+    private func addTabNativePTY(in project: Project) {
+        let tabId = UUID().uuidString
+        let tab = Tab(id: tabId, projectId: project.id, index: project.tabs.count, name: "zsh")
+        let paneId = UUID().uuidString
+        let pane = Pane(id: paneId, tabId: tabId, currentPath: project.path ?? NSHomeDirectory())
+        tab.panes.append(pane)
+        project.tabs.append(tab)
+        selectTab(tab)
+        ForgeLog.log("[app] Added tab in \(project.name) (native PTY)")
+    }
+
     func removeTab(_ tab: Tab) {
         ForgeLog.log("[app] Removing tab: \(tab.name) (\(tab.id))")
+        if config.isNativePTY {
+            removeTabNativePTY(tab, in: workspace.activeProject)
+            return
+        }
         Task {
             await tmux.killTab(id: tab.id)
             await syncEngine.refresh()
@@ -222,6 +241,10 @@ extension WorkspaceController {
 
     func removeTab(_ tab: Tab, in project: Project) {
         ForgeLog.log("[app] Removing tab: \(tab.name) from \(project.name)")
+        if config.isNativePTY {
+            removeTabNativePTY(tab, in: project)
+            return
+        }
         // Compute neighbor before kill — refresh will remove the tab from the model.
         let neighborTab: Tab? = {
             guard let index = project.tabs.firstIndex(where: { $0.id == tab.id }) else { return nil }
@@ -236,14 +259,54 @@ extension WorkspaceController {
         }
     }
 
+    private func removeTabNativePTY(_ tab: Tab, in project: Project?) {
+        guard let project else { return }
+        // Release daemon fds for all panes in this tab
+        for pane in tab.panes {
+            paneRenderers.removeValue(forKey: pane.id)
+            if let daemon = daemonAdapter {
+                Task { try? await daemon.release(paneId: pane.id) }
+            }
+        }
+        // Pick neighbor before removing
+        let neighborTab: Tab? = {
+            guard let index = project.tabs.firstIndex(where: { $0.id == tab.id }) else { return nil }
+            let nextIndex = index > 0 ? index - 1 : min(index + 1, project.tabs.count - 1)
+            guard nextIndex != index, nextIndex < project.tabs.count else { return nil }
+            return project.tabs[nextIndex]
+        }()
+        project.tabs.removeAll { $0.id == tab.id }
+        if let neighborTab {
+            selectTab(neighborTab)
+        } else if project.tabs.isEmpty {
+            // Last tab removed — remove the project
+            removeProjectNativePTY(project)
+        }
+        let frame = NSApp.mainWindow?.frame
+        WorkspacePersistence.save(workspace: workspace, windowFrame: frame)
+        ForgeLog.log("[app] Removed tab \(tab.name) (native PTY)")
+    }
+
     func renameProject(_ project: Project, to name: String) {
         ForgeLog.log("[app] Renaming project: \(project.name) → \(name)")
-        Task { await tmux.renameProject(target: project.name, newName: name) }
+        if config.isNativePTY {
+            project.name = name
+            let frame = NSApp.mainWindow?.frame
+            WorkspacePersistence.save(workspace: workspace, windowFrame: frame)
+        } else {
+            Task { await tmux.renameProject(target: project.name, newName: name) }
+        }
     }
 
     func renameTab(_ tab: Tab, to name: String) {
         ForgeLog.log("[app] Renaming tab: \(tab.name) → \(name)")
-        Task { await tmux.renameTab(id: tab.id, newName: name) }
+        if config.isNativePTY {
+            tab.name = name
+            let frame = NSApp.mainWindow?.frame
+            WorkspacePersistence.save(workspace: workspace, windowFrame: frame)
+        } else {
+            Task { await tmux.renameTab(id: tab.id, newName: name) }
+        }
     }
 
     func closeCurrentPane() {
