@@ -88,6 +88,11 @@ extension WorkspaceController {
     }
 
     func addProject(name: String, path: String) async {
+        if config.isNativePTY {
+            addProjectNativePTY(name: name, path: path)
+            return
+        }
+
         let success = await tmux.newProject(name: name, path: path)
         guard success else {
             toastState.show(
@@ -113,6 +118,20 @@ extension WorkspaceController {
                 attentionManager?.promoteToFront(tab.uuid)
             }
         }
+    }
+
+    private func addProjectNativePTY(name: String, path: String) {
+        let projectId = UUID().uuidString
+        let project = Project(id: projectId, name: name, path: path)
+        let tabId = UUID().uuidString
+        let tab = Tab(id: tabId, projectId: projectId, index: 0, name: "zsh")
+        let paneId = UUID().uuidString
+        let pane = Pane(id: paneId, tabId: tabId, currentPath: path)
+        tab.panes.append(pane)
+        project.tabs.append(tab)
+        workspace.projects.append(project)
+        selectProject(project)
+        ForgeLog.log("[app] Added project \(name) (native PTY)")
     }
 
     func removeProject(_ project: Project) async {

@@ -157,11 +157,21 @@ extension WorkspaceController {
             return
         }
 
-        let livePaneIds = Set(tab.panes.map(\.id))
-
-        for id in paneRenderers.keys where !livePaneIds.contains(id) {
+        // Only remove renderers for panes that no longer exist in ANY project.
+        // Never destroy renderers just because the user switched projects —
+        // that would close the PTY master fd and kill the shell process.
+        let allPaneIds = Set(workspace.projects.flatMap { $0.tabs.flatMap { $0.panes.map(\.id) } })
+        for id in paneRenderers.keys where !allPaneIds.contains(id) {
             paneRenderers.removeValue(forKey: id)
         }
+
+        // Mark inactive renderers as occluded (pauses GPU rendering)
+        let activePaneIds = Set(tab.panes.map(\.id))
+        for (id, renderer) in paneRenderers {
+            (renderer as? GhosttyRenderer)?.setOccluded(!activePaneIds.contains(id))
+        }
+
+        let livePaneIds = activePaneIds
 
         // Collect panes that need renderers — set a placeholder immediately
         // to prevent duplicate creation from concurrent updateRenderers calls.
