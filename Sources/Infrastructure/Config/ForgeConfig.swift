@@ -102,6 +102,8 @@ struct ForgeConfig: Codable {
         var notificationSound: String?      // system sound name or custom file path
         var hiddenTabUUIDs: [String]?    // persisted hidden set
         var contentPatterns: [String]?      // user-defined patterns merged with defaults
+        var ordering: String?               // "chronological" | "grouped" | "simple" (default "grouped")
+        var attentionTimestamps: [String: Double]?  // UUID string → timeIntervalSince1970
 
         public init() {}
     }
