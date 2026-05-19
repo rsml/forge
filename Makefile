@@ -35,6 +35,8 @@ bundle:
 	@cp Resources/Info.plist $(BUILD)/Forge.app/Contents/
 	@cp -f Resources/AppIcon.icns $(BUILD)/Forge.app/Contents/Resources/ 2>/dev/null || true
 	@cp -f Assets/appicon-transparent.png $(BUILD)/Forge.app/Contents/Resources/ 2>/dev/null || true
+	@mkdir -p $(BUILD)/Forge.app/Contents/Resources/themes
+	@cp -R Resources/themes/. $(BUILD)/Forge.app/Contents/Resources/themes/
 	@codesign --force --sign - $(BUILD)/Forge.app/Contents/MacOS/forged
 	@codesign --force --sign - $(BUILD)/Forge.app
 
@@ -43,3 +45,15 @@ build: prerequisites
 
 clean:
 	swift package clean
+
+test:
+	swift test
+
+restart:
+	@killall Forge 2>/dev/null || true
+	@$(MAKE) dev
+
+logs:
+	tail -f /tmp/forge.log
+
+.PHONY: icon ghosttykit prerequisites run dev bundle build clean test restart logs

@@ -48,12 +48,21 @@ struct ThemeSettingsPane: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onDisappear {
+            NotificationCenter.default.post(name: .forgeThemeHoverEnded, object: nil)
+        }
         .onAppear {
             if themes.isEmpty {
                 Task.detached {
                     let loaded = ThemeParser.loadAllThemes()
                     await MainActor.run { themes = loaded }
                 }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .forgeThemesChanged)) { _ in
+            Task.detached {
+                let loaded = ThemeParser.loadAllThemes()
+                await MainActor.run { themes = loaded }
             }
         }
     }

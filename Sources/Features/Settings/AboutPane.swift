@@ -46,6 +46,14 @@ struct AboutPane: View {
             .buttonStyle(.bordered)
             .controlSize(.large)
 
+            Button {
+                NSWorkspace.shared.open(URL(string: "https://github.com/rsml/forge/blob/main/docs/THEMES.md")!)
+            } label: {
+                Text("Theme Acknowledgments")
+            }
+            .buttonStyle(.link)
+            .foregroundStyle(.secondary)
+
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

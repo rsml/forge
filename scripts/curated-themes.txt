@@ -1,0 +1,62 @@
+# Curated theme catalog. One Ghostty-format theme name per line.
+# Source: https://github.com/mbadolato/iTerm2-Color-Schemes/tree/main/ghostty
+# Add/remove entries here, then re-run scripts/import-themes.sh.
+
+# Defaults
+Seti
+
+# Solarized
+Solarized Dark Patched
+iTerm2 Solarized Light
+
+# Dracula
+Dracula
+
+# Nord
+Nord
+
+# Gruvbox
+Gruvbox Dark
+Gruvbox Light
+
+# Tokyo Night
+TokyoNight
+TokyoNight Storm
+TokyoNight Day
+
+# Catppuccin
+Catppuccin Mocha
+Catppuccin Macchiato
+Catppuccin Frappe
+Catppuccin Latte
+
+# One Dark / One Half
+Atom One Dark
+One Half Dark
+One Half Light
+
+# Rose Pine
+Rose Pine
+Rose Pine Moon
+Rose Pine Dawn
+
+# GitHub
+GitHub Dark
+GitHub Light Default
+
+# Monokai
+Monokai Pro
+Monokai Soda
+
+# Ayu
+Ayu
+Ayu Mirage
+Ayu Light
+
+# Everforest
+Everforest Dark Hard
+Everforest Light Med
+
+# Misc
+Snazzy
+Material
