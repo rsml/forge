@@ -20,7 +20,7 @@ Forge bundles a curated subset of themes from [mbadolato/iTerm2-Color-Schemes](h
 | Ayu (Main, Mirage, Light) | Ike Ku — https://github.com/dempfi/ayu |
 | Everforest (Dark Hard, Light Med) | Sainnhepark — https://github.com/sainnhe/everforest |
 | Seti | Jesse Weed — https://github.com/jesseweed/seti-syntax |
-| Snazzy | Chris Branson — https://github.com/sindresorhus/hyper-snazzy |
+| Snazzy | Sindre Sorhus — https://github.com/sindresorhus/hyper-snazzy |
 | Material | Mattia Astorino — https://github.com/equinusocio/material-theme |
 
 ## Notes on trademarks and brand marks
