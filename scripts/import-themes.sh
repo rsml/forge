@@ -25,6 +25,12 @@ git -C "$WORKDIR/repo" sparse-checkout init --cone
 git -C "$WORKDIR/repo" sparse-checkout set ghostty
 git -C "$WORKDIR/repo" checkout FETCH_HEAD
 
+actual_sha="$(git -C "$WORKDIR/repo" rev-parse HEAD)"
+if [[ "$actual_sha" != "$PINNED_SHA" ]]; then
+    echo "ERROR: expected to be on $PINNED_SHA, but HEAD is $actual_sha" >&2
+    exit 1
+fi
+
 GHOSTTY_DIR="$WORKDIR/repo/ghostty"
 
 # Prepare destination directory.

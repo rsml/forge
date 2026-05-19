@@ -41,7 +41,7 @@ bundle:
 	@cp -f Resources/AppIcon.icns $(BUILD)/Forge.app/Contents/Resources/ 2>/dev/null || true
 	@cp -f Assets/appicon-transparent.png $(BUILD)/Forge.app/Contents/Resources/ 2>/dev/null || true
 	@mkdir -p $(BUILD)/Forge.app/Contents/Resources/themes
-	@cp -R Resources/themes/. $(BUILD)/Forge.app/Contents/Resources/themes/ 2>/dev/null || true
+	@cp -R Resources/themes/. $(BUILD)/Forge.app/Contents/Resources/themes/
 	@codesign --force --sign - $(BUILD)/Forge.app/Contents/MacOS/tmux 2>/dev/null || true
 	@codesign --force --sign - $(BUILD)/Forge.app/Contents/MacOS/forged
 	@codesign --force --sign - $(BUILD)/Forge.app
