@@ -52,3 +52,15 @@ build: prerequisites
 clean:
 	swift package clean
 	rm -rf .tmux-build
+
+test:
+	swift test
+
+restart:
+	@killall Forge 2>/dev/null || true
+	@$(MAKE) dev
+
+logs:
+	tail -f /tmp/forge.log
+
+.PHONY: tmux icon ghosttykit prerequisites run dev bundle build clean test restart logs
