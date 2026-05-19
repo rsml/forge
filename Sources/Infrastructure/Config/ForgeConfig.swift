@@ -111,7 +111,7 @@ struct ForgeConfig: Codable {
     static let defaultConfig = ForgeConfig(
         projects: [],
         recentDirectories: [],
-        theme: ThemeConfig(source: "ghostty-seti")
+        theme: ThemeConfig(source: "Seti.conf")
     )
 
     static var configURL: URL {

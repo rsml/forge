@@ -1,10 +1,30 @@
 import Foundation
 
 struct ThemeParser {
-    private static let searchPaths = [
-        "/Applications/Ghostty.app/Contents/Resources/ghostty/themes",
-        (NSHomeDirectory() as NSString).appendingPathComponent(".config/ghostty/themes"),
-    ]
+    private static var searchPaths: [String] {
+        var paths: [String] = []
+        let fm = FileManager.default
+
+        // 1. User override — listed first so it shadows bundled themes of the same name.
+        let userOverride = (NSHomeDirectory() as NSString).appendingPathComponent(".config/forge/themes")
+        paths.append(userOverride)
+
+        // 2. Bundled themes directory (.app bundle resource path).
+        if let bundleThemes = Bundle.main.resourceURL?.appendingPathComponent("themes").path,
+           fm.fileExists(atPath: bundleThemes) {
+            paths.append(bundleThemes)
+        }
+
+        // 3. Fallback for bare SPM builds (executable next to a `themes/` directory).
+        if let spmThemes = Bundle.main.executableURL?
+            .deletingLastPathComponent()
+            .appendingPathComponent("themes").path,
+           fm.fileExists(atPath: spmThemes) {
+            paths.append(spmThemes)
+        }
+
+        return paths
+    }
 
     static func loadTheme(id: String) -> ThemeDefinition? {
         for searchPath in searchPaths {
@@ -69,7 +89,8 @@ struct ThemeParser {
         }
 
         let ansiColors = (0..<16).map { palette[$0] ?? fg }
-        let name = id.replacingOccurrences(of: "_", with: " ")
+        let baseName = id.hasSuffix(".conf") ? String(id.dropLast(5)) : id
+        let name = baseName.replacingOccurrences(of: "_", with: " ")
             .replacingOccurrences(of: "-", with: " ")
         return ThemeDefinition(id: id, name: name, background: bg, foreground: fg, cursor: cursor, ansiColors: ansiColors)
     }
