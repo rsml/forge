@@ -40,6 +40,8 @@ extension Notification.Name {
     static let forgeFocusTerminal = Notification.Name("forgeFocusTerminal")
     static let forgeWindowTitleChanged = Notification.Name("forgeWindowTitleChanged")
     static let forgeThemesChanged = Notification.Name("forgeThemesChanged")
+    static let forgeThemeHoverPreview = Notification.Name("forgeThemeHoverPreview")
+    static let forgeThemeHoverEnded = Notification.Name("forgeThemeHoverEnded")
 }
 
 // MARK: - NSColor Helpers
@@ -152,6 +154,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NotificationCenter.default.addObserver(
             forName: .forgeConfigChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyGhosttyTheme() }
+        }
+        NotificationCenter.default.addObserver(
+            forName: .forgeThemeHoverPreview, object: nil, queue: .main
+        ) { [weak self] note in
+            let themeId = note.userInfo?["themeId"] as? String
+            MainActor.assumeIsolated {
+                guard let id = themeId,
+                      let theme = ThemeParser.loadTheme(id: id) else { return }
+                self?.applyGhosttyTheme(overrideTheme: theme)
+            }
+        }
+        NotificationCenter.default.addObserver(
+            forName: .forgeThemeHoverEnded, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.applyGhosttyTheme() }
         }

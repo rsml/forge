@@ -48,6 +48,9 @@ struct ThemeSettingsPane: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onDisappear {
+            NotificationCenter.default.post(name: .forgeThemeHoverEnded, object: nil)
+        }
         .onAppear {
             if themes.isEmpty {
                 Task.detached {
