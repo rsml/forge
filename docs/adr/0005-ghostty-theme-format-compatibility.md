@@ -11,13 +11,13 @@ Forge is moving from reading themes off the user's Ghostty install to bundling a
 
 ## Decision
 
-Forge themes stay Ghostty-format-compatible. The recognized keys are exactly: `background`, `foreground`, `palette=N=#hex` for `N` in `0..15`, and `cursor-color`. Forge does not extend the format.
+Forge themes stay Ghostty-format-compatible. The recognized keys are exactly: `background`, `foreground`, `palette=N=#hex` for `N` from 0 through 15, and `cursor-color`. Forge does not extend the format.
 
 Themes are stored as text files in `Resources/themes/*.conf` (bundled) and `~/.config/forge/themes/*.conf` (user override).
 
 ## Consequences
 
-- **Good**: Themes are zero-conversion portable between Forge, Ghostty, iTerm2, Alacritty, WezTerm, and Kitty — users can re-use existing themes and share theirs across terminals without reformatting.
+- **Good**: Themes are sourced verbatim from `mbadolato/iTerm2-Color-Schemes`, which exports the same color schemes into every major terminal's native format. A user who already has a theme they like in iTerm2, Alacritty, WezTerm, or Kitty can find the exact same theme pre-converted for Forge — and vice versa — with no manual reformatting.
 - **Good**: The import script can copy upstream files verbatim, adding only an attribution header — no per-theme conversion logic to maintain.
 - **Bad**: If Forge later wants selection bg/fg, cursor accent, per-pane overrides, or semantic colors (warning/success), we either fork the format (creating Forge-only themes that no longer round-trip) or push the feature upstream into Ghostty.
 - **Bad**: We inherit Ghostty's expressiveness limits — for example, no programmable color computation and no theme composition.
