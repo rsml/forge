@@ -20,6 +20,10 @@ final class GhosttyRenderer: TerminalRenderer {
     /// Debounce resize to avoid sending intermediate sizes during SwiftUI layout.
     private var pendingResize: DispatchWorkItem?
     var lastReportedSize: (cols: Int, rows: Int)?
+    /// Diagnostic tag — set by the controller after construction so that
+    /// `feed()` calls and other internal events can be correlated with a pane
+    /// in the log file. Empty when unset.
+    var diagnosticPaneId: String = ""
 
     var view: NSView { nsView }
 
@@ -198,21 +202,40 @@ final class GhosttyRenderer: TerminalRenderer {
                 ForgeLog.log("[ghostty] Reconnected pane \(paneId): \(cols)x\(rows) (event-driven)")
             }
 
-            // Send TIOCSWINSZ on every resize — MANUAL mode surfaces
-            // don't resize the PTY automatically (unlike EXEC mode).
-            // Toggle size first: if the PTY already has this size (same as
-            // previous session), the shell won't redraw. A brief size change
-            // forces the shell to handle a genuine resize → redraw prompt.
+            // Force the shell to redraw the prompt on reconnect (and on every
+            // resize) by toggling the PTY size: send cols-1 first, then cols
+            // back, ~50ms apart. Two separate size changes give zsh two
+            // SIGWINCH events — and crucially, enough wall-clock time between
+            // them for zsh's main loop to drain the first signal and write a
+            // prompt redraw before the second signal arrives.
+            //
+            // Without the delay, the kernel coalesces the two TIOCSWINSZ
+            // calls into a single SIGWINCH delivery at the final (=current)
+            // size, which equals what zsh had cached pre-reconnect — so zsh
+            // sees "no change" and skips the redraw, leaving Forge's surface
+            // blank with no way to recover except user input.
             let frame = self.nsView.frame
-            var ws = winsize()
-            ws.ws_xpixel = UInt16(frame.width)
-            ws.ws_ypixel = UInt16(frame.height)
-            ws.ws_col = UInt16(max(1, cols - 1))
-            ws.ws_row = UInt16(rows)
-            _ = ioctl(self.externalFD, TIOCSWINSZ, &ws)
-            ws.ws_col = UInt16(cols)
-            _ = ioctl(self.externalFD, TIOCSWINSZ, &ws)
-            if pid > 0 { kill(pid, SIGWINCH) }
+            let fd = self.externalFD
+            let xpixel = UInt16(frame.width)
+            let ypixel = UInt16(frame.height)
+            var ws1 = winsize(
+                ws_row: UInt16(rows),
+                ws_col: UInt16(max(1, cols - 1)),
+                ws_xpixel: xpixel,
+                ws_ypixel: ypixel
+            )
+            _ = ioctl(fd, TIOCSWINSZ, &ws1)
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                var ws2 = winsize(
+                    ws_row: UInt16(rows),
+                    ws_col: UInt16(cols),
+                    ws_xpixel: xpixel,
+                    ws_ypixel: ypixel
+                )
+                _ = ioctl(fd, TIOCSWINSZ, &ws2)
+                if pid > 0 { kill(pid, SIGWINCH) }
+            }
         }
     }
 
@@ -381,7 +404,12 @@ final class GhosttyRenderer: TerminalRenderer {
     }
 
     func feed(_ data: Data) {
-        guard let surface else { return }
+        guard let surface else {
+            if !diagnosticPaneId.isEmpty {
+                ForgeLog.log("[FEED:\(diagnosticPaneId):\(data.count):dropped-no-surface]")
+            }
+            return
+        }
         data.withUnsafeBytes { buffer in
             guard let ptr = buffer.baseAddress else { return }
             ghostty_surface_process_output(
@@ -389,6 +417,9 @@ final class GhosttyRenderer: TerminalRenderer {
                 ptr.assumingMemoryBound(to: CChar.self),
                 UInt(buffer.count)
             )
+        }
+        if !diagnosticPaneId.isEmpty {
+            ForgeLog.log("[FEED:\(diagnosticPaneId):\(data.count)]")
         }
     }
 
@@ -417,6 +448,32 @@ final class GhosttyRenderer: TerminalRenderer {
     func setOccluded(_ occluded: Bool) {
         guard let surface else { return }
         ghostty_surface_set_occlusion(surface, occluded)
+    }
+
+    /// Read the surface's visible viewport as plaintext. Used by the
+    /// `/surface-text` debug endpoint to assert what's actually rendered into
+    /// the emulator grid (independent of pixels reaching the screen).
+    func readVisibleText() -> String? {
+        guard let surface else { return nil }
+        let selection = ghostty_selection_s(
+            top_left: ghostty_point_s(
+                tag: GHOSTTY_POINT_VIEWPORT,
+                coord: GHOSTTY_POINT_COORD_TOP_LEFT,
+                x: 0, y: 0
+            ),
+            bottom_right: ghostty_point_s(
+                tag: GHOSTTY_POINT_VIEWPORT,
+                coord: GHOSTTY_POINT_COORD_BOTTOM_RIGHT,
+                x: 0, y: 0
+            ),
+            rectangle: false
+        )
+        var text = ghostty_text_s()
+        let ok = ghostty_surface_read_text(surface, selection, &text)
+        guard ok else { return nil }
+        defer { ghostty_surface_free_text(surface, &text) }
+        guard let ptr = text.text else { return "" }
+        return String(cString: ptr)
     }
 
     deinit {
