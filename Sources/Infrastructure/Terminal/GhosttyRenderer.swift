@@ -13,6 +13,9 @@ final class GhosttyRenderer: TerminalRenderer {
     nonisolated(unsafe) private var callbackContext: Unmanaged<GhosttyCallbackContext>?
     var onInput: ((Data) -> Void)?
     var onResize: ((Int, Int) -> Void)?
+    /// Fires when the user engages the pane via keyboard. Wired from GhosttyNSView.
+    /// Used to clear sticky attention flags as soon as the user starts responding.
+    var onUserInput: (() -> Void)?
     /// Fires on every chunk of PTY output bytes. Used by the native PTY
     /// attention watcher to detect BEL and scan for content patterns.
     /// Invoked on the main queue regardless of which thread produced the data.
@@ -84,6 +87,7 @@ final class GhosttyRenderer: TerminalRenderer {
         nsView.onKeyInput = { [weak self] data in
             self?.onInput?(data)
         }
+        nsView.onUserInput = { [weak self] in self?.onUserInput?() }
 
         if let surface {
             ghostty_surface_set_content_scale(surface, 2.0, 2.0)
@@ -99,6 +103,7 @@ final class GhosttyRenderer: TerminalRenderer {
     /// Write raw bytes to the pane's input. Used by the debug server for
     /// automated testing — equivalent to the user typing.
     func sendInput(_ data: Data) {
+        onUserInput?()
         data.withUnsafeBytes { buf in
             guard let ptr = buf.baseAddress else { return }
             if externalFD >= 0 {
@@ -128,6 +133,7 @@ final class GhosttyRenderer: TerminalRenderer {
     init(ghosttyApp: GhosttyApp, fd: Int32) {
         nsView = GhosttyNSView(frame: .zero)
         nsView.execMode = true // native key handling
+        nsView.onUserInput = { [weak self] in self?.onUserInput?() }
 
         guard let app = ghosttyApp.app else {
             ForgeLog.log("[ghostty] Cannot create EXTERNAL_FD renderer — app not initialized")
@@ -345,6 +351,7 @@ final class GhosttyRenderer: TerminalRenderer {
     init(ghosttyApp: GhosttyApp, cwd: String, env: [String: String] = [:]) {
         nsView = GhosttyNSView(frame: .zero)
         nsView.execMode = true
+        nsView.onUserInput = { [weak self] in self?.onUserInput?() }
 
         guard let app = ghosttyApp.app else {
             ForgeLog.log("[ghostty] Cannot create EXEC renderer — app not initialized")

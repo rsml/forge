@@ -159,6 +159,11 @@ final class WorkspaceController {
                         renderer.onOutput = { [weak self] data in
                             self?.paneActivityWatcher?.processOutput(paneId: paneId, data: data)
                         }
+                        renderer.onUserInput = { [weak self] in
+                            guard let self,
+                                  let found = self.workspace.findTab(byPaneId: paneId) else { return }
+                            self.clearAttention(tab: found.tab)
+                        }
                         paneRenderers[pane.id] = renderer
                         ForgeLog.log("[daemon] Pre-fetched pane \(pane.id) (fd=\(result.fd))")
                     }

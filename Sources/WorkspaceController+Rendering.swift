@@ -16,6 +16,11 @@ extension WorkspaceController {
         renderer.onOutput = { [weak self] data in
             self?.paneActivityWatcher?.processOutput(paneId: paneId, data: data)
         }
+        renderer.onUserInput = { [weak self] in
+            guard let self,
+                  let found = self.workspace.findTab(byPaneId: paneId) else { return }
+            self.clearAttention(tab: found.tab)
+        }
         return renderer
     }
 
@@ -105,6 +110,11 @@ extension WorkspaceController {
                             }
                             renderer.onOutput = { [weak self] data in
                                 self?.paneActivityWatcher?.processOutput(paneId: paneId, data: data)
+                            }
+                            renderer.onUserInput = { [weak self] in
+                                guard let self,
+                                      let found = self.workspace.findTab(byPaneId: paneId) else { return }
+                                self.clearAttention(tab: found.tab)
                             }
                             ForgeLog.log("[daemon] Reconnected pane \(paneId) (fd=\(result.fd), pid=\(pid))")
                         }
