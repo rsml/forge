@@ -155,19 +155,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] note in
             let themeId = note.userInfo?["themeId"] as? String
             MainActor.assumeIsolated {
-                guard let id = themeId,
+                guard let self,
+                      let id = themeId,
                       let theme = ThemeParser.loadTheme(id: id) else { return }
-                self?.applyGhosttyTheme(overrideTheme: theme)
+                self.configStore.previewTheme = theme
+                self.applyGhosttyTheme()
             }
         }
         NotificationCenter.default.addObserver(
             forName: .forgeThemeHoverEnded, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.applyGhosttyTheme() }
+            MainActor.assumeIsolated {
+                self?.configStore.previewTheme = nil
+                self?.applyGhosttyTheme()
+            }
         }
     }
 
-    private func applyGhosttyTheme(overrideTheme: ThemeDefinition? = nil) {
+    private func applyGhosttyTheme() {
         guard let ga = ghosttyApp else { return }
         let fontFamily = configStore.config.terminalFont?.family
             ?? configStore.config.terminal?.fontFamily
@@ -175,7 +180,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let fontSize = configStore.config.terminalFont?.size
             ?? configStore.config.terminal?.fontSize
             ?? configStore.config.appearance?.fontSize ?? 13
-        let theme = overrideTheme ?? configStore.resolvedTheme
+        let theme = configStore.resolvedTheme
         var fgHex: String?
         var bgHex: String?
         var ansiHex: [String]?
