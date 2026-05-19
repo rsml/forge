@@ -46,6 +46,12 @@ struct ForgeMenuCommands: Commands {
             }
             .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
 
+            Button("New Browser Tab") {
+                guard let project = controller.workspace.activeProject else { return }
+                controller.addBrowserTab(in: project)
+            }
+            .keyboardShortcut("t", modifiers: [.command, .option])
+
             Divider()
 
             Button("Close Pane") {
@@ -148,6 +154,26 @@ struct ForgeMenuCommands: Commands {
                 controller.clearScrollback()
             }
             .keyboardShortcut(KeyboardShortcuts.clearScrollback.key, modifiers: KeyboardShortcuts.clearScrollback.modifiers)
+
+            Button("Open URL...") {
+                guard let pane = controller.focusedBrowserPane else { return }
+                appState.openURLPalette(for: pane)
+            }
+            .keyboardShortcut("l", modifiers: .command)
+
+            Button("Find in Page...") {
+                guard let pane = controller.focusedBrowserPane else { return }
+                appState.openFind(for: pane.id)
+            }
+            .keyboardShortcut("f", modifiers: .command)
+
+            Button("Toggle Web Inspector") {
+                if let pane = controller.focusedBrowserPane,
+                   let renderer = controller.paneRenderers[pane.id] as? any BrowserRenderer {
+                    renderer.toggleDevTools()
+                }
+            }
+            .keyboardShortcut("i", modifiers: [.command, .option])
         }
 
         // MARK: Tab

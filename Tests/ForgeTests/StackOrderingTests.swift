@@ -9,7 +9,7 @@ struct StackOrderingTests {
     private func attentionTab(uuid: UUID, projectId: String, index: Int) -> Tab {
         let tab = Tab(id: UUID().uuidString, projectId: projectId, index: index, name: "tab-\(index)", uuid: uuid)
         let pane = Pane(id: UUID().uuidString, tabId: tab.id, currentPath: "/tmp")
-        pane.hasBell = true
+        pane.terminalState!.hasBell = true
         tab.panes.append(pane)
         return tab
     }
@@ -105,7 +105,7 @@ struct StackOrderingTests {
         // b has no attention — pane must have running command so status != .idle
         let noAttentionTab = Tab(id: UUID().uuidString, projectId: "p1", index: 1, name: "busy", uuid: b)
         let busyPane = Pane(id: UUID().uuidString, tabId: noAttentionTab.id, currentCommand: "vim", currentPath: "/tmp")
-        busyPane.status = .running
+        busyPane.terminalState!.status = .running
         noAttentionTab.panes.append(busyPane)
         p1.tabs.append(noAttentionTab)
 

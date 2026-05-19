@@ -274,6 +274,14 @@ final class GhosttyNSView: NSView {
     }
 
     override func rightMouseDown(with event: NSEvent) {
+        // If a context menu is attached, pop it up instead of forwarding the
+        // event to the ghostty surface. SwiftUI's `.contextMenu` modifier can't
+        // see right-clicks here because this NSView consumes them — so the
+        // menu is set directly on the view by PaneTerminalView.
+        if let menu {
+            NSMenu.popUpContextMenu(menu, with: event, for: self)
+            return
+        }
         guard let surface else { return }
         let point = convert(event.locationInWindow, from: nil)
         ghostty_surface_mouse_pos(surface, point.x, frame.height - point.y, modsFromFlags(event.modifierFlags))

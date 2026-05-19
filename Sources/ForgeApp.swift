@@ -118,7 +118,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller.processAdapter = ProcessAdapter(ghosttyApp: ga)
             let daemon = DaemonAdapter()
             controller.daemonAdapter = daemon
-            controller.activityPort = DaemonActivityAdapter(daemon: daemon)
+            controller.activityPort = DaemonActivityAdapter(
+                daemon: daemon,
+                workspace: controller.workspace
+            )
             // Launch and connect to daemon immediately
             Task {
                 do {
@@ -145,6 +148,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         )
+        // Back-reference so browser-pane creation paths can auto-open the URL palette.
+        controller.appState = appState
         controller.connect()
 
         // Restore expanded project IDs after connect

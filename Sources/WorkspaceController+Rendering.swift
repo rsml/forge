@@ -205,10 +205,12 @@ extension WorkspaceController {
 
         let livePaneIds = activePaneIds
 
-        // Collect panes that need renderers.
+        // Collect panes that need renderers. Terminal panes only — browser
+        // panes don't drive the daemon reconnect / PTY pipeline.
         var panesToCreate: [(pane: Pane, cwd: String)] = []
         for pane in tab.panes where paneRenderers[pane.id] == nil {
-            let cwd = pane.currentPath.isEmpty ? (project.path ?? NSHomeDirectory()) : pane.currentPath
+            guard let ts = pane.terminalState else { continue }
+            let cwd = ts.currentPath.isEmpty ? (project.path ?? NSHomeDirectory()) : ts.currentPath
             panesToCreate.append((pane, cwd))
         }
 

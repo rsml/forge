@@ -16,7 +16,7 @@ import ForgeCore
 ///   active→inactive transition, emits a commandCompleted event (the user's
 ///   long-running command finished and the shell is back).
 ///
-/// Mutates `pane.hasBell` / `pane.hasContentMatch` to mirror tmux behavior so
+/// Mutates `pane.terminalState.hasBell` / `pane.terminalState.hasContentMatch` to mirror tmux behavior so
 /// the sidebar dots show up; downstream wiring (AttentionManager,
 /// notification dispatch) is the caller's responsibility via `onEvent`.
 @MainActor
@@ -66,7 +66,7 @@ final class PaneActivityWatcher {
     func processOutput(paneId: String, data: Data) {
         // BEL detection — fire once per data chunk that contains 0x07.
         if data.contains(0x07), let found = workspace.findTab(byPaneId: paneId) {
-            for pane in found.tab.panes { pane.hasBell = true }
+            for pane in found.tab.panes { pane.terminalState?.hasBell = true }
             onEvent?(.bell(tabUUID: found.tab.uuid))
         }
 
@@ -86,13 +86,13 @@ final class PaneActivityWatcher {
         if matched {
             ForgeLog.log("[attention] Content match in pane \(paneId): \(content.suffix(80))")
             if let found = workspace.findPane(byId: paneId) {
-                found.pane.hasContentMatch = true
+                found.pane.terminalState?.hasContentMatch = true
                 onEvent?(.contentMatch(tabUUID: found.tab.uuid))
             }
         } else if !contentDetector.isActive(paneId: paneId) {
             // Content no longer matches — clear the flag if it was set.
-            if let found = workspace.findPane(byId: paneId), found.pane.hasContentMatch {
-                found.pane.hasContentMatch = false
+            if let found = workspace.findPane(byId: paneId), found.pane.terminalState?.hasContentMatch == true {
+                found.pane.terminalState?.hasContentMatch = false
             }
         }
     }

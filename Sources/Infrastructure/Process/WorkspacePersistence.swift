@@ -33,6 +33,57 @@ enum WorkspacePersistence {
     struct PersistedPane: Codable {
         var id: String
         var cwd: String
+        /// Pane-kind discriminator. Absent in legacy workspaces (decoded as `.terminal()`).
+        var content: PersistedPaneContent?
+
+        enum CodingKeys: String, CodingKey { case id, cwd, content }
+
+        init(id: String, cwd: String, content: PersistedPaneContent?) {
+            self.id = id
+            self.cwd = cwd
+            self.content = content
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.id = try c.decode(String.self, forKey: .id)
+            self.cwd = (try? c.decode(String.self, forKey: .cwd)) ?? ""
+            // Missing `content` field → legacy workspace → default to terminal.
+            self.content = (try? c.decode(PersistedPaneContent.self, forKey: .content)) ?? .terminal
+        }
+    }
+
+    /// Discriminated union for pane content. Adding new cases here is the
+    /// expected place to extend persistence for new pane kinds.
+    enum PersistedPaneContent: Codable, Equatable {
+        case terminal
+        case browser(url: String?)
+
+        private enum CodingKeys: String, CodingKey { case kind, url }
+        private enum Kind: String, Codable { case terminal, browser }
+
+        func encode(to encoder: Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            switch self {
+            case .terminal:
+                try c.encode(Kind.terminal, forKey: .kind)
+            case .browser(let url):
+                try c.encode(Kind.browser, forKey: .kind)
+                try c.encodeIfPresent(url, forKey: .url)
+            }
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            let kind = try c.decode(Kind.self, forKey: .kind)
+            switch kind {
+            case .terminal:
+                self = .terminal
+            case .browser:
+                let url = try c.decodeIfPresent(String.self, forKey: .url)
+                self = .browser(url: url)
+            }
+        }
     }
 
     indirect enum PersistedSplitNode: Codable {
@@ -60,7 +111,20 @@ enum WorkspacePersistence {
         for project in workspace.projects {
             var tabs: [PersistedTab] = []
             for tab in project.tabs {
-                let panes = tab.panes.map { PersistedPane(id: $0.id, cwd: $0.currentPath) }
+                let panes = tab.panes.map { pane -> PersistedPane in
+                    let content: PersistedPaneContent
+                    switch pane.content {
+                    case .terminal:
+                        content = .terminal
+                    case .browser(let bs):
+                        content = .browser(url: bs.url?.absoluteString)
+                    }
+                    return PersistedPane(
+                        id: pane.id,
+                        cwd: pane.terminalState?.currentPath ?? "",
+                        content: content
+                    )
+                }
                 let tree = tab.splitTree.map { encodeSplitNode($0) }
                 tabs.append(PersistedTab(id: tab.id, name: tab.name, panes: panes, splitTree: tree))
             }

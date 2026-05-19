@@ -18,7 +18,7 @@ struct BellEventHandlingTests {
         #expect(tab.needsAttention == false)
 
         // Set bell on pane
-        pane.hasBell = true
+        pane.terminalState!.hasBell = true
 
         // Tab should now need attention
         #expect(tab.needsAttention == true)
@@ -32,11 +32,11 @@ struct BellEventHandlingTests {
         tab.panes = [pane]
 
         // Set bell
-        pane.hasBell = true
+        pane.terminalState!.hasBell = true
         #expect(tab.needsAttention == true)
 
         // Clear bell
-        pane.hasBell = false
+        pane.terminalState!.hasBell = false
         #expect(tab.needsAttention == false)
     }
 
@@ -48,15 +48,15 @@ struct BellEventHandlingTests {
         tab.panes = [pane1, pane2]
 
         // Set bell on one pane
-        pane1.hasBell = true
+        pane1.terminalState!.hasBell = true
         #expect(tab.needsAttention == true)
 
         // Clear that pane's bell
-        pane1.hasBell = false
+        pane1.terminalState!.hasBell = false
         #expect(tab.needsAttention == false)
 
         // Set bell on second pane
-        pane2.hasBell = true
+        pane2.terminalState!.hasBell = true
         #expect(tab.needsAttention == true)
     }
 
@@ -73,7 +73,7 @@ struct BellEventHandlingTests {
         #expect(project.needsAttention == false)
 
         // Set bell on pane
-        pane.hasBell = true
+        pane.terminalState!.hasBell = true
 
         // Project should propagate the attention
         #expect(project.needsAttention == true)

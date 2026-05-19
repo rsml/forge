@@ -54,6 +54,14 @@ public struct PaneInfo {
 
 public enum SplitDirection: Sendable { case horizontal, vertical }
 
+/// Where the new pane is placed relative to the focused pane within a split.
+/// - `.before`: left of (horizontal) or above (vertical) the focused pane.
+/// - `.after`: right of (horizontal) or below (vertical) the focused pane.
+public enum SplitPosition: String, Sendable, Codable {
+    case before
+    case after
+}
+
 // MARK: - Focused Protocols
 
 /// Read-only queries against tmux state.

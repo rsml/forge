@@ -99,25 +99,32 @@ public enum StateMerger {
                 existing.index = info.index
                 existing.active = info.active
 
-                let wasRunning = PaneStatus.from(command: existing.currentCommand) == .running
+                // tmux PaneInfo only describes terminal panes. Browser panes
+                // are Forge-owned and never appear here; skip the terminal merge.
+                guard let ts = existing.terminalState else {
+                    updated.append(existing)
+                    continue
+                }
+
+                let wasRunning = PaneStatus.from(command: ts.currentCommand) == .running
                 let nowIdle = PaneStatus.from(command: info.currentCommand) == .idle
                 if wasRunning && nowIdle {
                     events.append(.commandCompleted(tabUUID: tab.uuid))
                 }
 
-                let wasIdle = PaneStatus.from(command: existing.currentCommand) == .idle
+                let wasIdle = PaneStatus.from(command: ts.currentCommand) == .idle
                 let nowRunning = PaneStatus.from(command: info.currentCommand) == .running
                 if wasIdle && nowRunning {
-                    existing.hasBell = false
+                    ts.hasBell = false
                 }
 
-                existing.previousCommand = existing.currentCommand
-                existing.currentCommand = info.currentCommand
-                existing.currentPath = info.currentPath
-                existing.width = info.width
-                existing.height = info.height
-                existing.pid = info.pid
-                existing.status = existing.hasBell ? .needsAttention : PaneStatus.from(command: info.currentCommand)
+                ts.previousCommand = ts.currentCommand
+                ts.currentCommand = info.currentCommand
+                ts.currentPath = info.currentPath
+                ts.width = info.width
+                ts.height = info.height
+                ts.pid = info.pid
+                ts.status = ts.hasBell ? .needsAttention : PaneStatus.from(command: info.currentCommand)
                 updated.append(existing)
             } else {
                 updated.append(Pane(id: info.id, tabId: info.tabId, index: info.index,

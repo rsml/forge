@@ -393,16 +393,53 @@ extension WorkspaceController {
         Task { await tmux.clearHistory(pane: paneId) }
     }
 
-    func splitPane(direction: SplitDirection) {
+    /// Currently focused pane, derived from `lastFocusedPaneId` (set on focus
+    /// gain) with fallback to the active tab's first pane. Used by the
+    /// right-click menu to decide the dynamic Convert label.
+    var focusedPane: Pane? {
+        guard let project = workspace.activeProject,
+              let tabId = workspace.activeTabId,
+              let tab = project.tabs.first(where: { $0.id == tabId })
+        else { return nil }
+        if let focusedId = lastFocusedPaneId,
+           let p = tab.panes.first(where: { $0.id == focusedId }) {
+            return p
+        }
+        return tab.panes.first
+    }
+
+    /// Convert the focused pane between terminal and browser. Routes to the
+    /// kind-specific implementation in WorkspaceController+Browser.
+    func convertFocusedPane() {
+        guard let pane = focusedPane else { return }
+        switch pane.kind {
+        case .terminal: convertToBrowser(pane: pane)
+        case .browser:  convertToTerminal(pane: pane)
+        }
+    }
+
+    func splitPane(direction: SplitDirection, position: SplitPosition = .after, as kind: PaneKind = .terminal) {
         if config.isNativePTY {
-            splitPaneNativePTY(direction: direction)
+            splitPaneNativePTY(direction: direction, position: position, as: kind)
             return
         }
+        // Browser panes only exist in native PTY mode. Ignore in tmux mode.
+        guard kind == .terminal else {
+            ForgeLog.log("[app] Browser splits require native PTY mode — ignoring")
+            return
+        }
+        // tmux mode has no native concept of `.before` vs `.after` placement
+        // for split-window — the new pane always lands after the focused pane.
+        // Position is captured in the model only.
         guard let tabId = workspace.activeTabId else { return }
         Task { await tmux.splitWindow(id: tabId, direction: direction) }
     }
 
-    private func splitPaneNativePTY(direction: SplitDirection) {
+    func splitPaneNativePTY(
+        direction: SplitDirection,
+        position: SplitPosition = .after,
+        as kind: PaneKind = .terminal
+    ) {
         guard let project = workspace.activeProject,
               let tabId = workspace.activeTabId,
               let tab = project.tabs.first(where: { $0.id == tabId })
@@ -410,7 +447,6 @@ extension WorkspaceController {
 
         let paneId = UUID().uuidString
         let cwd = project.path ?? NSHomeDirectory()
-        let pane = Pane(id: paneId, tabId: tabId, currentPath: cwd)
 
         // Find which pane was last focused (clicked). Can't use firstResponder
         // because clicking a toolbar button moves focus away from the terminal.
@@ -423,10 +459,26 @@ extension WorkspaceController {
             return max(tab.panes.count - 1, 0)
         }()
 
-        // Insert after the active pane
-        tab.panes.insert(pane, at: activePaneIndex + 1)
+        // Construct the new pane based on kind. Terminal/browser differ ONLY in:
+        //   (a) Pane factory, (b) renderer type, (c) no daemon register for browser,
+        //   (d) no PTY spawn for browser. Tree mutation + persistence are identical.
+        let pane: Pane
+        switch kind {
+        case .terminal:
+            pane = Pane(id: paneId, tabId: tabId, currentPath: cwd)
+        case .browser:
+            pane = Pane.browser(id: paneId, tabId: tabId)
+        }
 
-        // Update split tree: replace the active leaf with a split(direction, [leaf, leaf])
+        // Insert relative to the active pane. `.after` keeps existing behavior;
+        // `.before` inserts at the active pane's slot, shifting it right/down.
+        let insertIndex = position == .before ? activePaneIndex : activePaneIndex + 1
+        tab.panes.insert(pane, at: insertIndex)
+
+        // Update split tree: replace the active leaf with a split of two leaves.
+        // Leaf order is fixed (`[.leaf, .leaf]`); the new pane's position relative
+        // to the original is determined by `tab.panes` insertion above (the tree's
+        // leaf-index walk maps positionally to `tab.panes`).
         if let existing = tab.splitTree {
             var leafIndex = 0
             tab.splitTree = splitLeafAt(node: existing, targetLeaf: activePaneIndex,
@@ -438,14 +490,37 @@ extension WorkspaceController {
         // Set focus to the NEW pane (so subsequent splits target it)
         lastFocusedPaneId = paneId
 
-        ForgeLog.log("[app] Split \(direction) at pane[\(activePaneIndex)] → \(paneId) (tree: \(tab.splitTree?.leafCount ?? 0) leaves, panes: \(tab.panes.count))")
-        updateRenderers()
+        // Create the renderer synchronously BEFORE the next SwiftUI render to avoid
+        // a frame with no renderer for the new pane (flash). Mirrors the terminal
+        // pattern in addTabNativePTY / addProjectNativePTY.
+        switch kind {
+        case .terminal:
+            // Terminal path: let updateRenderers create the EXEC renderer +
+            // schedule daemon register. Matches existing behavior.
+            ForgeLog.log("[app] Split \(direction) \(position) at pane[\(activePaneIndex)] → \(paneId) (tree: \(tab.splitTree?.leafCount ?? 0) leaves, panes: \(tab.panes.count))")
+            updateRenderers()
+        case .browser:
+            // Browser path: no PTY, no daemon. Create renderer + wire callbacks
+            // directly, then let updateRenderers handle focus + persistence.
+            let renderer = WebKitBrowserRenderer()
+            wireBrowserCallbacks(renderer: renderer, pane: pane)
+            paneRenderers[paneId] = renderer
+            ForgeLog.log("[app] Split \(direction) \(position) (browser) at pane[\(activePaneIndex)] → \(paneId) (tree: \(tab.splitTree?.leafCount ?? 0) leaves, panes: \(tab.panes.count))")
+            updateRenderers()
+            // Auto-open the URL palette so the user can navigate immediately.
+            appState?.openURLPalette(for: pane)
+        }
+
         WorkspacePersistence.save(workspace: workspace, windowFrame: nil)
 
-        // Make the new pane's view first responder (visual focus)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            if let renderer = self?.paneRenderers[paneId] as? GhosttyRenderer {
-                renderer.nsView.window?.makeFirstResponder(renderer.nsView)
+        // Make the new pane's view first responder (visual focus). Skip for
+        // browser panes — the URL palette opened above (.openURLPalette) takes
+        // focus; promoting the WKWebView here triggers a 300ms-late steal that
+        // the palette has to fight via its repeated-assert loop.
+        if kind == .terminal {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                guard let renderer = self?.paneRenderers[paneId] else { return }
+                renderer.view.window?.makeFirstResponder(renderer.view)
             }
         }
     }
@@ -467,6 +542,27 @@ extension WorkspaceController {
                            currentLeaf: &currentLeaf, direction: direction)
             }
             return .split(dir, newChildren, proportions: proportions)
+        }
+    }
+
+    /// Close a specific pane by ID. Mirrors `closeCurrentPane` but targets the
+    /// pane the user actually right-clicked (which may not be `lastFocusedPaneId`).
+    /// Cascades to tab close if this is the only pane in its tab.
+    func closePane(_ paneId: String) {
+        Task { @MainActor in
+            await closePaneAsync(paneId: paneId)
+        }
+    }
+
+    @MainActor
+    private func closePaneAsync(paneId: String) async {
+        guard let (project, tab, _) = workspace.findPane(byId: paneId) else { return }
+        guard await confirmClose(target: .pane(id: paneId)) else { return }
+
+        if config.isNativePTY {
+            performClosePaneNativePTY(paneId: paneId, in: tab, project: project)
+        } else {
+            Task { await tmux.killPane(id: paneId) }
         }
     }
 
@@ -545,8 +641,8 @@ extension WorkspaceController {
 
     private func clearAttention(tab: Tab) {
         for pane in tab.panes {
-            pane.hasBell = false
-            pane.hasContentMatch = false
+            pane.terminalState?.hasBell = false
+            pane.terminalState?.hasContentMatch = false
         }
         Task { await tmux.clearBellFlag(tabId: tab.id) }
     }

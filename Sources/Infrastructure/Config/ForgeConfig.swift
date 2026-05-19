@@ -45,6 +45,7 @@ struct ForgeConfig: Codable {
         var confirmClosePane: String?           // "never" | "whenActive" | "always"
         var confirmCloseTab: String?            // "never" | "whenActive" | "always"
         var confirmCloseProject: String?        // "never" | "whenActive" | "always"
+        var browserChromeType: String?          // "full" | "slim" | "none" (default "full")
         var warnOnMoveTab: Bool?
         var sidebarPosition: String?    // "left" or "right"
         var tabBarPosition: String?     // "top" or "bottom"

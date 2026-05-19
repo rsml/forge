@@ -2,18 +2,31 @@ import SwiftUI
 import ForgeCore
 
 /// Recursive view that renders a split pane layout from a SplitNode tree.
-/// Leaf nodes render a PaneTerminalView. Split nodes delegate to
-/// SplitContainer which owns the draggable divider state.
+/// Leaf nodes render either a PaneTerminalView or BrowserPaneView based on
+/// pane.kind. Split nodes delegate to SplitContainer which owns the
+/// draggable divider state.
 struct PaneSplitView: View {
     let node: SplitNode
     let panes: ArraySlice<Pane>
-    let renderers: [String: any TerminalRenderer]
+    let renderers: [String: any PaneRenderer]
+    @Environment(WorkspaceController.self) private var controller
 
     var body: some View {
         switch node {
         case .leaf:
             if let pane = panes.first, let renderer = renderers[pane.id] {
-                PaneTerminalView(renderer: renderer).id(pane.id)
+                if pane.kind == .browser, let browser = renderer as? any BrowserRenderer {
+                    BrowserPaneView(pane: pane, renderer: browser)
+                        .id(pane.id)
+                } else if let terminal = renderer as? any TerminalRenderer {
+                    // Context menu is attached via AppKit's `NSView.menu` inside
+                    // PaneTerminalView. SwiftUI's `.contextMenu` doesn't fire
+                    // here — GhosttyNSView intercepts right-click events.
+                    PaneTerminalView(renderer: terminal, pane: pane)
+                        .id(pane.id)
+                } else {
+                    Color(red: 0.1, green: 0.1, blue: 0.1)
+                }
             } else {
                 Color(red: 0.1, green: 0.1, blue: 0.1)
             }
@@ -40,7 +53,7 @@ private struct SplitContainer: View {
     let children: [SplitNode]
     let tmuxProportions: [CGFloat]
     let panes: ArraySlice<Pane>
-    let renderers: [String: any TerminalRenderer]
+    let renderers: [String: any PaneRenderer]
     @Environment(WorkspaceController.self) private var controller
 
     @State private var proportions: [CGFloat]
@@ -64,7 +77,7 @@ private struct SplitContainer: View {
     }
 
     init(direction: SplitDirection, children: [SplitNode], tmuxProportions: [CGFloat],
-         panes: ArraySlice<Pane>, renderers: [String: any TerminalRenderer]) {
+         panes: ArraySlice<Pane>, renderers: [String: any PaneRenderer]) {
         self.direction = direction
         self.children = children
         self.tmuxProportions = tmuxProportions
@@ -152,7 +165,7 @@ private struct SplitContainer: View {
                 guard i < proportions.count, i < slices.count else { continue }
                 // Leaf panes get their size directly; nested splits inherit from parent
                 let leafPanes = slices[i]
-                for pane in leafPanes {
+                for pane in leafPanes where pane.kind == .terminal {
                     if let renderer = renderers[pane.id] {
                         let frame = renderer.view.frame
                         let cols = Int(frame.width / cellSize.width)

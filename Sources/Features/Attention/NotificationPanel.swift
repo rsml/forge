@@ -98,8 +98,8 @@ struct NotificationPanel: View {
         for project in controller.workspace.projects {
             for tab in project.tabs {
                 for pane in tab.panes {
-                    pane.hasBell = false
-                    pane.hasContentMatch = false
+                    pane.terminalState?.hasBell = false
+                    pane.terminalState?.hasContentMatch = false
                 }
                 Task { await controller.tmux.clearBellFlag(tabId: tab.id) }
             }

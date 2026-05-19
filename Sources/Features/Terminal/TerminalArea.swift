@@ -34,8 +34,17 @@ struct TerminalArea: View {
                            proportions: [CGFloat](repeating: 1.0 / CGFloat(tab.panes.count), count: tab.panes.count))
                 }
                 PaneSplitView(node: tree, panes: tab.panes[...], renderers: controller.paneRenderers)
-            } else if let pane = tab.panes.first, let renderer = controller.paneRenderers[pane.id] {
-                PaneTerminalView(renderer: renderer).id(pane.id)
+            } else if let pane = tab.panes.first {
+                if pane.kind == .browser,
+                   let renderer = controller.paneRenderers[pane.id] as? any BrowserRenderer {
+                    BrowserPaneView(pane: pane, renderer: renderer).id(pane.id)
+                } else if let renderer = controller.paneRenderers[pane.id] as? any TerminalRenderer {
+                    // Context menu is attached via AppKit's `NSView.menu` inside
+                    // PaneTerminalView. SwiftUI's `.contextMenu` doesn't fire
+                    // here — GhosttyNSView intercepts right-click events.
+                    PaneTerminalView(renderer: renderer, pane: pane)
+                        .id(pane.id)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

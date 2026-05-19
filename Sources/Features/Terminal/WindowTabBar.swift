@@ -55,22 +55,14 @@ struct WindowTabBar: View {
                                 controller.selectTab(tab)
                             }
                             .contextMenu {
-                                Button("New Tab") { controller.addTab(in: project) }
-                                    .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
-                                Button("New Browser Tab") {}
-                                Divider()
-                                Button("Rename Tab") { appState.startTabRename(tab) }
-                                    .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
-                                Button("Close Tab", role: .destructive) { controller.removeTab(tab, in: project) }
-                                    .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)
-                                Divider()
-                                if attention.isHidden(tab.uuid) {
-                                    Button("Enable Notifications") { attention.unhide(tab.uuid) }
-                                        .keyboardShortcut(KeyboardShortcuts.toggleNotifications.key, modifiers: KeyboardShortcuts.toggleNotifications.modifiers)
-                                } else {
-                                    Button("Disable Notifications") { attention.hide(tab.uuid) }
-                                        .keyboardShortcut(KeyboardShortcuts.toggleNotifications.key, modifiers: KeyboardShortcuts.toggleNotifications.modifiers)
-                                }
+                                PaneContextMenu(
+                                    controller: controller,
+                                    appState: appState,
+                                    attention: attention,
+                                    project: project,
+                                    tab: tab,
+                                    pane: nil
+                                )
                             }
                         }
                     } onReorder: { from, to in
@@ -91,7 +83,10 @@ struct WindowTabBar: View {
                             controller.addTab(in: project)
                         }
                         .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
-                        Button("New Browser Tab") {}
+                        Button("New Browser Tab") {
+                            controller.addBrowserTab(in: project)
+                        }
+                        .keyboardShortcut("t", modifiers: [.command, .option])
                     }
 
                 // Only show split icons in tab bar when tabs are on bottom OR fullscreen

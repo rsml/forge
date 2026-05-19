@@ -41,9 +41,35 @@ struct GeneralSettingsPane: View {
                 }
                 .padding(.vertical, -4)
             }
+
+            Section("Browser") {
+                Picker("Browser chrome type", selection: generalBinding(\.browserChromeType, default: "full")) {
+                    Text("Full").tag("full")
+                    Text("Slim").tag("slim")
+                    Text("None").tag("none")
+                }
+                .padding(.vertical, -4)
+
+                Text(chromeSubtext(for: store.config.general?.browserChromeType ?? "full"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, -4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .formStyle(.grouped)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func chromeSubtext(for value: String) -> String {
+        switch value {
+        case "full":
+            return "Back, forward, reload buttons and the URL bar are always visible. Most space cost."
+        case "slim":
+            return "Compact strip showing URL and page title. Use \u{2318}L to focus URL, \u{2318}[ \u{2318}] for back/forward, \u{2318}R to reload, \u{2318}F to find in page."
+        default:
+            return "No persistent chrome. Use \u{2318}L to enter a URL, \u{2318}[ \u{2318}] for back/forward, \u{2318}R to reload, \u{2318}F to find in page."
+        }
     }
 
     private func generalBinding<T>(_ keyPath: WritableKeyPath<ForgeConfig.GeneralSettings, T?>, default defaultValue: T) -> Binding<T> {

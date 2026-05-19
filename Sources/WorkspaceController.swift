@@ -11,6 +11,9 @@ final class WorkspaceController {
     let workspace = Workspace()
     var attentionManager: (any AttentionPort)?
     var notifier: (any NotificationPort)?
+    /// Cross-feature UI state. Wired by AppDelegate after AppState is built.
+    /// Used by browser-pane creation paths to auto-open the URL palette.
+    weak var appState: AppState?
     let config: ForgeConfigStore
     let toastState: NotificationToastState
     let syncEngine: TmuxSyncEngine
@@ -21,7 +24,7 @@ final class WorkspaceController {
     var expectingDisconnect = false
     let outputRouter = OutputRouter()
     /// One renderer per live pane. Keyed by pane ID. Triggers SwiftUI updates.
-    var paneRenderers: [String: any TerminalRenderer] = [:]
+    var paneRenderers: [String: any PaneRenderer] = [:]
     /// Total terminal area frame size (set by TerminalArea via GeometryReader).
     var terminalAreaSize: CGSize = .zero
     /// Terminal cell size in points (width, height). Computed from the first
@@ -114,7 +117,21 @@ final class WorkspaceController {
                     for pt in pp.tabs {
                         let tab = Tab(id: pt.id, projectId: pp.id, index: project.tabs.count, name: pt.name)
                         for pPane in pt.panes {
-                            let pane = Pane(id: pPane.id, tabId: pt.id, currentPath: pPane.cwd)
+                            let pane: Pane
+                            switch pPane.content ?? .terminal {
+                            case .browser(let urlString):
+                                let url = urlString.flatMap { URL(string: $0) }
+                                pane = Pane.browser(id: pPane.id, tabId: pt.id, url: url)
+                                // Browser panes don't go through the daemon/EXEC reconnect path —
+                                // create the renderer + wire callbacks here so they're ready when
+                                // updateRenderers() runs at the end of connectNativePTY().
+                                let renderer = WebKitBrowserRenderer()
+                                wireBrowserCallbacks(renderer: renderer, pane: pane)
+                                paneRenderers[pane.id] = renderer
+                                if let url { renderer.loadURL(url) }
+                            case .terminal:
+                                pane = Pane(id: pPane.id, tabId: pt.id, currentPath: pPane.cwd)
+                            }
                             tab.panes.append(pane)
                         }
                         // Restore split tree (directions, nesting, proportions)
@@ -150,7 +167,11 @@ final class WorkspaceController {
             // This prevents the race where updateRenderers creates EXEC surfaces
             // that get replaced by EXTERNAL_FD surfaces 40s later.
             if let daemon = daemonAdapter {
+                // Only terminal panes had a daemon fd to persist. Browser panes
+                // are handled in the project/tab loader above (renderer created
+                // synchronously and URL loaded).
                 let allPanes = workspace.projects.flatMap { $0.tabs.flatMap { $0.panes } }
+                                                 .filter { $0.kind == .terminal }
                 for pane in allPanes {
                     if let result = try? await daemon.retrieve(paneId: pane.id) {
                         guard let ghosttyApp else { continue }
@@ -335,6 +356,25 @@ final class WorkspaceController {
         uiState.save(workspace: workspace, sidebarVisible: sidebarVisible, expandedProjectNames: expandedProjectNames)
     }
 
+    // MARK: - Workspace persistence
+
+    /// Debounced workspace.json save. Used by high-frequency change sources
+    /// (e.g. browser URL updates during page navigation) to batch writes —
+    /// the most recent state lands ~1s after the last change.
+    private var saveDebounceTask: Task<Void, Never>?
+
+    @MainActor
+    func scheduleSaveWorkspace() {
+        saveDebounceTask?.cancel()
+        saveDebounceTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if Task.isCancelled { return }
+            guard let self else { return }
+            let frame = NSApp.mainWindow?.frame
+            WorkspacePersistence.save(workspace: self.workspace, windowFrame: frame)
+        }
+    }
+
     // MARK: - Private
 
     private func cleanStaleSocket() {
@@ -353,7 +393,7 @@ final class WorkspaceController {
         switch event {
         case .bell(let tabId):
             if let (_, tab) = workspace.findTab(byTmuxId: tabId) {
-                for pane in tab.panes { pane.hasBell = true }
+                for pane in tab.panes { pane.terminalState?.hasBell = true }
                 attentionManager?.handleEvent(.bell(tabUUID: tab.uuid))
             } else {
                 ForgeLog.log("[control] Bell event for unknown tab: \(tabId)")
@@ -364,9 +404,11 @@ final class WorkspaceController {
             // Clearing is handled by the poll cycle checking window_activity freshness,
             // which naturally ignores brief touches from tab selection.
             if isSilent, let (_, tab) = workspace.findTab(byTmuxId: tabId) {
-                let alreadyHadBell = tab.panes.contains(where: \.hasBell)
-                for pane in tab.panes where pane.status == .running { pane.hasBell = true }
-                if tab.panes.contains(where: { $0.status == .running }) {
+                let alreadyHadBell = tab.panes.contains(where: { $0.terminalState?.hasBell == true })
+                for pane in tab.panes where pane.terminalState?.status == .running {
+                    pane.terminalState?.hasBell = true
+                }
+                if tab.panes.contains(where: { $0.terminalState?.status == .running }) {
                     attentionManager?.handleEvent(.bell(tabUUID: tab.uuid))
                     if !alreadyHadBell {
                         sendAttentionNotification(tabUUID: tab.uuid)

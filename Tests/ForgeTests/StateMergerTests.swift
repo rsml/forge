@@ -173,9 +173,9 @@ struct StateMergerTests {
                      width: 120, height: 40, pid: 999)
         ])
 
-        #expect(tab.panes[0].currentCommand == "vim")
-        #expect(tab.panes[0].width == 120)
-        #expect(tab.panes[0].status == .running)
+        #expect(tab.panes[0].terminalState?.currentCommand == "vim")
+        #expect(tab.panes[0].terminalState?.width == 120)
+        #expect(tab.panes[0].terminalState?.status == .running)
         #expect(events.isEmpty)
     }
 
@@ -198,7 +198,7 @@ struct StateMergerTests {
     func mergePanesClearsBellOnResume() {
         let tab = Tab(id: "@1", projectId: "$1", index: 0, name: "t")
         let pane = Pane(id: "%1", tabId: "@1", currentCommand: "zsh")
-        pane.hasBell = true
+        pane.terminalState!.hasBell = true
         tab.panes = [pane]
 
         _ = StateMerger.mergePanes(tab: tab, with: [
@@ -207,14 +207,14 @@ struct StateMergerTests {
                      width: 80, height: 24, pid: 1)
         ])
 
-        #expect(tab.panes[0].hasBell == false)
+        #expect(tab.panes[0].terminalState?.hasBell == false)
     }
 
     @Test("preserves bell status in needsAttention")
     func mergePanesPreservesBellStatus() {
         let tab = Tab(id: "@1", projectId: "$1", index: 0, name: "t")
         let pane = Pane(id: "%1", tabId: "@1", currentCommand: "zsh")
-        pane.hasBell = true
+        pane.terminalState!.hasBell = true
         tab.panes = [pane]
 
         _ = StateMerger.mergePanes(tab: tab, with: [
@@ -223,7 +223,7 @@ struct StateMergerTests {
                      width: 80, height: 24, pid: 1)
         ])
 
-        #expect(tab.panes[0].status == .needsAttention)
+        #expect(tab.panes[0].terminalState?.status == .needsAttention)
     }
 
     @Test("appends new panes not in existing list")

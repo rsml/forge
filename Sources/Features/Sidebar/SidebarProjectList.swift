@@ -96,6 +96,8 @@ struct SidebarProjectList: View {
                             .keyboardShortcut(KeyboardShortcuts.newProject.key, modifiers: KeyboardShortcuts.newProject.modifiers)
                         Button("New Tab") { controller.addTab(in: project) }
                             .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
+                        Button("New Browser Tab") { controller.addBrowserTab(in: project) }
+                            .keyboardShortcut("t", modifiers: [.command, .option])
                         Divider()
                         Button("Expand All Projects") { appState.dispatch(.expandAll) }
                         Button("Collapse All Projects") { appState.dispatch(.collapseAll) }

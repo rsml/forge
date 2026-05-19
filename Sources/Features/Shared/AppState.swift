@@ -27,6 +27,15 @@ final class AppState {
     // Stack action trigger — StackView observes this to run animations
     var pendingStackAction: WorkspaceController.StackDismissAction? = nil
 
+    /// Browser URL palette — when non-nil, the named pane displays an overlay
+    /// palette for entering a URL or picking a detected port from a sibling
+    /// terminal pane. Auto-opened on browser-pane creation; ⌘L re-opens.
+    var urlPalettePane: Pane? = nil
+
+    /// Browser find-in-page — when non-nil, the named pane displays an overlay
+    /// find bar. Opened via ⌘F when the focused pane is a browser; Esc dismisses.
+    var findActivePane: String? = nil
+
     private weak var controller: WorkspaceController?
     private weak var attentionManager: (any AttentionPort)?
     private weak var config: ForgeConfigStore?
@@ -175,5 +184,25 @@ final class AppState {
         tab.name = renameText
         controller?.renameTab(tab, to: renameText)
         renamingTabId = nil
+    }
+
+    // MARK: - URL Palette
+
+    func openURLPalette(for pane: Pane) {
+        urlPalettePane = pane
+    }
+
+    func closeURLPalette() {
+        urlPalettePane = nil
+    }
+
+    // MARK: - Find in Page
+
+    func openFind(for paneId: String) {
+        findActivePane = paneId
+    }
+
+    func closeFind() {
+        findActivePane = nil
     }
 }

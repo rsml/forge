@@ -92,13 +92,15 @@ final class TmuxSyncEngine {
                 paneEvents.append(contentsOf: mergePaneState(tab: tab, panesByWindow[tab.id] ?? []))
 
                 guard let info = tabInfoById[tab.id] else { continue }
-                let hasRunningPanes = tab.panes.contains { $0.status == .running }
-                let hadBell = tab.panes.contains(where: \.hasBell)
+                let hasRunningPanes = tab.panes.contains { $0.terminalState?.status == .running }
+                let hadBell = tab.panes.contains(where: { $0.terminalState?.hasBell == true })
 
                 if info.hasBell {
                     nonSilentSince[tab.id] = nil
                     if !hadBell {
-                        for pane in tab.panes where pane.status == .running { pane.hasBell = true }
+                        for pane in tab.panes where pane.terminalState?.status == .running {
+                            pane.terminalState?.hasBell = true
+                        }
                         if hasRunningPanes {
                             paneEvents.append(.bell(tabUUID: tab.uuid))
                         }
@@ -111,7 +113,7 @@ final class TmuxSyncEngine {
                         return Date()
                     }()
                     if Date().timeIntervalSince(since) > 5 {
-                        for pane in tab.panes { pane.hasBell = false }
+                        for pane in tab.panes { pane.terminalState?.hasBell = false }
                         paneEvents.append(.silenceCleared(tabUUID: tab.uuid))
                         nonSilentSince[tab.id] = nil
                     }
@@ -137,18 +139,20 @@ final class TmuxSyncEngine {
         var events: [StateMerger.PaneEvent] = []
         for project in workspace.projects {
             for tab in project.tabs {
-                for pane in tab.panes where pane.status == .running {
-                    if let content = await tmux.capturePaneContent(id: pane.id, lastN: pane.height) {
+                for pane in tab.panes {
+                    guard let ts = pane.terminalState, ts.status == .running else { continue }
+                    if let content = await tmux.capturePaneContent(id: pane.id, lastN: ts.height) {
                         if contentDetector.scan(paneId: pane.id, content: content, patterns: patterns) {
                             ForgeLog.log("[attention] Content match in pane \(pane.id): \(content.suffix(80))")
-                            pane.hasContentMatch = true
+                            ts.hasContentMatch = true
                             events.append(.contentMatch(tabUUID: tab.uuid))
                         }
                     }
                 }
-                for pane in tab.panes where pane.hasContentMatch {
+                for pane in tab.panes {
+                    guard let ts = pane.terminalState, ts.hasContentMatch else { continue }
                     if !contentDetector.isActive(paneId: pane.id) {
-                        pane.hasContentMatch = false
+                        ts.hasContentMatch = false
                     }
                 }
             }

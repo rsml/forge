@@ -43,11 +43,12 @@ extension DebugServer {
                         "id": pane.id,
                         "index": pane.index,
                         "active": pane.active,
-                        "command": pane.currentCommand,
-                        "path": pane.currentPath,
-                        "status": pane.status.rawValue,
-                        "hasBell": pane.hasBell,
-                        "size": "\(pane.width)x\(pane.height)"
+                        "kind": pane.kind.rawValue,
+                        "command": pane.terminalState?.currentCommand ?? "",
+                        "path": pane.terminalState?.currentPath ?? "",
+                        "status": pane.terminalState?.status.rawValue ?? "",
+                        "hasBell": pane.terminalState?.hasBell ?? false,
+                        "size": pane.terminalState.map { "\($0.width)x\($0.height)" } ?? ""
                     ]
                 }
                 return [
@@ -237,11 +238,15 @@ extension DebugServer {
         } ?? []
 
         for pane in activePanes {
+            guard let ts = pane.terminalState else {
+                paneEntries.append(["paneId": pane.id, "kind": pane.kind.rawValue])
+                continue
+            }
             var entry: [String: Any] = [
                 "paneId": pane.id,
                 "tmux": [
-                    "cols": pane.width,
-                    "rows": pane.height
+                    "cols": ts.width,
+                    "rows": ts.height
                 ]
             ]
 
@@ -274,7 +279,7 @@ extension DebugServer {
 
                 // Mismatch flag — makes it easy to grep the JSON output.
                 if let grid = gridSize {
-                    entry["mismatch"] = grid.cols != pane.width || grid.rows != pane.height
+                    entry["mismatch"] = grid.cols != ts.width || grid.rows != ts.height
                 }
             } else {
                 entry["renderer"] = "none"
