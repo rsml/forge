@@ -623,7 +623,7 @@ extension WorkspaceController {
         }
     }
 
-    private func clearAttention(tab: Tab) {
+    func clearAttention(tab: Tab) {
         for pane in tab.panes {
             pane.terminalState?.hasBell = false
             pane.terminalState?.hasContentMatch = false

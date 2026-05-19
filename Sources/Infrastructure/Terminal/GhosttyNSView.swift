@@ -132,6 +132,12 @@ final class GhosttyNSView: NSView {
     /// Wired by GhosttyRenderer to send to tmux via send-keys -H.
     var onKeyInput: ((Data) -> Void)?
 
+    /// Fires for any user-driven input event — keys, text insertion.
+    /// Pure-modifier presses (Shift, Cmd alone) and key releases don't count.
+    /// Used by the attention pipeline to clear stale bell / content-match flags
+    /// the moment the user engages the pane.
+    var onUserInput: (() -> Void)?
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard event.type == .keyDown else { return false }
         guard window?.firstResponder === self else { return false }
@@ -156,6 +162,7 @@ final class GhosttyNSView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
+        onUserInput?()
         if execMode {
             sendExecKey(event)
             return
@@ -201,6 +208,7 @@ final class GhosttyNSView: NSView {
         else if let s = insertString as? NSAttributedString { text = s.string }
         else { return }
         guard !text.isEmpty else { return }
+        onUserInput?()
         if execMode {
             text.withCString { cStr in
                 if let surface { ghostty_surface_text(surface, cStr, UInt(text.utf8.count)) }

@@ -161,26 +161,19 @@ final class WebKitBrowserRenderer: NSObject, BrowserRenderer {
     }
 
     func toggleDevTools() {
-        // Opens the Web Inspector in a separate floating window (Safari style).
-        //
-        // `isInspectable = true` (set in init) is the prerequisite — without it,
-        // both this private path and the public right-click "Inspect Element"
-        // menu item silently no-op.
-        //
-        // The selector `_inspector` returns a private inspector object that
-        // exposes `show:` / `hide:` / `isVisible`. As of macOS 14 there is no
-        // public toggle API, so this remains the only programmatic path.
-        // If Apple ever removes the selector, the user fallback is
-        // right-click → Inspect Element (works because of `isInspectable`).
+        // _WKInspector exposes `- (void)show;` and `- (void)hide;` — no colon,
+        // no argument. Using `show:`/`hide:` silently no-ops.
         guard let inspector = webView.value(forKey: "_inspector") as? NSObject else {
             ForgeLog.log("[browser] _inspector unavailable; user can right-click → Inspect Element")
             return
         }
-        if (inspector.value(forKey: "isVisible") as? Bool) == true {
-            _ = inspector.perform(NSSelectorFromString("hide:"), with: nil)
-        } else {
-            _ = inspector.perform(NSSelectorFromString("show:"), with: nil)
+        let isVisible = (inspector.value(forKey: "isVisible") as? Bool) == true
+        let sel = NSSelectorFromString(isVisible ? "hide" : "show")
+        guard inspector.responds(to: sel) else {
+            ForgeLog.log("[browser] _inspector does not respond to \(isVisible ? "hide" : "show"); user can right-click → Inspect Element")
+            return
         }
+        _ = inspector.perform(sel)
     }
 }
 
