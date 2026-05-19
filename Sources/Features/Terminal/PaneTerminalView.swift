@@ -2,9 +2,8 @@ import SwiftUI
 import ForgeCore
 
 /// Embeds a TerminalRenderer's NSView in SwiftUI. One per pane.
-/// SwiftTerm's TerminalView auto-calculates cols/rows from its frame via
-/// setFrameSize → processSizeChange → sizeChanged delegate callback.
-/// We rely on that callback to send resize-pane to tmux.
+/// The renderer (GhosttyNSView) handles its own resize via SwiftUI's
+/// frame changes — no separate dispatch needed.
 ///
 /// Attaches an AppKit `NSMenu` to the renderer's NSView on every update so
 /// the right-click context menu fires. SwiftUI's `.contextMenu` modifier
@@ -14,8 +13,7 @@ import ForgeCore
 struct PaneTerminalView: NSViewRepresentable {
     let renderer: any TerminalRenderer
     /// Non-nil when this view is rendered inside a domain pane (TerminalArea
-    /// / PaneSplitView). The legacy tmux path also uses this view but does
-    /// not need a context menu, so `pane` is optional.
+    /// / PaneSplitView). Pane right-click context menu is built from this.
     var pane: Pane?
 
     @Environment(WorkspaceController.self) private var controller

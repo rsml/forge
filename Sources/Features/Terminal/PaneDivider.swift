@@ -10,7 +10,11 @@ struct PaneDivider: View {
     let onDrag: (CGFloat) -> Void
     let onDragEnd: () -> Void
 
-    private let visualWidth: CGFloat = 1
+    /// True hairline: 1 device pixel on whichever screen the window is on
+    /// (0.5pt @ 2x retina, ~0.333pt @ 3x), floored at 0.33pt so it never
+    /// fades to invisibility on hypothetical super-dense displays.
+    @Environment(\.displayScale) private var displayScale
+    private var visualWidth: CGFloat { max(1.0 / displayScale, 0.33) }
 
     var body: some View {
         ZStack {

@@ -16,34 +16,22 @@ final class WorkspaceController {
     weak var appState: AppState?
     let config: ForgeConfigStore
     let toastState: NotificationToastState
-    let syncEngine: TmuxSyncEngine
-    let tmux: any TmuxPort
     private let uiState: UIStatePersistence
     var perProjectActiveTabId: [String: String] = [:]
-    /// Set before intentionally stopping control mode (e.g. removing last project) to suppress reconnect toast.
-    var expectingDisconnect = false
-    let outputRouter = OutputRouter()
     /// One renderer per live pane. Keyed by pane ID. Triggers SwiftUI updates.
     var paneRenderers: [String: any PaneRenderer] = [:]
     /// Total terminal area frame size (set by TerminalArea via GeometryReader).
     var terminalAreaSize: CGSize = .zero
     /// Terminal cell size in points (width, height). Computed from the first
-    /// renderer that reports cols/rows. Used by PaneSplitView for divider width
-    /// so SwiftUI's pixel allocation matches tmux's cell-based layout exactly.
+    /// renderer that reports cols/rows. Used by PaneSplitView for divider width.
     var terminalCellSize: CGSize = .zero
     /// When true, resize flush is deferred until drag ends.
     var suppressPaneResize = false
     var pendingResizes: [String: (cols: Int, rows: Int)] = [:]
     var resizeFlushWork: DispatchWorkItem?
-    /// Set true after divider drag — flushPendingResizes sends resize-pane
-    /// to apply the user's proportions. On startup, only resize-window is
-    /// sent (tmux proportionally scales, preserving stored ratios).
-    var sendResizePaneOnFlush = false
     /// Ghostty app instance for native rendering.
     var ghosttyApp: GhosttyApp?
-    /// Process adapter for native PTY mode. Nil when using tmux IO.
-    var processAdapter: ProcessAdapter?
-    /// Daemon adapter for PTY fd persistence. Nil when using tmux.
+    /// Daemon adapter for PTY fd persistence.
     var daemonAdapter: DaemonAdapter?
     /// Last focused pane ID — set by GhosttyNSView.onFocusGained.
     /// Used by splitPane to know which pane to split (firstResponder
@@ -51,41 +39,28 @@ final class WorkspaceController {
     var lastFocusedPaneId: String?
 
     /// Foreground-process activity check for close-confirmation prompts.
-    /// Set by AppDelegate after the daemon adapter is created (native PTY)
-    /// or immediately (tmux mode).
+    /// Set by AppDelegate after the daemon adapter is created.
     var activityPort: (any PaneActivityPort)?
 
-    /// Native PTY attention detector. Watches PTY output (bell, content match)
-    /// and polls foreground-process activity (command completion). Lives only
-    /// in native PTY mode; tmux mode emits these events via TmuxSyncEngine's
-    /// post-refresh hook.
+    /// Detects bell, content-match, and command-completed events from PTY
+    /// output and daemon activity polls. Hooked into every renderer's
+    /// onOutput callback.
     var paneActivityWatcher: PaneActivityWatcher?
 
-    /// Active project's git branch. Driven by GitBranchPoller, not tmux.
+    /// Active project's git branch.
     let gitBranchPoller = GitBranchPoller()
 
     var gitBranch: String? { gitBranchPoller.branch }
 
-    init(tmux: any TmuxPort, config: ForgeConfigStore, toastState: NotificationToastState) {
-        self.tmux = tmux
+    init(config: ForgeConfigStore, toastState: NotificationToastState) {
         self.config = config
         self.toastState = toastState
-        self.syncEngine = TmuxSyncEngine(workspace: workspace, tmux: tmux, config: config)
         self.uiState = UIStatePersistence(config: config)
     }
 
     // MARK: - Lifecycle
 
     func connect() {
-        if config.isNativePTY {
-            connectNativePTY()
-            return
-        }
-        connectTmux()
-    }
-
-    /// Native PTY connect: load workspace from JSON, no tmux.
-    private func connectNativePTY() {
         // Stand up the attention watcher before we start creating renderers
         // so it can be wired into onOutput callbacks from the first byte.
         if let activity = activityPort {
@@ -108,7 +83,7 @@ final class WorkspaceController {
         }
 
         Task {
-            ForgeLog.log("[app] Connecting (native PTY mode)...")
+            ForgeLog.log("[app] Connecting...")
 
             // Load workspace structure from disk
             if let persisted = WorkspacePersistence.load() {
@@ -161,7 +136,6 @@ final class WorkspaceController {
             }
 
             // Empty workspace — user can add projects via the UI.
-            // No default project created.
 
             // Pre-fetch daemon fds BEFORE creating renderers.
             // This prevents the race where updateRenderers creates EXEC surfaces
@@ -194,69 +168,7 @@ final class WorkspaceController {
             paneActivityWatcher?.start()
             gitBranchPoller.start(workspace: workspace)
             workspace.connected = true
-            ForgeLog.log("[app] Connected (native PTY). \(workspace.projects.count) projects.")
-        }
-    }
-
-    /// Legacy tmux connect flow.
-    private func connectTmux() {
-        Task {
-            ForgeLog.log("[app] Connecting...")
-            cleanStaleSocket()
-            if let configPath = tmux.configPath {
-                await tmux.sourceConfig(path: configPath)
-            }
-            syncEngine.setPostRefreshHook { [weak self] events in
-                guard let self else { return }
-                for event in events {
-                    switch event {
-                    case .bell(let tabUUID):
-                        self.attentionManager?.handleEvent(.bell(tabUUID: tabUUID))
-                        self.sendAttentionNotification(tabUUID: tabUUID)
-                    case .silenceCleared(let tabUUID):
-                        self.attentionManager?.markDone(tabUUID)
-                    case .commandCompleted(let tabUUID):
-                        self.attentionManager?.handleEvent(.commandCompleted(tabUUID: tabUUID))
-                        self.sendAttentionNotification(tabUUID: tabUUID)
-                    case .contentMatch(let tabUUID):
-                        self.attentionManager?.handleEvent(.contentMatch(tabUUID: tabUUID))
-                        self.sendAttentionNotification(tabUUID: tabUUID)
-                    }
-                }
-                // Prune queue items whose attention resolved (except front item)
-                if self.config.isStackMode {
-                    let activeUUIDs = Set(
-                        self.workspace.projects
-                            .flatMap(\.tabs)
-                            .filter(\.needsAttention)
-                            .map(\.uuid)
-                    )
-                    self.attentionManager?.pruneResolved(activeAttentionUUIDs: activeUUIDs)
-                }
-                // Sync renderers with current pane state — creates renderers for
-                // new panes (splits), removes stale ones (closed panes).
-                self.updateRenderers()
-            }
-            await syncEngine.refresh()
-            uiState.seedRecentDirectories(from: workspace)
-            let allUUIDs = Set(workspace.projects.flatMap { $0.tabs.map(\.uuid) })
-            attentionManager?.pruneStaleHiddenEntries(validUUIDs: allUUIDs)
-
-            // Detach stale clients BEFORE starting control mode.
-            // Must happen before any controlModeSend calls (including
-            // uiState.restore which sends select-tab/switch-client).
-            if let adapter = tmux as? TmuxAdapter {
-                await adapter.detachAllClients()
-            }
-
-            if workspace.projects.isEmpty {
-                expectingDisconnect = true
-            } else {
-                startControlMode()
-            }
-
-            // Restore UI state AFTER control mode is running so commands aren't dropped.
-            uiState.restore(workspace: workspace, tmux: tmux)
+            ForgeLog.log("[app] Connected. \(workspace.projects.count) projects.")
 
             NotificationCenter.default.addObserver(
                 forName: .forgeNavigateToTab, object: nil, queue: .main
@@ -270,84 +182,12 @@ final class WorkspaceController {
                     NotificationCenter.default.post(name: .forgeFocusTerminal, object: nil)
                 }
             }
-
-            // Seed native renderers for the active project's panes after initial sync.
-            // switchClient ensures the control mode client is on the active session
-            // before renderers fire resize commands.
-            if config.isNativePaneRendering {
-                if let project = workspace.activeProject {
-                    await tmux.switchClient(project: project.name)
-                }
-                updateRenderers()
-            }
-
-            syncEngine.start()
-            gitBranchPoller.start(workspace: workspace)
-            workspace.connected = true
-            ForgeLog.log("[app] Connected. \(workspace.projects.count) sessions found.")
         }
     }
 
     func disconnect() {
-        syncEngine.stop()
         paneActivityWatcher?.stop()
         gitBranchPoller.stop()
-        tmux.stopControlMode()
-    }
-
-    func startControlMode() {
-        // Set native rendering flag on the adapter before starting control mode
-        if let adapter = tmux as? TmuxAdapter {
-            adapter.nativeRendering = config.isNativePaneRendering
-        }
-
-        var outputHandler: (@Sendable (String, Data) -> Void)?
-        if config.isNativePaneRendering {
-            outputHandler = { [weak self] paneId, data in
-                ForgeLog.log("[debug] %output \(paneId): \(data.count) bytes")
-                Task { @MainActor in
-                    self?.outputRouter.route(paneId: paneId, data: data)
-                }
-            }
-        }
-
-        tmux.startControlMode(
-            onEvent: { [weak self] event in
-                Task { @MainActor in
-                    self?.handleEvent(event)
-                }
-            },
-            onOutput: outputHandler,
-            onDisconnect: { [weak self] in
-                Task { @MainActor in
-                    guard let self else { return }
-                    if self.expectingDisconnect {
-                        self.expectingDisconnect = false
-                        // Workspace still has the removed project (sync hasn't run yet).
-                        // count <= 1 means the last project was removed — clean up.
-                        if self.workspace.projects.count <= 1 {
-                            self.workspace.projects.removeAll()
-                            self.workspace.activeProjectId = nil
-                            self.workspace.activeTabId = nil
-                            self.tmux.stopControlMode()
-                        }
-                        // Non-last: suppress toast, control mode will reconnect.
-                        return
-                    }
-                    self.toastState.show(
-                        title: "Connection lost",
-                        message: "Reconnecting to tmux...",
-                        icon: "exclamationmark.triangle.fill",
-                        duration: 300
-                    )
-                }
-            },
-            onReconnect: { [weak self] in
-                Task { @MainActor in
-                    self?.toastState.dismiss()
-                }
-            }
-        )
     }
 
     // MARK: - UI State
@@ -372,61 +212,6 @@ final class WorkspaceController {
             guard let self else { return }
             let frame = NSApp.mainWindow?.frame
             WorkspacePersistence.save(workspace: self.workspace, windowFrame: frame)
-        }
-    }
-
-    // MARK: - Private
-
-    private func cleanStaleSocket() {
-        let socketPath = "/private/tmp/tmux-\(getuid())/forge"
-        let sessions = (try? FileManager.default.contentsOfDirectory(atPath: "/private/tmp/tmux-\(getuid())")) ?? []
-        if sessions.isEmpty, FileManager.default.fileExists(atPath: socketPath) {
-            try? FileManager.default.removeItem(atPath: socketPath)
-            ForgeLog.log("[app] Removed stale tmux socket")
-        }
-    }
-
-    private func handleEvent(_ rawEvent: String) {
-        ForgeLog.log("[control] \(rawEvent)")
-
-        let event = TmuxEventParser.parse(rawEvent)
-        switch event {
-        case .bell(let tabId):
-            if let (_, tab) = workspace.findTab(byTmuxId: tabId) {
-                for pane in tab.panes { pane.terminalState?.hasBell = true }
-                attentionManager?.handleEvent(.bell(tabUUID: tab.uuid))
-            } else {
-                ForgeLog.log("[control] Bell event for unknown tab: \(tabId)")
-            }
-
-        case .silenceChanged(let tabId, let isSilent):
-            // Only react to silence onset — show dot instantly for running panes.
-            // Clearing is handled by the poll cycle checking window_activity freshness,
-            // which naturally ignores brief touches from tab selection.
-            if isSilent, let (_, tab) = workspace.findTab(byTmuxId: tabId) {
-                let alreadyHadBell = tab.panes.contains(where: { $0.terminalState?.hasBell == true })
-                for pane in tab.panes where pane.terminalState?.status == .running {
-                    pane.terminalState?.hasBell = true
-                }
-                if tab.panes.contains(where: { $0.terminalState?.status == .running }) {
-                    attentionManager?.handleEvent(.bell(tabUUID: tab.uuid))
-                    if !alreadyHadBell {
-                        sendAttentionNotification(tabUUID: tab.uuid)
-                    }
-                }
-            }
-
-        case .tabClose(let tabId):
-            if let (_, tab) = workspace.findTab(byTmuxId: tabId) {
-                attentionManager?.removeTab(tab.uuid)
-            }
-            syncEngine.scheduleRefresh()
-
-        case .structural:
-            syncEngine.scheduleRefresh()
-
-        case .ignored:
-            break
         }
     }
 }

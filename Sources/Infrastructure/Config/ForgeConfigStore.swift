@@ -10,14 +10,6 @@ extension ForgeConfig.FontConfig {
 }
 
 extension ForgeConfigStore {
-    var isNativePaneRendering: Bool {
-        config.general?.nativePaneRendering ?? true
-    }
-
-    var isNativePTY: Bool {
-        config.general?.nativePTY ?? true
-    }
-
     var primaryFont: Font {
         (config.primaryFont ?? ForgeConfig.FontConfig()).resolved(defaultSize: 13)
     }
@@ -55,6 +47,21 @@ final class ForgeConfigStore {
     /// Stack mode vs list mode for the sidebar project view.
     var isStackMode: Bool = false
 
+    /// Transient hover-preview theme. When non-nil, shadows the config-resolved
+    /// theme everywhere `resolvedTheme` is read — sidebar, title bar, modals,
+    /// terminal. Set by the hover observer in AppDelegate; cleared on hover-out
+    /// or settings pane disappear. Not persisted.
+    ///
+    /// Posts `.forgeConfigChanged` on change so AppKit-bound surfaces
+    /// (TitleBarManager.syncAppearance) refresh alongside SwiftUI views.
+    /// The notification name implies "config saved", but observers treat it
+    /// as "theme-relevant state changed" — keep it that way.
+    var previewTheme: ThemeDefinition? {
+        didSet {
+            NotificationCenter.default.post(name: .forgeConfigChanged, object: nil)
+        }
+    }
+
     private let themeLoader: (String) -> ThemeDefinition?
 
     init(themeLoader: @escaping (String) -> ThemeDefinition?) {
@@ -73,6 +80,7 @@ final class ForgeConfigStore {
 
     private var _resolvedTheme: ThemeDefinition??  // nil = not loaded, .some(nil) = no theme
     var resolvedTheme: ThemeDefinition? {
+        if let preview = previewTheme { return preview }
         if let cached = _resolvedTheme { return cached }
         let result = resolveThemeFromConfig()
         _resolvedTheme = .some(result)

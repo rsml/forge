@@ -7,16 +7,12 @@ struct TerminalArea: View {
     @Environment(ForgeConfigStore.self) private var configStore
 
     var body: some View {
-        if configStore.isNativePaneRendering, !controller.paneRenderers.isEmpty,
-           let tab = project.tabs.first(where: { $0.id == controller.workspace.activeTabId }) {
+        if let tab = project.tabs.first(where: { $0.id == controller.workspace.activeTabId }),
+           !controller.paneRenderers.isEmpty {
             nativeTerminal(tab: tab)
         } else {
-            ForgeTerminalView(sessionName: project.name)
-                .padding(.trailing, -15)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Color(red: 0.1, green: 0.1, blue: 0.1)
                 .ignoresSafeArea(edges: [.bottom, .trailing])
-                .id(project.id)
-                .background(Color(red: 0.1, green: 0.1, blue: 0.1))
         }
     }
 
@@ -24,15 +20,11 @@ struct TerminalArea: View {
     private func nativeTerminal(tab: ForgeCore.Tab) -> some View {
         Group {
             if tab.panes.count > 1 {
-                let tree: SplitNode = if let splitTree = tab.splitTree {
-                    splitTree
-                } else if let layout = tab.layout {
-                    LayoutParser.parse(layout)
-                } else {
-                    .split(.vertical,
-                           [SplitNode](repeating: .leaf, count: tab.panes.count),
-                           proportions: [CGFloat](repeating: 1.0 / CGFloat(tab.panes.count), count: tab.panes.count))
-                }
+                let tree: SplitNode = tab.splitTree ?? .split(
+                    .vertical,
+                    [SplitNode](repeating: .leaf, count: tab.panes.count),
+                    proportions: [CGFloat](repeating: 1.0 / CGFloat(tab.panes.count), count: tab.panes.count)
+                )
                 PaneSplitView(node: tree, panes: tab.panes[...], renderers: controller.paneRenderers)
             } else if let pane = tab.panes.first {
                 if pane.kind == .browser,

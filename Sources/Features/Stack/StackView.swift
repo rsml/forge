@@ -159,7 +159,7 @@ struct StackView: View {
 
     private func findTerminalView(in view: NSView?) -> NSView? {
         guard let view else { return nil }
-        if String(describing: type(of: view)).contains("LocalProcessTerminalView") {
+        if view is GhosttyNSView {
             return view
         }
         for sub in view.subviews {

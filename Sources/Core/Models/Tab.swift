@@ -5,7 +5,7 @@ import Observation
 @MainActor
 public final class Tab: Identifiable {
     public let id: String
-    public let projectId: String
+    public var projectId: String
     /// Stable identifier used for attention tracking; never reassigned after init.
     public let uuid: UUID
     public var index: Int

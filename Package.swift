@@ -4,9 +4,7 @@ import PackageDescription
 let package = Package(
     name: "Forge",
     platforms: [.macOS(.v14)],
-    dependencies: [
-        .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", from: "1.2.0"),
-    ],
+    dependencies: [],
     targets: [
         // Shared kernel — domain models, ports, pure logic. No framework deps.
         .target(
@@ -16,7 +14,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "Forge",
-            dependencies: ["SwiftTerm", "ForgeCore", "GhosttyKit"],
+            dependencies: ["ForgeCore", "GhosttyKit"],
             path: "Sources",
             exclude: ["Core", "Daemon"],
             swiftSettings: [

@@ -101,7 +101,6 @@ struct NotificationPanel: View {
                     pane.terminalState?.hasBell = false
                     pane.terminalState?.hasContentMatch = false
                 }
-                Task { await controller.tmux.clearBellFlag(tabId: tab.id) }
             }
         }
     }

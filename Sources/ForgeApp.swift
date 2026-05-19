@@ -39,6 +39,9 @@ extension Notification.Name {
     static let forgeNavigateToTab = Notification.Name("forgeNavigateToTab")
     static let forgeFocusTerminal = Notification.Name("forgeFocusTerminal")
     static let forgeWindowTitleChanged = Notification.Name("forgeWindowTitleChanged")
+    static let forgeThemesChanged = Notification.Name("forgeThemesChanged")
+    static let forgeThemeHoverPreview = Notification.Name("forgeThemeHoverPreview")
+    static let forgeThemeHoverEnded = Notification.Name("forgeThemeHoverEnded")
 }
 
 // MARK: - NSColor Helpers
@@ -57,7 +60,7 @@ extension NSColor {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let configStore = ForgeConfigStore.shared
     let toastState = NotificationToastState()
-    lazy var controller = WorkspaceController(tmux: TmuxAdapter(), config: configStore, toastState: toastState)
+    lazy var controller = WorkspaceController(config: configStore, toastState: toastState)
     let appState = AppState(sidebarVisible: ForgeConfig.load().uiState?.sidebarVisible ?? true)
     let commandRegistry = CommandRegistry()
     let modifierKeyMonitor = ModifierKeyMonitor()
@@ -67,6 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindow: NSWindow?
     private var titleBarManager: TitleBarManager?
     private var appearanceObservation: NSKeyValueObservation?
+    private var themeWatcher: ThemeWatcher?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -83,56 +87,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.attentionManager = attentionManager
         controller.notifier = notifier
 
-        if configStore.isNativePaneRendering || configStore.isNativePTY {
-            let ga = GhosttyApp()
-            // Apply Forge's font and theme to ghostty
-            let fontFamily = configStore.config.terminalFont?.family
-                ?? configStore.config.terminal?.fontFamily
-                ?? configStore.config.appearance?.fontFamily
-            let fontSize = configStore.config.terminalFont?.size
-                ?? configStore.config.terminal?.fontSize
-                ?? configStore.config.appearance?.fontSize ?? 13
-            var fgHex: String?
-            var bgHex: String?
-            if let theme = configStore.resolvedTheme {
-                fgHex = String(format: "#%02x%02x%02x",
-                    Int(theme.foreground.red * 255),
-                    Int(theme.foreground.green * 255),
-                    Int(theme.foreground.blue * 255))
-                bgHex = String(format: "#%02x%02x%02x",
-                    Int(theme.background.red * 255),
-                    Int(theme.background.green * 255),
-                    Int(theme.background.blue * 255))
+        let ga = GhosttyApp()
+        ghosttyApp = ga
+        applyGhosttyTheme()
+        controller.ghosttyApp = ga
+        themeWatcher = ThemeWatcher()
+
+        let daemon = DaemonAdapter()
+        controller.daemonAdapter = daemon
+        controller.activityPort = DaemonActivityAdapter(
+            daemon: daemon,
+            workspace: controller.workspace
+        )
+        Task {
+            do {
+                try daemon.ensureConnected()
+                ForgeLog.log("[app] Connected to forged daemon")
+            } catch {
+                ForgeLog.log("[app] Failed to connect to daemon: \(error)")
             }
-            var ansiHex: [String]?
-            if let theme = configStore.resolvedTheme {
-                ansiHex = theme.ansiColors.prefix(16).map { c in
-                    String(format: "#%02x%02x%02x", Int(c.red * 255), Int(c.green * 255), Int(c.blue * 255))
-                }
-            }
-            ga.applyConfig(fontFamily: fontFamily, fontSize: fontSize, foreground: fgHex, background: bgHex, ansiColors: ansiHex)
-            ghosttyApp = ga
-        }
-        controller.ghosttyApp = ghosttyApp
-        if configStore.isNativePTY, let ga = ghosttyApp {
-            controller.processAdapter = ProcessAdapter(ghosttyApp: ga)
-            let daemon = DaemonAdapter()
-            controller.daemonAdapter = daemon
-            controller.activityPort = DaemonActivityAdapter(
-                daemon: daemon,
-                workspace: controller.workspace
-            )
-            // Launch and connect to daemon immediately
-            Task {
-                do {
-                    try daemon.ensureConnected()
-                    ForgeLog.log("[app] Connected to forged daemon")
-                } catch {
-                    ForgeLog.log("[app] Failed to connect to daemon: \(error)")
-                }
-            }
-        } else {
-            controller.activityPort = TmuxActivityAdapter(workspace: controller.workspace)
         }
 
         createMainWindow()
@@ -177,6 +150,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
             MainActor.assumeIsolated { self?.titleBarManager?.syncAppearance() }
         }
+        NotificationCenter.default.addObserver(
+            forName: .forgeConfigChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyGhosttyTheme() }
+        }
+        // Hover observers only mutate previewTheme. Its didSet posts
+        // .forgeConfigChanged, which the observer above turns into an
+        // applyGhosttyTheme() call — single dispatch path.
+        NotificationCenter.default.addObserver(
+            forName: .forgeThemeHoverPreview, object: nil, queue: .main
+        ) { [weak self] note in
+            let themeId = note.userInfo?["themeId"] as? String
+            MainActor.assumeIsolated {
+                guard let self,
+                      let id = themeId,
+                      let theme = ThemeParser.loadTheme(id: id) else { return }
+                self.configStore.previewTheme = theme
+            }
+        }
+        NotificationCenter.default.addObserver(
+            forName: .forgeThemeHoverEnded, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.configStore.previewTheme = nil
+            }
+        }
+    }
+
+    private func applyGhosttyTheme() {
+        guard let ga = ghosttyApp else { return }
+        let fontFamily = configStore.config.terminalFont?.family
+            ?? configStore.config.terminal?.fontFamily
+            ?? configStore.config.appearance?.fontFamily
+        let fontSize = configStore.config.terminalFont?.size
+            ?? configStore.config.terminal?.fontSize
+            ?? configStore.config.appearance?.fontSize ?? 13
+        let theme = configStore.resolvedTheme
+        var fgHex: String?
+        var bgHex: String?
+        var ansiHex: [String]?
+        if let theme {
+            fgHex = String(format: "#%02x%02x%02x",
+                Int(theme.foreground.red * 255),
+                Int(theme.foreground.green * 255),
+                Int(theme.foreground.blue * 255))
+            bgHex = String(format: "#%02x%02x%02x",
+                Int(theme.background.red * 255),
+                Int(theme.background.green * 255),
+                Int(theme.background.blue * 255))
+            ansiHex = theme.ansiColors.prefix(16).map { c in
+                String(format: "#%02x%02x%02x", Int(c.red * 255), Int(c.green * 255), Int(c.blue * 255))
+            }
+        }
+        ga.applyConfig(fontFamily: fontFamily, fontSize: fontSize,
+                       foreground: fgHex, background: bgHex, ansiColors: ansiHex)
     }
 
     private func createMainWindow() {
@@ -228,27 +256,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        // In native PTY mode, save workspace before quitting.
-        // Daemon keeps fds alive; workspace.json preserves structure.
-        if configStore.isNativePTY {
-            let windowFrame = NSApp.mainWindow?.frame
-            WorkspacePersistence.save(workspace: controller.workspace, windowFrame: windowFrame)
-            ForgeLog.log("[app] Saved workspace for native PTY persistence")
-            // _exit() bypasses AppKit teardown which would destroy Ghostty surfaces
-            // and send SIGHUP to child processes. The daemon holds fd dups, so
-            // PTYs stay alive. Child processes keep running.
-            _exit(0)
-        }
-
-        guard configStore.config.general?.confirmBeforeClose ?? true else {
-            return .terminateNow
-        }
-        let alert = NSAlert()
-        alert.messageText = "Quit Forge?"
-        alert.informativeText = "Your tmux sessions will keep running in the background."
-        alert.addButton(withTitle: "Quit")
-        alert.addButton(withTitle: "Cancel")
-        alert.alertStyle = .warning
-        return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
+        let windowFrame = NSApp.mainWindow?.frame
+        WorkspacePersistence.save(workspace: controller.workspace, windowFrame: windowFrame)
+        ForgeLog.log("[app] Saved workspace for native PTY persistence")
+        // _exit() bypasses AppKit teardown which would destroy Ghostty surfaces
+        // and send SIGHUP to child processes. The daemon holds fd dups, so
+        // PTYs stay alive. Child processes keep running.
+        _exit(0)
     }
 }

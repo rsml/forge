@@ -61,20 +61,8 @@ private struct SplitContainer: View {
 
     private let minProportion: CGFloat = 0.05
 
-    /// Divider hit-target size. In tmux mode it matches tmux's 1-cell divider so pixel
-    /// allocation is identical. In native PTY mode it shrinks to a flush 6px hit-area
-    /// around the 1px visible line.
-    private var dividerSize: CGFloat {
-        if controller.config.isNativePTY {
-            return 6
-        }
-        let cell = controller.terminalCellSize
-        if direction == .horizontal {
-            return cell.width > 0 ? cell.width : 8
-        } else {
-            return cell.height > 0 ? cell.height : 8
-        }
-    }
+    /// Divider hit-target size — flush 6px hit-area around the 1px visible line.
+    private var dividerSize: CGFloat { 6 }
 
     init(direction: SplitDirection, children: [SplitNode], tmuxProportions: [CGFloat],
          panes: ArraySlice<Pane>, renderers: [String: any PaneRenderer]) {
@@ -136,7 +124,6 @@ private struct SplitContainer: View {
     private func handleDrag(at index: Int, delta: CGFloat, available: CGFloat) {
         if dragStartProportions == nil {
             dragStartProportions = proportions
-            controller.suppressPaneResize = true
         }
         guard let start = dragStartProportions else { return }
         let proportionDelta = delta / available
@@ -149,37 +136,11 @@ private struct SplitContainer: View {
 
     private func endDrag() {
         dragStartProportions = nil
-        controller.suppressPaneResize = false
-
         // Write dragged proportions back to the split tree on the Tab model
-        // so they persist to workspace.json.
+        // so they persist to workspace.json. Ghostty renderers resize their
+        // own PTYs when the SwiftUI frame changes — no separate resize
+        // dispatch is needed.
         updateSplitTreeProportions()
-
-        // Compute target cell counts from the NEW proportions and write them
-        // into pendingResizes. Without this, flushPendingResizes sends the
-        // current renderer sizes (which haven't changed) — a no-op.
-        let cellSize = controller.terminalCellSize
-        if cellSize.width > 0, cellSize.height > 0 {
-            let slices = slicePanes()
-            for (i, child) in children.enumerated() {
-                guard i < proportions.count, i < slices.count else { continue }
-                // Leaf panes get their size directly; nested splits inherit from parent
-                let leafPanes = slices[i]
-                for pane in leafPanes where pane.kind == .terminal {
-                    if let renderer = renderers[pane.id] {
-                        let frame = renderer.view.frame
-                        let cols = Int(frame.width / cellSize.width)
-                        let rows = Int(frame.height / cellSize.height)
-                        if cols > 0, rows > 0 {
-                            controller.pendingResizes[pane.id] = (cols, rows)
-                        }
-                    }
-                }
-            }
-        }
-
-        controller.sendResizePaneOnFlush = true
-        controller.flushPendingResizes()
     }
 
     /// Write the current @State proportions back into the Tab's splitTree

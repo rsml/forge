@@ -147,7 +147,7 @@ extension DebugServer {
             return jsonResponse(["error": "No active project"])
 
         case "refresh":
-            await ctrl.syncEngine.refresh()
+            // Native PTY has no refresh cycle — state is event-driven.
             return jsonResponse(["ok": true])
 
         case "splitPane":

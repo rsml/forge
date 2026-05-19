@@ -240,10 +240,6 @@ extension WorkspaceController {
     /// user can navigate immediately.
     @MainActor
     func addBrowserTab(in project: Project) {
-        guard config.isNativePTY else {
-            ForgeLog.log("[app] Browser tab requires native PTY mode — ignoring")
-            return
-        }
         addBrowserTabNativePTY(in: project)
     }
 

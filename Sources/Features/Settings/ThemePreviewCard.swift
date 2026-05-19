@@ -51,6 +51,17 @@ struct ThemePreviewCard: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { onSelect() }
+        .onHover { hovering in
+            if hovering {
+                NotificationCenter.default.post(
+                    name: .forgeThemeHoverPreview,
+                    object: nil,
+                    userInfo: ["themeId": theme.id])
+            } else {
+                NotificationCenter.default.post(
+                    name: .forgeThemeHoverEnded, object: nil)
+            }
+        }
     }
 
     private func colorAt(_ index: Int) -> Color {

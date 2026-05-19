@@ -23,24 +23,6 @@ final class UIStatePersistence {
         }
     }
 
-    func restore(workspace: Workspace, tmux: any TmuxPort) {
-        guard let state = ForgeConfig.load().uiState else { return }
-
-        if let name = state.activeProjectName,
-           let project = workspace.projects.first(where: { $0.name == name }) {
-            workspace.activeProjectId = project.id
-            Task { await tmux.switchClient(project: project.name) }
-
-            if let index = state.activeTabIndex,
-               let tab = project.tabs.first(where: { $0.index == index }) {
-                workspace.activeTabId = tab.id
-                Task { await tmux.selectTab(id: tab.id) }
-            } else if let first = project.tabs.first {
-                workspace.activeTabId = first.id
-            }
-        }
-    }
-
     func seedRecentDirectories(from workspace: Workspace) {
         let paths = workspace.projects.compactMap { project -> String? in
             guard let path = project.path, !path.isEmpty, path != NSHomeDirectory() else { return nil }
