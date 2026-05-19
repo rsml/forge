@@ -1,9 +1,8 @@
 import SwiftUI
 
 /// Embeds a TerminalRenderer's NSView in SwiftUI. One per pane.
-/// SwiftTerm's TerminalView auto-calculates cols/rows from its frame via
-/// setFrameSize → processSizeChange → sizeChanged delegate callback.
-/// We rely on that callback to send resize-pane to tmux.
+/// The renderer (GhosttyNSView) handles its own resize via SwiftUI's
+/// frame changes — no separate dispatch needed.
 struct PaneTerminalView: NSViewRepresentable {
     let renderer: any TerminalRenderer
 
