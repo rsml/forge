@@ -56,5 +56,11 @@ struct ThemeSettingsPane: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .forgeThemesChanged)) { _ in
+            Task.detached {
+                let loaded = ThemeParser.loadAllThemes()
+                await MainActor.run { themes = loaded }
+            }
+        }
     }
 }

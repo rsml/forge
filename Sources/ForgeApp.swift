@@ -39,6 +39,7 @@ extension Notification.Name {
     static let forgeNavigateToTab = Notification.Name("forgeNavigateToTab")
     static let forgeFocusTerminal = Notification.Name("forgeFocusTerminal")
     static let forgeWindowTitleChanged = Notification.Name("forgeWindowTitleChanged")
+    static let forgeThemesChanged = Notification.Name("forgeThemesChanged")
 }
 
 // MARK: - NSColor Helpers
@@ -67,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindow: NSWindow?
     private var titleBarManager: TitleBarManager?
     private var appearanceObservation: NSKeyValueObservation?
+    private var themeWatcher: ThemeWatcher?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -89,6 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             applyGhosttyTheme()
         }
         controller.ghosttyApp = ghosttyApp
+        themeWatcher = ThemeWatcher()
         if configStore.isNativePTY, let ga = ghosttyApp {
             controller.processAdapter = ProcessAdapter(ghosttyApp: ga)
             let daemon = DaemonAdapter()
