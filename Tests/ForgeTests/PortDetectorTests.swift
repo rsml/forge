@@ -72,4 +72,53 @@ struct PortDetectorTests {
         let ports = PortDetector.detect(in: "")
         #expect(ports.isEmpty)
     }
+
+    // MARK: - port-keyword regex (port/server + space + digits)
+
+    @Test("detects `port 8080` (Python http.server style)")
+    func testPortKeywordSpace() {
+        let out = "Serving HTTP on :: port 8080 (http://[::]:8080/) ..."
+        let ports = PortDetector.detect(in: out)
+        #expect(ports.contains { $0.port == 8080 && $0.host == "localhost" })
+    }
+
+    @Test("detects `server 8080`")
+    func testServerKeywordSpace() {
+        let out = "starting server 8080"
+        let ports = PortDetector.detect(in: out)
+        #expect(ports.contains { $0.port == 8080 })
+    }
+
+    @Test("detects `port: 8080` (colon + space)")
+    func testPortKeywordColonSpace() {
+        let out = "Listening on port: 8080"
+        let ports = PortDetector.detect(in: out)
+        #expect(ports.contains { $0.port == 8080 })
+    }
+
+    @Test("port-keyword regex catches short ports like 80")
+    func testPortKeywordShortPort() {
+        let out = "running on port 80"
+        let ports = PortDetector.detect(in: out)
+        #expect(ports.contains { $0.port == 80 })
+    }
+
+    @Test("port-keyword does not match unrelated digits")
+    func testPortKeywordNoFalsePositive() {
+        // "port" must be followed by whitespace and digits — not part of another word
+        let out = "important 12345 things"
+        let ports = PortDetector.detect(in: out)
+        #expect(ports.isEmpty)
+    }
+
+    @Test("port-keyword dedups against strict pass")
+    func testPortKeywordDedup() {
+        // "port 3000" + "localhost:3000" should yield ONE result, not two
+        let out = """
+        listening on localhost:3000
+        port 3000 ready
+        """
+        let ports = PortDetector.detect(in: out)
+        #expect(ports.filter { $0.port == 3000 }.count == 1)
+    }
 }
