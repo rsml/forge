@@ -27,11 +27,14 @@ struct ThemeParser {
     }
 
     static func loadTheme(id: String) -> ThemeDefinition? {
-        for searchPath in searchPaths {
+        for searchPath in Self.searchPaths {
             let path = (searchPath as NSString).appendingPathComponent(id)
             if let theme = parseThemeFile(path: path, id: id) {
                 return theme
             }
+        }
+        if !id.isEmpty {
+            ForgeLog.log("[theme] no file found for id '\(id)' — picker will fall back to default colors")
         }
         return nil
     }
