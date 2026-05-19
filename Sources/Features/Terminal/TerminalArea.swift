@@ -40,7 +40,7 @@ struct TerminalArea: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea(edges: [.bottom, .trailing])
-        .background(Color(red: 0.1, green: 0.1, blue: 0.1))
+        .background(configStore.resolvedTheme?.background.color ?? Color(red: 0.1, green: 0.1, blue: 0.1))
         .background(
             GeometryReader { geo in
                 Color.clear.onChange(of: geo.size) { _, size in

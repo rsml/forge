@@ -55,31 +55,22 @@ struct WindowTabBar: View {
                                 controller.selectTab(tab)
                             }
                             .contextMenu {
-                                Button("New Tab") {
-                                    controller.addTab(in: project)
-                                }
-                                .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
+                                Button("New Tab") { controller.addTab(in: project) }
+                                    .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
                                 Button("New Browser Tab") {}
                                 Divider()
-                                Button("Rename") {
-                                    appState.startTabRename(tab)
-                                }
-                                .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
+                                Button("Rename Tab") { appState.startTabRename(tab) }
+                                    .keyboardShortcut(KeyboardShortcuts.renameTab.key, modifiers: KeyboardShortcuts.renameTab.modifiers)
+                                Button("Close Tab", role: .destructive) { controller.removeTab(tab, in: project) }
+                                    .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)
+                                Divider()
                                 if attention.isHidden(tab.uuid) {
-                                    Button("Enable Notifications") {
-                                        attention.unhide(tab.uuid)
-                                    }
-                                    .keyboardShortcut(KeyboardShortcuts.toggleNotifications.key, modifiers: KeyboardShortcuts.toggleNotifications.modifiers)
+                                    Button("Enable Notifications") { attention.unhide(tab.uuid) }
+                                        .keyboardShortcut(KeyboardShortcuts.toggleNotifications.key, modifiers: KeyboardShortcuts.toggleNotifications.modifiers)
                                 } else {
-                                    Button("Disable Notifications") {
-                                        attention.hide(tab.uuid)
-                                    }
-                                    .keyboardShortcut(KeyboardShortcuts.toggleNotifications.key, modifiers: KeyboardShortcuts.toggleNotifications.modifiers)
+                                    Button("Disable Notifications") { attention.hide(tab.uuid) }
+                                        .keyboardShortcut(KeyboardShortcuts.toggleNotifications.key, modifiers: KeyboardShortcuts.toggleNotifications.modifiers)
                                 }
-                                Button("Close Tab", role: .destructive) {
-                                    controller.removeTab(tab, in: project)
-                                }
-                                .keyboardShortcut(KeyboardShortcuts.closePane.key, modifiers: KeyboardShortcuts.closePane.modifiers)
                             }
                         }
                     } onReorder: { from, to in

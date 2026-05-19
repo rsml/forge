@@ -52,7 +52,16 @@ final class WorkspaceController {
     /// or immediately (tmux mode).
     var activityPort: (any PaneActivityPort)?
 
-    var gitBranch: String? { syncEngine.gitBranch }
+    /// Native PTY attention detector. Watches PTY output (bell, content match)
+    /// and polls foreground-process activity (command completion). Lives only
+    /// in native PTY mode; tmux mode emits these events via TmuxSyncEngine's
+    /// post-refresh hook.
+    var paneActivityWatcher: PaneActivityWatcher?
+
+    /// Active project's git branch. Driven by GitBranchPoller, not tmux.
+    let gitBranchPoller = GitBranchPoller()
+
+    var gitBranch: String? { gitBranchPoller.branch }
 
     init(tmux: any TmuxPort, config: ForgeConfigStore, toastState: NotificationToastState) {
         self.tmux = tmux
@@ -74,6 +83,27 @@ final class WorkspaceController {
 
     /// Native PTY connect: load workspace from JSON, no tmux.
     private func connectNativePTY() {
+        // Stand up the attention watcher before we start creating renderers
+        // so it can be wired into onOutput callbacks from the first byte.
+        if let activity = activityPort {
+            let watcher = PaneActivityWatcher(workspace: workspace, activity: activity, config: config)
+            watcher.onEvent = { [weak self] event in
+                guard let self else { return }
+                self.attentionManager?.handleEvent(event)
+                self.sendAttentionNotification(tabUUID: event.tabUUID)
+                if self.config.isStackMode {
+                    let activeUUIDs = Set(
+                        self.workspace.projects
+                            .flatMap(\.tabs)
+                            .filter(\.needsAttention)
+                            .map(\.uuid)
+                    )
+                    self.attentionManager?.pruneResolved(activeAttentionUUIDs: activeUUIDs)
+                }
+            }
+            paneActivityWatcher = watcher
+        }
+
         Task {
             ForgeLog.log("[app] Connecting (native PTY mode)...")
 
@@ -126,8 +156,12 @@ final class WorkspaceController {
                         guard let ghosttyApp else { continue }
                         let renderer = GhosttyRenderer(ghosttyApp: ghosttyApp, fd: result.fd)
                         renderer.configureForReconnect(paneId: pane.id, pid: result.pid)
+                        let paneId = pane.id
                         renderer.nsView.onFocusGained = { [weak self] in
-                            self?.lastFocusedPaneId = pane.id
+                            self?.lastFocusedPaneId = paneId
+                        }
+                        renderer.onOutput = { [weak self] data in
+                            self?.paneActivityWatcher?.processOutput(paneId: paneId, data: data)
                         }
                         paneRenderers[pane.id] = renderer
                         ForgeLog.log("[daemon] Pre-fetched pane \(pane.id) (fd=\(result.fd))")
@@ -136,6 +170,8 @@ final class WorkspaceController {
             }
 
             updateRenderers()
+            paneActivityWatcher?.start()
+            gitBranchPoller.start(workspace: workspace)
             workspace.connected = true
             ForgeLog.log("[app] Connected (native PTY). \(workspace.projects.count) projects.")
         }
@@ -225,6 +261,7 @@ final class WorkspaceController {
             }
 
             syncEngine.start()
+            gitBranchPoller.start(workspace: workspace)
             workspace.connected = true
             ForgeLog.log("[app] Connected. \(workspace.projects.count) sessions found.")
         }
@@ -232,6 +269,8 @@ final class WorkspaceController {
 
     func disconnect() {
         syncEngine.stop()
+        paneActivityWatcher?.stop()
+        gitBranchPoller.stop()
         tmux.stopControlMode()
     }
 

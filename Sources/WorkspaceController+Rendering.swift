@@ -103,6 +103,9 @@ extension WorkspaceController {
         renderer.nsView.onFocusGained = { [weak self] in
             self?.lastFocusedPaneId = paneId
         }
+        renderer.onOutput = { [weak self] data in
+            self?.paneActivityWatcher?.processOutput(paneId: paneId, data: data)
+        }
         return renderer
     }
 
@@ -228,6 +231,9 @@ extension WorkspaceController {
                             paneRenderers[paneId] = renderer
                             renderer.nsView.onFocusGained = { [weak self] in
                                 self?.lastFocusedPaneId = paneId
+                            }
+                            renderer.onOutput = { [weak self] data in
+                                self?.paneActivityWatcher?.processOutput(paneId: paneId, data: data)
                             }
                             ForgeLog.log("[daemon] Reconnected pane \(paneId) (fd=\(result.fd), pid=\(pid))")
                         }

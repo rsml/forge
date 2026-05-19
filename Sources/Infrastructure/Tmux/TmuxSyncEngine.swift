@@ -15,8 +15,6 @@ final class TmuxSyncEngine {
     private var refreshDebounceTask: Task<Void, Never>?
     private var isRefreshing = false
     private var needsRefreshAfterCurrent = false
-    private var lastGitBranchProjectId: String?
-    private(set) var gitBranch: String?
     private let contentDetector = ContentDetector()
     /// Tracks when a tab first became non-silent. hasBell only clears after
     /// sustained non-silence (> 5s), avoiding flicker from brief activity like tab selection.
@@ -128,15 +126,6 @@ final class TmuxSyncEngine {
 
         await onPostRefresh?(paneEvents)
 
-        let activeProjectId = workspace.activeProjectId
-        if activeProjectId != lastGitBranchProjectId {
-            lastGitBranchProjectId = activeProjectId
-            if let path = workspace.activeProject?.path {
-                gitBranch = await currentBranch(at: path)
-            } else {
-                gitBranch = nil
-            }
-        }
         NotificationCenter.default.post(name: .forgeWindowTitleChanged, object: nil)
     }
 
@@ -171,26 +160,5 @@ final class TmuxSyncEngine {
         let (activePaneId, events) = StateMerger.mergePanes(tab: tab, with: infos)
         if let activePaneId { workspace.activePaneId = activePaneId }
         return events
-    }
-
-    private func currentBranch(at path: String) async -> String? {
-        await withCheckedContinuation { cont in
-            let process = Process()
-            let pipe = Pipe()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            process.arguments = ["-C", path, "rev-parse", "--abbrev-ref", "HEAD"]
-            process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
-            do {
-                try process.run()
-                process.waitUntilExit()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let branch = String(data: data, encoding: .utf8)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                cont.resume(returning: (branch?.isEmpty == false) ? branch : nil)
-            } catch {
-                cont.resume(returning: nil)
-            }
-        }
     }
 }

@@ -199,6 +199,7 @@ extension WorkspaceController {
             for pane in tab.panes {
                 paneRenderers.removeValue(forKey: pane.id)
                 outputRouter.unregister(paneId: pane.id)
+                paneActivityWatcher?.paneRemoved(pane.id)
                 if let daemon = daemonAdapter {
                     Task { try? await daemon.release(paneId: pane.id) }
                 }
@@ -324,6 +325,7 @@ extension WorkspaceController {
         // Release daemon fds for all panes in this tab
         for pane in tab.panes {
             paneRenderers.removeValue(forKey: pane.id)
+            paneActivityWatcher?.paneRemoved(pane.id)
             if let daemon = daemonAdapter {
                 Task { try? await daemon.release(paneId: pane.id) }
             }
@@ -427,6 +429,7 @@ extension WorkspaceController {
         }
 
         paneRenderers.removeValue(forKey: paneToClose.id)
+        paneActivityWatcher?.paneRemoved(paneToClose.id)
         if let daemon = daemonAdapter {
             Task { try? await daemon.release(paneId: paneToClose.id) }
         }

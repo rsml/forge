@@ -87,14 +87,18 @@ struct SidebarProjectList: View {
                         projectIndex: controller.workspace.projects.firstIndex(where: { $0.id == project.id }).map { $0 + 1 } ?? 0
                     )
                     .contextMenu {
-                        Button("Rename...") { appState.startProjectRename(project) }
+                        Button("Rename Project") { appState.startProjectRename(project) }
                             .keyboardShortcut(KeyboardShortcuts.renameProject.key, modifiers: KeyboardShortcuts.renameProject.modifiers)
+                        Button("Close Project", role: .destructive) { Task { await controller.removeProject(project) } }
+                            .keyboardShortcut(KeyboardShortcuts.closeProject.key, modifiers: KeyboardShortcuts.closeProject.modifiers)
                         Divider()
+                        Button("New Project") { appState.dispatch(.showProjectPicker) }
+                            .keyboardShortcut(KeyboardShortcuts.newProject.key, modifiers: KeyboardShortcuts.newProject.modifiers)
                         Button("New Tab") { controller.addTab(in: project) }
                             .keyboardShortcut(KeyboardShortcuts.newTab.key, modifiers: KeyboardShortcuts.newTab.modifiers)
                         Divider()
-                        Button("Close Project", role: .destructive) { Task { await controller.removeProject(project) } }
-                            .keyboardShortcut(KeyboardShortcuts.closeProject.key, modifiers: KeyboardShortcuts.closeProject.modifiers)
+                        Button("Expand All Projects") { appState.dispatch(.expandAll) }
+                        Button("Collapse All Projects") { appState.dispatch(.collapseAll) }
                     }
                 } onReorder: { from, to in
                     controller.workspace.projects.move(fromOffsets: IndexSet(integer: from), toOffset: to)
@@ -107,5 +111,12 @@ struct SidebarProjectList: View {
         .simultaneousGesture(TapGesture(count: 2).onEnded {
             appState.dispatch(.showProjectPicker)
         })
+        .contextMenu {
+            Button("New Project") { appState.dispatch(.showProjectPicker) }
+                .keyboardShortcut(KeyboardShortcuts.newProject.key, modifiers: KeyboardShortcuts.newProject.modifiers)
+            Divider()
+            Button("Expand All Projects") { appState.dispatch(.expandAll) }
+            Button("Collapse All Projects") { appState.dispatch(.collapseAll) }
+        }
     }
 }

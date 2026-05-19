@@ -11,11 +11,11 @@ extension ForgeConfig.FontConfig {
 
 extension ForgeConfigStore {
     var isNativePaneRendering: Bool {
-        config.general?.nativePaneRendering ?? false
+        config.general?.nativePaneRendering ?? true
     }
 
     var isNativePTY: Bool {
-        config.general?.nativePTY ?? false
+        config.general?.nativePTY ?? true
     }
 
     var primaryFont: Font {

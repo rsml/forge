@@ -13,6 +13,10 @@ final class GhosttyRenderer: TerminalRenderer {
     nonisolated(unsafe) private var callbackContext: Unmanaged<GhosttyCallbackContext>?
     var onInput: ((Data) -> Void)?
     var onResize: ((Int, Int) -> Void)?
+    /// Fires on every chunk of PTY output bytes. Used by the native PTY
+    /// attention watcher to detect BEL and scan for content patterns.
+    /// Invoked on the main queue regardless of which thread produced the data.
+    var onOutput: ((Data) -> Void)?
     /// Debounce resize to avoid sending intermediate sizes during SwiftUI layout.
     private var pendingResize: DispatchWorkItem?
     var lastReportedSize: (cols: Int, rows: Int)?
@@ -291,6 +295,7 @@ final class GhosttyRenderer: TerminalRenderer {
                 self.appendToScrollbackLog(data)
                 DispatchQueue.main.async { [weak self] in
                     self?.feed(data)
+                    self?.onOutput?(data)
                 }
             }
         }
@@ -333,6 +338,11 @@ final class GhosttyRenderer: TerminalRenderer {
                 .fromOpaque(userdata)
                 .takeUnretainedValue()
             ctx.renderer?.appendToScrollbackLog(bytes)
+            // Hop to main for attention detection — onOutput touches @Observable
+            // pane state via PaneActivityWatcher.
+            DispatchQueue.main.async {
+                ctx.renderer?.onOutput?(bytes)
+            }
         }
         config.io_read_userdata = retained.toOpaque()
         #endif

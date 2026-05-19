@@ -48,9 +48,13 @@ private struct SplitContainer: View {
 
     private let minProportion: CGFloat = 0.05
 
-    /// Divider size matches tmux's 1-cell divider so pixel allocation is identical.
-    /// Falls back to 8px before cell size is known.
+    /// Divider hit-target size. In tmux mode it matches tmux's 1-cell divider so pixel
+    /// allocation is identical. In native PTY mode it shrinks to a flush 6px hit-area
+    /// around the 1px visible line.
     private var dividerSize: CGFloat {
+        if controller.config.isNativePTY {
+            return 6
+        }
         let cell = controller.terminalCellSize
         if direction == .horizontal {
             return cell.width > 0 ? cell.width : 8

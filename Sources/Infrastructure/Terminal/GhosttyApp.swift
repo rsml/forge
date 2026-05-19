@@ -57,7 +57,11 @@ final class GhosttyApp {
             return
         }
 
-        var lines: [String] = []
+        var lines: [String] = [
+            "window-padding-x=0",
+            "window-padding-y=0",
+            "window-padding-balance=false",
+        ]
         if let family = fontFamily {
             lines.append("font-family=\(family)")
         }
@@ -127,6 +131,9 @@ final class GhosttyApp {
             "scrollback-limit=10000",
             "cursor-style=bar",
             "input-default-bindings=false",
+            "window-padding-x=0",
+            "window-padding-y=0",
+            "window-padding-balance=false",
         ].joined(separator: "\n")
         loadConfigString(defaults, into: cfg, label: "defaults")
         ghostty_config_finalize(cfg)
