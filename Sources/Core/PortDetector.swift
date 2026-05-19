@@ -24,6 +24,14 @@ public enum PortDetector {
         pattern: #"(?i)\b(?:ready|listening|started|running|Local|url)\b[^\n]{0,40}?:(\d{4,5})\b"#,
         options: []
     )
+    /// `port 8080` / `server 8080` / `port: 8080` / `server: 8080` — keyword followed by
+    /// whitespace (optionally a colon) then a port number. Covers Python's `python -m http.server`
+    /// output ("Serving HTTP on :: port 8080") and similar.
+    /// 2-5 digit ports — the keyword anchor protects against false positives.
+    private static let portKeywordRegex = try! NSRegularExpression(
+        pattern: #"(?i)\b(?:port|server)\b\s*:?\s+(\d{2,5})\b"#,
+        options: []
+    )
 
     public static func detect(in text: String) -> [DetectedPort] {
         var seen: Set<DetectedPort> = []
@@ -43,6 +51,14 @@ public enum PortDetector {
             guard match.numberOfRanges >= 2 else { continue }
             let portStr = ns.substring(with: match.range(at: 1))
             guard let port = Int(portStr), (1024...65535).contains(port) else { continue }
+            // Loose pass assumes localhost — dev-server output rarely names a different host.
+            let p = DetectedPort(host: "localhost", port: port)
+            if seen.insert(p).inserted { result.append(p) }
+        }
+        for match in portKeywordRegex.matches(in: text, range: range) {
+            guard match.numberOfRanges >= 2 else { continue }
+            let portStr = ns.substring(with: match.range(at: 1))
+            guard let port = Int(portStr), (1...65535).contains(port) else { continue }
             // Loose pass assumes localhost — dev-server output rarely names a different host.
             let p = DetectedPort(host: "localhost", port: port)
             if seen.insert(p).inserted { result.append(p) }
