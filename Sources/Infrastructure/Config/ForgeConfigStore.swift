@@ -51,7 +51,16 @@ final class ForgeConfigStore {
     /// theme everywhere `resolvedTheme` is read — sidebar, title bar, modals,
     /// terminal. Set by the hover observer in AppDelegate; cleared on hover-out
     /// or settings pane disappear. Not persisted.
-    var previewTheme: ThemeDefinition?
+    ///
+    /// Posts `.forgeConfigChanged` on change so AppKit-bound surfaces
+    /// (TitleBarManager.syncAppearance) refresh alongside SwiftUI views.
+    /// The notification name implies "config saved", but observers treat it
+    /// as "theme-relevant state changed" — keep it that way.
+    var previewTheme: ThemeDefinition? {
+        didSet {
+            NotificationCenter.default.post(name: .forgeConfigChanged, object: nil)
+        }
+    }
 
     private let themeLoader: (String) -> ThemeDefinition?
 
