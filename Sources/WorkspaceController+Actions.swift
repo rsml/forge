@@ -34,28 +34,16 @@ extension WorkspaceController {
         if let savedWindowId = perProjectActiveTabId[project.id],
            project.tabs.contains(where: { $0.id == savedWindowId }) {
             workspace.activeTabId = savedWindowId
-            Task { await tmux.selectTab(id: savedWindowId) }
         } else if let tab = project.tabs.first(where: { $0.active }) ?? project.tabs.first {
             workspace.activeTabId = tab.id
         }
 
         saveUIState()
-        if config.isNativePTY {
-            // Native PTY: no tmux switchClient needed. Just sync renderers.
-            updateRenderers()
-        } else {
-            // switchClient must complete before updateRenderers — resize commands
-            // only work when the control mode client is attached to the correct session.
-            Task {
-                await tmux.switchClient(project: project.name)
-                updateRenderers()
-            }
-        }
+        updateRenderers()
     }
 
     func selectTab(_ tab: Tab) {
         workspace.activeTabId = tab.id
-        Task { await tmux.selectTab(id: tab.id) }
         saveUIState()
         updateRenderers()
     }
@@ -68,56 +56,12 @@ extension WorkspaceController {
         }
         workspace.activeProjectId = project.id
         workspace.activeTabId = tab.id
-        Task { await tmux.selectTab(id: tab.id) }
         saveUIState()
-        if config.isNativePTY {
-            updateRenderers()
-        } else {
-            Task {
-                await tmux.switchClient(project: project.name)
-                updateRenderers()
-            }
-        }
-    }
-
-    /// Switch tmux to a different window without updating workspace state.
-    /// Used by stack dismiss animation to pre-switch the terminal while the
-    /// snapshot flyout covers the transition.
-    func switchTerminalWindow(tabId: String) {
-        Task { await tmux.selectTab(id: tabId) }
+        updateRenderers()
     }
 
     func addProject(name: String, path: String) async {
-        if config.isNativePTY {
-            addProjectNativePTY(name: name, path: path)
-            return
-        }
-
-        let success = await tmux.newProject(name: name, path: path)
-        guard success else {
-            toastState.show(
-                title: "Failed to create project",
-                message: "Could not create tmux session \"\(name)\"",
-                icon: "exclamationmark.triangle.fill"
-            )
-            return
-        }
-        if expectingDisconnect {
-            expectingDisconnect = false
-            startControlMode()
-        }
-
-        if let adapter = tmux as? TmuxAdapter {
-            await restoreSession(name: name, path: path, adapter: adapter)
-        }
-
-        await syncEngine.refresh()
-        if let project = workspace.projects.first(where: { $0.name == name }) {
-            selectProject(project)
-            if config.isStackMode, let tab = project.tabs.first {
-                attentionManager?.promoteToFront(tab.uuid)
-            }
-        }
+        addProjectNativePTY(name: name, path: path)
     }
 
     private func addProjectNativePTY(name: String, path: String) {
@@ -232,20 +176,7 @@ extension WorkspaceController {
 
     func addTab(in project: Project) {
         ForgeLog.log("[app] Adding tab in project: \(project.name)")
-        if config.isNativePTY {
-            addTabNativePTY(in: project)
-            return
-        }
-        Task {
-            guard let windowId = await tmux.newTab(project: project.id, path: project.path) else { return }
-            await syncEngine.refresh()
-            if let tab = project.tabs.first(where: { $0.id == windowId }) {
-                selectTab(tab)
-                if config.isStackMode {
-                    attentionManager?.promoteToFront(tab.uuid)
-                }
-            }
-        }
+        addTabNativePTY(in: project)
     }
 
     private func addTabNativePTY(in project: Project) {
@@ -280,21 +211,7 @@ extension WorkspaceController {
     /// Inner removeTab path — no confirmation (caller already prompted).
     @MainActor
     private func performRemoveTab(_ tab: Tab, in project: Project) {
-        if config.isNativePTY {
-            removeTabNativePTY(tab, in: project)
-            return
-        }
-        let neighborTab: Tab? = {
-            guard let index = project.tabs.firstIndex(where: { $0.id == tab.id }) else { return nil }
-            let nextIndex = index > 0 ? index - 1 : min(index + 1, project.tabs.count - 1)
-            guard nextIndex != index, nextIndex < project.tabs.count else { return nil }
-            return project.tabs[nextIndex]
-        }()
-        Task {
-            await tmux.killTab(id: tab.id)
-            await syncEngine.refresh()
-            if let neighborTab { selectTab(neighborTab) }
-        }
+        removeTabNativePTY(tab, in: project)
     }
 
     /// Project close path that skips re-prompting (caller already confirmed via
@@ -302,22 +219,7 @@ extension WorkspaceController {
     @MainActor
     private func removeProjectAfterConfirm(_ project: Project) async {
         ForgeLog.log("[app] Removing project: \(project.name) (post-confirm)")
-        if config.isNativePTY {
-            removeProjectNativePTY(project)
-            return
-        }
-        expectingDisconnect = true
-        if let path = project.path,
-           let snapshot = await (tmux as? TmuxAdapter)?.captureSessionSnapshot(project: project.name, path: path) {
-            SessionSnapshotStore.save(snapshot)
-        }
-        if let index = workspace.projects.firstIndex(where: { $0.id == project.id }) {
-            let nextIndex = index > 0 ? index - 1 : min(1, workspace.projects.count - 1)
-            if nextIndex != index {
-                selectProject(workspace.projects[nextIndex])
-            }
-        }
-        Task { await tmux.killProject(name: project.name) }
+        removeProjectNativePTY(project)
     }
 
     private func removeTabNativePTY(_ tab: Tab, in project: Project?) {
@@ -351,24 +253,16 @@ extension WorkspaceController {
 
     func renameProject(_ project: Project, to name: String) {
         ForgeLog.log("[app] Renaming project: \(project.name) → \(name)")
-        if config.isNativePTY {
-            project.name = name
-            let frame = NSApp.mainWindow?.frame
-            WorkspacePersistence.save(workspace: workspace, windowFrame: frame)
-        } else {
-            Task { await tmux.renameProject(target: project.name, newName: name) }
-        }
+        project.name = name
+        let frame = NSApp.mainWindow?.frame
+        WorkspacePersistence.save(workspace: workspace, windowFrame: frame)
     }
 
     func renameTab(_ tab: Tab, to name: String) {
         ForgeLog.log("[app] Renaming tab: \(tab.name) → \(name)")
-        if config.isNativePTY {
-            tab.name = name
-            let frame = NSApp.mainWindow?.frame
-            WorkspacePersistence.save(workspace: workspace, windowFrame: frame)
-        } else {
-            Task { await tmux.renameTab(id: tab.id, newName: name) }
-        }
+        tab.name = name
+        let frame = NSApp.mainWindow?.frame
+        WorkspacePersistence.save(workspace: workspace, windowFrame: frame)
     }
 
     func closeCurrentPane() {
