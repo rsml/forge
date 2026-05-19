@@ -47,6 +47,12 @@ final class ForgeConfigStore {
     /// Stack mode vs list mode for the sidebar project view.
     var isStackMode: Bool = false
 
+    /// Transient hover-preview theme. When non-nil, shadows the config-resolved
+    /// theme everywhere `resolvedTheme` is read — sidebar, title bar, modals,
+    /// terminal. Set by the hover observer in AppDelegate; cleared on hover-out
+    /// or settings pane disappear. Not persisted.
+    var previewTheme: ThemeDefinition?
+
     private let themeLoader: (String) -> ThemeDefinition?
 
     init(themeLoader: @escaping (String) -> ThemeDefinition?) {
@@ -65,6 +71,7 @@ final class ForgeConfigStore {
 
     private var _resolvedTheme: ThemeDefinition??  // nil = not loaded, .some(nil) = no theme
     var resolvedTheme: ThemeDefinition? {
+        if let preview = previewTheme { return preview }
         if let cached = _resolvedTheme { return cached }
         let result = resolveThemeFromConfig()
         _resolvedTheme = .some(result)
