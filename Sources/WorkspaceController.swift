@@ -150,6 +150,7 @@ final class WorkspaceController {
                     if let result = try? await daemon.retrieve(paneId: pane.id) {
                         guard let ghosttyApp else { continue }
                         let renderer = GhosttyRenderer(ghosttyApp: ghosttyApp, fd: result.fd)
+                        renderer.diagnosticPaneId = pane.id
                         renderer.configureForReconnect(paneId: pane.id, pid: result.pid)
                         let paneId = pane.id
                         renderer.nsView.onFocusGained = { [weak self] in

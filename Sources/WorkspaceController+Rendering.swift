@@ -8,6 +8,7 @@ extension WorkspaceController {
     func createExecRenderer(for pane: Pane, cwd: String) -> any TerminalRenderer {
         guard let ghosttyApp else { fatalError("createExecRenderer requires ghosttyApp") }
         let renderer = GhosttyRenderer(ghosttyApp: ghosttyApp, cwd: cwd)
+        renderer.diagnosticPaneId = pane.id
         let paneId = pane.id
         renderer.nsView.onFocusGained = { [weak self] in
             self?.lastFocusedPaneId = paneId
@@ -93,6 +94,7 @@ extension WorkspaceController {
                     if let result = try? await daemon.retrieve(paneId: paneId) {
                         guard let ghosttyApp else { continue }
                         let renderer = GhosttyRenderer(ghosttyApp: ghosttyApp, fd: result.fd)
+                        renderer.diagnosticPaneId = paneId
                         let pid = result.pid
                         await MainActor.run {
                             guard paneRenderers[paneId] == nil else { return }

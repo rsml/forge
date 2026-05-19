@@ -147,7 +147,18 @@ final class DebugServer {
             return bodyStr.isEmpty ? nil : bodyStr
         }()
 
-        switch (method, path) {
+        // Strip query string for routing — preserve for handlers via `query`.
+        let pathOnly: String
+        let query: String
+        if let qIdx = path.firstIndex(of: "?") {
+            pathOnly = String(path[..<qIdx])
+            query = String(path[path.index(after: qIdx)...])
+        } else {
+            pathOnly = path
+            query = ""
+        }
+
+        switch (method, pathOnly) {
         case ("GET", "/ping"):
             return jsonResponse(["status": "ok", "app": "Forge"])
 
@@ -170,7 +181,17 @@ final class DebugServer {
             return logsResponse()
 
         default:
-            return jsonResponse(["error": "Not found", "path": path], status: "404 Not Found")
+            // Diagnostic routes: /surface-text/<paneId>, /pty-tail/<paneId>
+            if method == "GET", pathOnly.hasPrefix("/surface-text/") {
+                let paneId = String(pathOnly.dropFirst("/surface-text/".count))
+                return surfaceTextResponse(paneId: paneId)
+            }
+            if method == "GET", pathOnly.hasPrefix("/pty-tail/") {
+                let paneId = String(pathOnly.dropFirst("/pty-tail/".count))
+                let bytes = parseQueryParam(query, name: "bytes").flatMap(Int.init) ?? 4096
+                return ptyTailResponse(paneId: paneId, bytes: bytes)
+            }
+            return jsonResponse(["error": "Not found", "path": pathOnly], status: "404 Not Found")
         }
     }
 
