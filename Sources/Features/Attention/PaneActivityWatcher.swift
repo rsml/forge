@@ -64,8 +64,11 @@ final class PaneActivityWatcher {
     /// the caller (Ghostty's I/O thread or the EXTERNAL_FD read thread) hops
     /// to main via DispatchQueue before invoking the renderer's onOutput.
     func processOutput(paneId: String, data: Data) {
-        // BEL detection — fire once per data chunk that contains 0x07.
-        if data.contains(0x07), let found = workspace.findTab(byPaneId: paneId) {
+        // BEL detection — fire only on standalone 0x07, ignoring BELs that are
+        // OSC string terminators (e.g. OSC 133 semantic-prompt markers emitted
+        // by zsh on every prompt redraw, which are not user-facing alerts).
+        if BellDetector.containsStandaloneBell(data),
+           let found = workspace.findTab(byPaneId: paneId) {
             for pane in found.tab.panes { pane.terminalState?.hasBell = true }
             onEvent?(.bell(tabUUID: found.tab.uuid))
         }
