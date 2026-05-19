@@ -122,4 +122,15 @@ public final class Pane: Identifiable {
         p.content = .browser(BrowserState(url: url))
         return p
     }
+
+    /// Applies a daemon-reported activity snapshot. Writes `currentCommand` and
+    /// re-derives `status` so `needsAttention` reflects whether the foreground
+    /// process is a user-facing program vs an idle shell.
+    public func apply(activity: PaneActivity) {
+        guard let ts = terminalState else { return }
+        let newCmd = activity.command ?? ""
+        guard ts.currentCommand != newCmd else { return }
+        ts.currentCommand = newCmd
+        ts.status = PaneStatus.from(command: newCmd)
+    }
 }

@@ -110,6 +110,14 @@ final class PaneActivityWatcher {
         for result in results {
             let wasActive = lastActiveState[result.paneId] ?? false
             lastActiveState[result.paneId] = result.isActive
+
+            // Keep model in sync with daemon's view of the foreground process.
+            // Without this, currentCommand stays "" forever → status stays .idle
+            // → needsAttention stays true regardless of what's actually running.
+            if let found = workspace.findPane(byId: result.paneId) {
+                found.pane.apply(activity: result)
+            }
+
             // Transition active → inactive = user's long-running command finished.
             if wasActive && !result.isActive {
                 if let found = workspace.findTab(byPaneId: result.paneId) {
