@@ -57,8 +57,12 @@ struct StackView: View {
         }
         .onChange(of: attention.currentTabUUID) { _, newUUID in
             if let uuid = newUUID,
-               let (_, tab) = controller.workspace.findTab(byUUID: uuid) {
-                controller.selectTab(tab)
+               let (project, tab) = controller.workspace.findTab(byUUID: uuid) {
+                if project.id == controller.workspace.activeProjectId {
+                    controller.selectTab(tab)
+                } else {
+                    controller.navigateToTab(tab, in: project)
+                }
             }
         }
         .toolbar(.hidden, for: .automatic)
