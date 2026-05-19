@@ -150,6 +150,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.applyGhosttyTheme() }
         }
+        // Hover observers only mutate previewTheme. Its didSet posts
+        // .forgeConfigChanged, which the observer above turns into an
+        // applyGhosttyTheme() call — single dispatch path.
         NotificationCenter.default.addObserver(
             forName: .forgeThemeHoverPreview, object: nil, queue: .main
         ) { [weak self] note in
@@ -159,7 +162,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                       let id = themeId,
                       let theme = ThemeParser.loadTheme(id: id) else { return }
                 self.configStore.previewTheme = theme
-                self.applyGhosttyTheme()
             }
         }
         NotificationCenter.default.addObserver(
@@ -167,7 +169,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.configStore.previewTheme = nil
-                self?.applyGhosttyTheme()
             }
         }
     }
