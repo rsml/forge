@@ -142,7 +142,6 @@ extension WorkspaceController {
         for tab in project.tabs {
             for pane in tab.panes {
                 paneRenderers.removeValue(forKey: pane.id)
-                outputRouter.unregister(paneId: pane.id)
                 paneActivityWatcher?.paneRemoved(pane.id)
                 if let daemon = daemonAdapter {
                     Task { try? await daemon.release(paneId: pane.id) }
@@ -278,27 +277,19 @@ extension WorkspaceController {
               let tab = project.tabs.first(where: { $0.id == tabId })
         else { return }
 
-        // Pick the active/focused pane — tmux uses the model flag, native PTY
-        // uses lastFocusedPaneId set on focus gain.
+        // Pick the focused pane — set by GhosttyNSView.onFocusGained.
         let activePane: Pane? = {
-            if config.isNativePTY {
-                if let focusedId = lastFocusedPaneId,
-                   let p = tab.panes.first(where: { $0.id == focusedId }) {
-                    return p
-                }
-                return tab.panes.last
+            if let focusedId = lastFocusedPaneId,
+               let p = tab.panes.first(where: { $0.id == focusedId }) {
+                return p
             }
-            return tab.panes.first(where: { $0.active }) ?? tab.panes.first
+            return tab.panes.last
         }()
         guard let pane = activePane else { return }
 
         guard await confirmClose(target: .pane(id: pane.id)) else { return }
 
-        if config.isNativePTY {
-            performClosePaneNativePTY(paneId: pane.id, in: tab, project: project)
-        } else {
-            Task { await tmux.killPane(id: pane.id) }
-        }
+        performClosePaneNativePTY(paneId: pane.id, in: tab, project: project)
     }
 
     /// Pane-close worker for native PTY. No confirmation (caller already prompted).
@@ -385,21 +376,31 @@ extension WorkspaceController {
             }
         }
 
-        Task { await tmux.moveTab(id: tab.id, toSession: target.name) }
+        source.tabs.removeAll { $0.id == tab.id }
+        tab.projectId = target.id
+        tab.index = target.tabs.count
+        target.tabs.append(tab)
+        let frame = NSApp.mainWindow?.frame
+        WorkspacePersistence.save(workspace: workspace, windowFrame: frame)
     }
 
     func clearScrollback() {
-        guard let paneId = workspace.activePaneId else { return }
-        Task { await tmux.clearHistory(pane: paneId) }
+        guard let paneId = workspace.activePaneId,
+              let renderer = paneRenderers[paneId] as? GhosttyRenderer
+        else { return }
+        // Feed CSI 3 J (erase saved lines / scrollback), CSI 2 J (erase display),
+        // CSI H (cursor home). Ghostty's emulator processes these as if they
+        // arrived from the PTY — gives the user a clear screen + cleared
+        // scrollback buffer.
+        renderer.feed(Data([
+            0x1B, 0x5B, 0x33, 0x4A,
+            0x1B, 0x5B, 0x32, 0x4A,
+            0x1B, 0x5B, 0x48,
+        ]))
     }
 
     func splitPane(direction: SplitDirection) {
-        if config.isNativePTY {
-            splitPaneNativePTY(direction: direction)
-            return
-        }
-        guard let tabId = workspace.activeTabId else { return }
-        Task { await tmux.splitWindow(id: tabId, direction: direction) }
+        splitPaneNativePTY(direction: direction)
     }
 
     private func splitPaneNativePTY(direction: SplitDirection) {
@@ -472,15 +473,9 @@ extension WorkspaceController {
 
     func reorderTab(in project: Project, from: Int, to: Int) {
         guard from >= 0, from < project.tabs.count else { return }
-        let tab = project.tabs[from]
-
-        let ids = project.tabs.map(\.id)
-        let targets = TabReordering.swapTargets(fromIndex: from, toIndex: to, ids: ids)
-
         project.tabs.move(fromOffsets: IndexSet(integer: from), toOffset: to)
-
-        guard !targets.isEmpty else { return }
-        Task { await tmux.reorderTab(id: tab.id, swapWith: targets) }
+        let frame = NSApp.mainWindow?.frame
+        WorkspacePersistence.save(workspace: workspace, windowFrame: frame)
     }
 
     func swapTab(offset: Int) {
@@ -491,7 +486,8 @@ extension WorkspaceController {
         let toIndex = fromIndex + offset
         guard toIndex >= 0, toIndex < project.tabs.count else { return }
         project.tabs.swapAt(fromIndex, toIndex)
-        Task { await tmux.swapTab(id: tabId, offset: offset) }
+        let frame = NSApp.mainWindow?.frame
+        WorkspacePersistence.save(workspace: workspace, windowFrame: frame)
     }
 
     func swapProject(offset: Int) {
@@ -548,79 +544,5 @@ extension WorkspaceController {
             pane.hasBell = false
             pane.hasContentMatch = false
         }
-        Task { await tmux.clearBellFlag(tabId: tab.id) }
-    }
-
-    // MARK: - Session Restore
-
-    private func restoreSession(name: String, path: String, adapter: TmuxAdapter) async {
-        let canonical = URL(fileURLWithPath: path).standardized.path
-        guard let snapshot = SessionSnapshotStore.load(path: canonical),
-              !snapshot.tabs.isEmpty else { return }
-
-        ForgeLog.log("[app] Restoring \(snapshot.tabs.count) tabs for \(name)")
-
-        for (i, tab) in snapshot.tabs.enumerated() {
-            let windowTarget: String
-            if i == 0 {
-                await adapter.renameWindow(target: "\(name):0", name: tab.name)
-                windowTarget = "\(name):0"
-            } else {
-                let firstDir = tab.panes.first?.directory ?? path
-                guard let windowId = await adapter.restoreTab(session: name, name: tab.name, directory: firstDir) else {
-                    ForgeLog.log("[app] Failed to restore tab \(tab.name)")
-                    continue
-                }
-                windowTarget = windowId
-            }
-
-            if tab.panes.count > 1, let layout = tab.layout {
-                let tree = LayoutParser.parse(layout)
-                let existingPaneIds = await adapter.listPaneIds(window: windowTarget)
-                guard let firstPaneId = existingPaneIds.first else { continue }
-
-                var leafPaneIds: [String] = []
-                await collectLeafPanes(tree: tree, adapter: adapter, currentPaneId: firstPaneId, leafPaneIds: &leafPaneIds)
-
-                await adapter.applyLayout(windowId: windowTarget, layout: layout)
-
-                for (j, pane) in tab.panes.enumerated() where j < leafPaneIds.count {
-                    if pane.directory != path {
-                        await adapter.sendKeys(paneId: leafPaneIds[j], keys: "cd \(quoteForShell(pane.directory))")
-                    }
-                }
-            } else if let pane = tab.panes.first, i == 0, pane.directory != path {
-                if let paneId = (await adapter.listPaneIds(window: windowTarget)).first {
-                    await adapter.sendKeys(paneId: paneId, keys: "cd \(quoteForShell(pane.directory))")
-                }
-            }
-        }
-
-        SessionSnapshotStore.delete(path: canonical)
-        ForgeLog.log("[app] Restored session snapshot for \(name)")
-    }
-
-    private func collectLeafPanes(
-        tree: SplitNode, adapter: TmuxAdapter,
-        currentPaneId: String, leafPaneIds: inout [String]
-    ) async {
-        switch tree {
-        case .leaf:
-            leafPaneIds.append(currentPaneId)
-        case .split(let direction, let children, _):
-            var childPaneIds = [currentPaneId]
-            for _ in children.dropFirst() {
-                if let newId = await adapter.restoreSplit(targetPane: currentPaneId, direction: direction) {
-                    childPaneIds.append(newId)
-                }
-            }
-            for (i, child) in children.enumerated() where i < childPaneIds.count {
-                await collectLeafPanes(tree: child, adapter: adapter, currentPaneId: childPaneIds[i], leafPaneIds: &leafPaneIds)
-            }
-        }
-    }
-
-    private func quoteForShell(_ s: String) -> String {
-        "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }
