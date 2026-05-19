@@ -85,33 +85,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if configStore.isNativePaneRendering || configStore.isNativePTY {
             let ga = GhosttyApp()
-            // Apply Forge's font and theme to ghostty
-            let fontFamily = configStore.config.terminalFont?.family
-                ?? configStore.config.terminal?.fontFamily
-                ?? configStore.config.appearance?.fontFamily
-            let fontSize = configStore.config.terminalFont?.size
-                ?? configStore.config.terminal?.fontSize
-                ?? configStore.config.appearance?.fontSize ?? 13
-            var fgHex: String?
-            var bgHex: String?
-            if let theme = configStore.resolvedTheme {
-                fgHex = String(format: "#%02x%02x%02x",
-                    Int(theme.foreground.red * 255),
-                    Int(theme.foreground.green * 255),
-                    Int(theme.foreground.blue * 255))
-                bgHex = String(format: "#%02x%02x%02x",
-                    Int(theme.background.red * 255),
-                    Int(theme.background.green * 255),
-                    Int(theme.background.blue * 255))
-            }
-            var ansiHex: [String]?
-            if let theme = configStore.resolvedTheme {
-                ansiHex = theme.ansiColors.prefix(16).map { c in
-                    String(format: "#%02x%02x%02x", Int(c.red * 255), Int(c.green * 255), Int(c.blue * 255))
-                }
-            }
-            ga.applyConfig(fontFamily: fontFamily, fontSize: fontSize, foreground: fgHex, background: bgHex, ansiColors: ansiHex)
             ghosttyApp = ga
+            applyGhosttyTheme()
         }
         controller.ghosttyApp = ghosttyApp
         if configStore.isNativePTY, let ga = ghosttyApp {
@@ -172,6 +147,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
             MainActor.assumeIsolated { self?.titleBarManager?.syncAppearance() }
         }
+        NotificationCenter.default.addObserver(
+            forName: .forgeConfigChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyGhosttyTheme() }
+        }
+    }
+
+    private func applyGhosttyTheme(overrideTheme: ThemeDefinition? = nil) {
+        guard let ga = ghosttyApp else { return }
+        let fontFamily = configStore.config.terminalFont?.family
+            ?? configStore.config.terminal?.fontFamily
+            ?? configStore.config.appearance?.fontFamily
+        let fontSize = configStore.config.terminalFont?.size
+            ?? configStore.config.terminal?.fontSize
+            ?? configStore.config.appearance?.fontSize ?? 13
+        let theme = overrideTheme ?? configStore.resolvedTheme
+        var fgHex: String?
+        var bgHex: String?
+        var ansiHex: [String]?
+        if let theme {
+            fgHex = String(format: "#%02x%02x%02x",
+                Int(theme.foreground.red * 255),
+                Int(theme.foreground.green * 255),
+                Int(theme.foreground.blue * 255))
+            bgHex = String(format: "#%02x%02x%02x",
+                Int(theme.background.red * 255),
+                Int(theme.background.green * 255),
+                Int(theme.background.blue * 255))
+            ansiHex = theme.ansiColors.prefix(16).map { c in
+                String(format: "#%02x%02x%02x", Int(c.red * 255), Int(c.green * 255), Int(c.blue * 255))
+            }
+        }
+        ga.applyConfig(fontFamily: fontFamily, fontSize: fontSize,
+                       foreground: fgHex, background: bgHex, ansiColors: ansiHex)
     }
 
     private func createMainWindow() {
