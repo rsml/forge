@@ -92,6 +92,19 @@ final class GhosttyRenderer: TerminalRenderer {
     /// Public accessor for surface pointer (used by findPaneBySurface).
     var surfaceHandle: ghostty_surface_t? { surface }
 
+    /// Write raw bytes to the pane's input. Used by the debug server for
+    /// automated testing — equivalent to the user typing.
+    func sendInput(_ data: Data) {
+        data.withUnsafeBytes { buf in
+            guard let ptr = buf.baseAddress else { return }
+            if externalFD >= 0 {
+                _ = Darwin.write(externalFD, ptr, buf.count)
+            } else if let surface {
+                ghostty_surface_text(surface, ptr.assumingMemoryBound(to: CChar.self), UInt(buf.count))
+            }
+        }
+    }
+
     /// PTY master fd for EXEC mode surfaces. -1 if unavailable.
     /// Used by DaemonAdapter to send fd for persistence.
     var ptyFD: Int32 {

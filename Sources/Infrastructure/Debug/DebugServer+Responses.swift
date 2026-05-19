@@ -156,6 +156,47 @@ extension DebugServer {
             ctrl.splitPane(direction: dir)
             return jsonResponse(["ok": true])
 
+        case "sendKeys":
+            guard let paneId = args["paneId"] as? String else {
+                return jsonResponse(["error": "Missing paneId"], status: "400 Bad Request")
+            }
+            guard let renderer = ctrl.paneRenderers[paneId] as? GhosttyRenderer else {
+                return jsonResponse(["error": "No renderer for pane"], status: "404 Not Found")
+            }
+            let bytes: Data
+            if let text = args["text"] as? String {
+                bytes = Data(text.utf8)
+            } else if let hex = args["hex"] as? String {
+                bytes = Data(hex.split(separator: " ").compactMap { UInt8($0, radix: 16) })
+            } else {
+                return jsonResponse(["error": "Provide text or hex"], status: "400 Bad Request")
+            }
+            renderer.sendInput(bytes)
+            return jsonResponse(["ok": true, "bytes": bytes.count])
+
+        case "stackDismiss":
+            let mode = args["mode"] as? String ?? "done"
+            let dismissAction: WorkspaceController.StackDismissAction
+            switch mode {
+            case "done":       dismissAction = .done
+            case "hide":       dismissAction = .hide
+            case "moveToBack": dismissAction = .moveToBack
+            default:
+                return jsonResponse(["error": "mode must be done|hide|moveToBack"], status: "400 Bad Request")
+            }
+            ctrl.stackDismiss(dismissAction)
+            return jsonResponse(["ok": true, "mode": mode])
+
+        case "setMode":
+            let mode = args["mode"] as? String ?? ""
+            switch mode {
+            case "stack": ctrl.config.isStackMode = true
+            case "list":  ctrl.config.isStackMode = false
+            default:
+                return jsonResponse(["error": "mode must be stack|list"], status: "400 Bad Request")
+            }
+            return jsonResponse(["ok": true, "mode": mode])
+
         default:
             return jsonResponse(["error": "Unknown action: \(action)"], status: "400 Bad Request")
         }
