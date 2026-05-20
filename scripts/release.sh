@@ -7,14 +7,16 @@ set -euo pipefail
 #
 # Required env vars (loaded from .env if present):
 #   APPLE_APP_SPECIFIC_PASSWORD    App-specific password from appleid.apple.com
-#   SIGNING_IDENTITY               e.g. "Developer ID Application: Name (TEAMID)"
 #
-# APPLE_ID and APPLE_TEAM_ID are hardcoded below — neither is secret
-# (the team ID is stamped on every signed binary, and the Apple ID is
-# just a login username).
+# APPLE_ID, APPLE_TEAM_ID, and SIGNING_IDENTITY are hardcoded below —
+# none are secret. The team ID is stamped on every signed binary, the
+# Apple ID is just a login username, and the signing identity is a
+# Keychain certificate name (the actual cert + private key live in the
+# local Keychain, gated by macOS).
 
 export APPLE_ID="admin@serendipityapps.com"
 export APPLE_TEAM_ID="9CD626Q2L2"
+export SIGNING_IDENTITY="Developer ID Application: Serendipity Apps LLC (TN) (9CD626Q2L2)"
 
 if [ -f .env ]; then
   set -a
@@ -24,7 +26,6 @@ if [ -f .env ]; then
 fi
 
 : "${APPLE_APP_SPECIFIC_PASSWORD:?Set APPLE_APP_SPECIFIC_PASSWORD in .env or environment}"
-: "${SIGNING_IDENTITY:?Set SIGNING_IDENTITY in .env or environment}"
 
 PLIST="Resources/Info.plist"
 ENTITLEMENTS="Resources/Forge.entitlements"

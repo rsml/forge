@@ -228,7 +228,7 @@ make release-minor     # bump-minor + release
 make release-major     # bump-major + release
 ```
 
-`APPLE_ID` and `APPLE_TEAM_ID` are hardcoded in `scripts/release.sh` (`admin@serendipityapps.com` / `9CD626Q2L2` — same Apple Developer team as the `tutor` repo). Neither is secret. Only `APPLE_APP_SPECIFIC_PASSWORD` and `SIGNING_IDENTITY` live in `.env` (gitignored) — see `.env.example`. `SIGNING_IDENTITY` is `Developer ID Application: Serendipity Apps LLC (TN) (9CD626Q2L2)`.
+`APPLE_ID`, `APPLE_TEAM_ID`, and `SIGNING_IDENTITY` are hardcoded in `scripts/release.sh` (`admin@serendipityapps.com` / `9CD626Q2L2` / `Developer ID Application: Serendipity Apps LLC (TN) (9CD626Q2L2)` — same Apple Developer team as the `tutor` repo). None are secret. Only `APPLE_APP_SPECIFIC_PASSWORD` lives in `.env` (gitignored) — see `.env.example`.
 
 ### Commit Conventions
 
