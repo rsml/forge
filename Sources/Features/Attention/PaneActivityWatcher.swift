@@ -1,12 +1,8 @@
 import Foundation
 import ForgeCore
 
-/// Watches PTY output and foreground-process activity in native PTY mode and
-/// emits AttentionEvents. The tmux equivalent of this lives in TmuxSyncEngine
-/// (bell detection from control-mode events, content scanning during the
-/// refresh cycle, silence/activity tracking). Native PTY has no refresh
-/// cycle — output flows continuously through Ghostty surfaces — so detection
-/// is event-driven instead.
+/// Watches PTY output and foreground-process activity and emits AttentionEvents.
+/// Output flows continuously through Ghostty surfaces, so detection is event-driven.
 ///
 /// Three sources:
 /// - `processOutput(paneId:data:)`: PTY output bytes from GhosttyRenderer's
@@ -16,7 +12,7 @@ import ForgeCore
 ///   active→inactive transition, emits a commandCompleted event (the user's
 ///   long-running command finished and the shell is back).
 ///
-/// Mutates `pane.terminalState.hasBell` / `pane.terminalState.hasContentMatch` to mirror tmux behavior so
+/// Mutates `pane.terminalState.hasBell` / `pane.terminalState.hasContentMatch` so
 /// the sidebar dots show up; downstream wiring (AttentionManager,
 /// notification dispatch) is the caller's responsibility via `onEvent`.
 @MainActor

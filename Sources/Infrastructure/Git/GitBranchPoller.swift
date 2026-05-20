@@ -3,10 +3,7 @@ import Observation
 import ForgeCore
 
 /// Polls `git rev-parse --abbrev-ref HEAD` for the active project and
-/// publishes the result to title-bar consumers. Lifecycle is independent
-/// of tmux — the previous home for this logic was TmuxSyncEngine, but
-/// branch tracking has no tmux dependency and continues to work under
-/// native PTY.
+/// publishes the result to title-bar consumers.
 ///
 /// Posts `forgeWindowTitleChanged` whenever the resolved branch changes.
 @Observable
@@ -21,9 +18,6 @@ final class GitBranchPoller {
         self.workspace = workspace
         pollTask?.cancel()
         pollTask = Task { [weak self] in
-            // Cadence matches the historical TmuxSyncEngine refresh interval
-            // so behavior is indistinguishable between modes. git rev-parse
-            // is local and inexpensive.
             await self?.refresh()
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(5))

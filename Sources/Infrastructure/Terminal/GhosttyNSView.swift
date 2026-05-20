@@ -125,11 +125,11 @@ final class GhosttyNSView: NSView {
     //
     // We bypass ghostty's key encoder (ghostty_surface_key) entirely.
     // Ghostty uses Kitty keyboard protocol which encodes Ctrl+C as ESC[3;5u —
-    // tmux's shell doesn't expect that. Instead, we convert NSEvent → raw
-    // terminal bytes and send directly to tmux via onKeyInput.
+    // the shell doesn't expect that. Instead, we convert NSEvent → raw
+    // terminal bytes and send directly to the PTY via onKeyInput.
 
     /// Callback for raw terminal bytes from keyboard input.
-    /// Wired by GhosttyRenderer to send to tmux via send-keys -H.
+    /// Wired by GhosttyRenderer to write directly to the PTY.
     var onKeyInput: ((Data) -> Void)?
 
     /// Callback for raw bytes that must reach the PTY uninterpreted.

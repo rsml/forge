@@ -56,4 +56,30 @@ restart:
 logs:
 	tail -f /tmp/forge.log
 
-.PHONY: icon ghosttykit prerequisites run dev bundle build clean test restart logs
+# ---- Release ----------------------------------------------------------------
+# `make release` builds, signs with Developer ID, notarizes, and publishes.
+# Requires Apple credentials in .env (see .env.example).
+#
+# `make bump-{patch,minor,major}` increments the version in Info.plist.
+# `make release-{patch,minor,major}` does both in one step.
+
+bump-patch:
+	@scripts/bump-version.sh patch
+
+bump-minor:
+	@scripts/bump-version.sh minor
+
+bump-major:
+	@scripts/bump-version.sh major
+
+release: prerequisites
+	@scripts/release.sh
+
+release-patch: bump-patch release
+
+release-minor: bump-minor release
+
+release-major: bump-major release
+
+.PHONY: icon ghosttykit prerequisites run dev bundle build clean test restart logs \
+	bump-patch bump-minor bump-major release release-patch release-minor release-major

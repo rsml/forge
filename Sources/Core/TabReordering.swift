@@ -1,5 +1,5 @@
 /// Pure index math for computing tab reorder swap targets.
-/// No framework imports — fully testable without tmux.
+/// No framework imports — fully testable in isolation.
 public enum TabReordering {
 
     /// Compute the ordered list of tab IDs to swap with when moving a tab

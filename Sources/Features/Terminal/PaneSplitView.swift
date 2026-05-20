@@ -34,7 +34,7 @@ struct PaneSplitView: View {
             SplitContainer(
                 direction: direction,
                 children: children,
-                tmuxProportions: proportions,
+                initialProportions: proportions,
                 panes: panes,
                 renderers: renderers
             )
@@ -45,13 +45,13 @@ struct PaneSplitView: View {
 // MARK: - SplitContainer
 
 /// Lays out child split nodes with draggable dividers between them.
-/// Proportions are initialized from the tmux layout string and updated
-/// locally during drag. After drag ends, the next tmux refresh overwrites
-/// proportions with the authoritative layout dimensions.
+/// Proportions are initialized from the SplitNode tree and updated locally
+/// during drag. On drag end, the new proportions are written back into the
+/// Tab's split tree so they persist to workspace.json.
 private struct SplitContainer: View {
     let direction: SplitDirection
     let children: [SplitNode]
-    let tmuxProportions: [CGFloat]
+    let initialProportions: [CGFloat]
     let panes: ArraySlice<Pane>
     let renderers: [String: any PaneRenderer]
     @Environment(WorkspaceController.self) private var controller
@@ -64,14 +64,14 @@ private struct SplitContainer: View {
     /// Divider hit-target size — flush 6px hit-area around the 1px visible line.
     private var dividerSize: CGFloat { 6 }
 
-    init(direction: SplitDirection, children: [SplitNode], tmuxProportions: [CGFloat],
+    init(direction: SplitDirection, children: [SplitNode], initialProportions: [CGFloat],
          panes: ArraySlice<Pane>, renderers: [String: any PaneRenderer]) {
         self.direction = direction
         self.children = children
-        self.tmuxProportions = tmuxProportions
+        self.initialProportions = initialProportions
         self.panes = panes
         self.renderers = renderers
-        self._proportions = State(initialValue: tmuxProportions)
+        self._proportions = State(initialValue: initialProportions)
     }
 
     var body: some View {
@@ -112,11 +112,9 @@ private struct SplitContainer: View {
                 }
             }
         }
-        // No onChange: local proportions are authoritative.
-        // tmux is told to match via resize-pane, but its layout response
-        // (which rounds to cell boundaries) never overwrites local state.
-        // Proportions reinitialize from tmux only when the tree structure
-        // changes (pane added/removed), which recreates this view.
+        // Local proportions are authoritative. The view is recreated (and
+        // proportions reinitialize from the SplitNode tree) only when the
+        // tree structure changes — i.e. a pane is added or removed.
     }
 
     // MARK: - Drag Handling

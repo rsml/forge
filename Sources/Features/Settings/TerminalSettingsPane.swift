@@ -37,43 +37,6 @@ struct TerminalSettingsPane: View {
                     }
                 }
                 .padding(.vertical, -4)
-
-                Toggle("Use tmux for project persistence", isOn: Binding(
-                    get: { store.config.terminal?.useTmuxPersistence ?? true },
-                    set: { newValue in
-                        store.update {
-                            if $0.terminal == nil { $0.terminal = ForgeConfig.TerminalSettings() }
-                            $0.terminal!.useTmuxPersistence = newValue
-                        }
-                    }
-                ))
-                .padding(.vertical, -4)
-            }
-
-            Section("tmux Configuration") {
-                TextEditor(text: Binding(
-                    get: { store.config.terminal?.tmuxConfigOverride ?? Self.defaultTmuxConfig },
-                    set: { newValue in
-                        store.update {
-                            if $0.terminal == nil { $0.terminal = ForgeConfig.TerminalSettings() }
-                            $0.terminal!.tmuxConfigOverride = newValue
-                        }
-                    }
-                ))
-                .font(.system(.body, design: .monospaced))
-                .frame(height: 80)
-                .scrollContentBackground(.hidden)
-                .padding(4)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                HStack {
-                    Spacer()
-                    Button("Reset to Defaults") {
-                        store.update { $0.terminal?.tmuxConfigOverride = nil }
-                    }
-                    .foregroundStyle(.red)
-                }
             }
         }
         .formStyle(.grouped)
@@ -91,10 +54,4 @@ struct TerminalSettingsPane: View {
             $0.terminal!.scrollbackLines = value
         }
     }
-
-    static let defaultTmuxConfig = """
-    set -g status off
-    set -g mouse on
-    set -g default-terminal "xterm-256color"
-    """
 }

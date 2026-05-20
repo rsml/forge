@@ -1,6 +1,6 @@
 # 0004: Eventual Consistency for Tmux Commands
 
-**Status:** accepted
+**Status:** superseded — tmux integration has been removed; Forge now uses libghostty + a `forged` PTY-fd daemon. Retained as historical record.
 **Date:** 2026-05-06
 
 ## Context

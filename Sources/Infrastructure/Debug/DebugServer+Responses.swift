@@ -288,7 +288,7 @@ extension DebugServer {
             }
             var entry: [String: Any] = [
                 "paneId": pane.id,
-                "tmux": [
+                "terminalState": [
                     "cols": ts.width,
                     "rows": ts.height
                 ]
@@ -349,8 +349,8 @@ extension DebugServer {
         // Summary: are all panes matched?
         let mismatches = paneEntries.filter { ($0["mismatch"] as? Bool) == true }
         result["summary"] = mismatches.isEmpty
-            ? "ok — all renderer grids match tmux pane dimensions"
-            : "\(mismatches.count) pane(s) have renderer/tmux dimension mismatch"
+            ? "ok — all renderer grids match PTY dimensions"
+            : "\(mismatches.count) pane(s) have renderer/PTY dimension mismatch"
 
         return jsonResponse(result)
     }

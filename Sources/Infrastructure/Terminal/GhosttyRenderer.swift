@@ -83,7 +83,7 @@ final class GhosttyRenderer: TerminalRenderer {
         }
 
         // Wire keyboard input: bypass ghostty's key encoder (Kitty protocol),
-        // send raw terminal bytes directly to tmux
+        // send raw terminal bytes directly to the PTY
         nsView.onKeyInput = { [weak self] data in
             self?.onInput?(data)
         }
@@ -129,7 +129,7 @@ final class GhosttyRenderer: TerminalRenderer {
 
     /// Creates a renderer for reconnecting to a pre-existing PTY fd.
     /// Uses MANUAL IO mode with a background read thread on the fd.
-    /// Input is written directly to the fd (no tmux send-keys).
+    /// Input is written directly to the fd.
     init(ghosttyApp: GhosttyApp, fd: Int32) {
         nsView = GhosttyNSView(frame: .zero)
         nsView.execMode = true // native key handling

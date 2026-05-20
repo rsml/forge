@@ -22,7 +22,7 @@ final class AttentionManager: AttentionPort {
         self.timestamps = loadTimestamps(from: config)
     }
 
-    /// Call after initial tmux sync to prune stale UUIDs from a previous project.
+    /// Call after initial workspace load to prune stale UUIDs from a previous project.
     func pruneStaleHiddenEntries(validUUIDs: Set<UUID>) {
         let stale = hiddenSet.subtracting(validUUIDs)
         if !stale.isEmpty {

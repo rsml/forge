@@ -1,7 +1,7 @@
 import AppKit
 import ForgeCore
 
-/// Project/tab lifecycle commands — thin delegation to the tmux port.
+/// Project/tab lifecycle commands.
 extension WorkspaceController {
 
     enum StackDismissAction {

@@ -2,7 +2,7 @@ import Foundation
 
 /// Pure helper that classifies a set of pane IDs into browser activities
 /// (resolved locally from `Workspace`) and terminal pane IDs (which the
-/// caller forwards to its backend — daemon or in-memory tmux state).
+/// caller forwards to its backend — typically the daemon's activity port).
 ///
 /// A browser pane with any loaded URL counts as active. The displayed
 /// "command" follows a graceful fallback: page title → host → full URL.
@@ -10,8 +10,8 @@ import Foundation
 /// this tab will terminate \"\(command)\"") — for browser panes the user
 /// sees the page title rather than a process name.
 ///
-/// Lives in Core (Foundation-only) so both the daemon-backed and
-/// tmux-backed activity adapters can call it without duplicating logic.
+/// Lives in Core (Foundation-only) so any activity adapter can call it
+/// without duplicating logic.
 public enum BrowserActivityResolver {
 
     /// Split `paneIds` into (browser activities, remaining terminal IDs).
@@ -25,7 +25,7 @@ public enum BrowserActivityResolver {
     ) -> (browsers: [PaneActivity], terminalIds: [String]) {
         guard let workspace else {
             // No workspace → can't classify. Treat everything as terminal so
-            // the daemon/tmux path can fail-open without losing entries.
+            // the activity adapter can fail-open without losing entries.
             return (browsers: [], terminalIds: paneIds)
         }
 

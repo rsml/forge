@@ -30,16 +30,6 @@ public final class Workspace {
         return nil
     }
 
-    /// Find a tab by its tmux tab ID string, returning the owning project alongside it.
-    public func findTab(byTmuxId tmuxId: String) -> (project: Project, tab: Tab)? {
-        for project in projects {
-            if let tab = project.tabs.first(where: { $0.id == tmuxId }) {
-                return (project, tab)
-            }
-        }
-        return nil
-    }
-
     /// Find the tab that owns the given pane.
     public func findTab(byPaneId paneId: String) -> (project: Project, tab: Tab)? {
         for project in projects {

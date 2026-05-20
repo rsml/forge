@@ -13,7 +13,7 @@ struct ForgeMenuCommands: Commands {
                 let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
                 let alert = NSAlert()
                 alert.messageText = "Forge \(version) (\(build))"
-                alert.informativeText = "A native macOS frontend for tmux."
+                alert.informativeText = "A native macOS terminal multiplexer."
                 alert.alertStyle = .informational
                 if let iconPath = bundleResource("appicon-transparent.png"),
                    let icon = NSImage(contentsOf: iconPath) {

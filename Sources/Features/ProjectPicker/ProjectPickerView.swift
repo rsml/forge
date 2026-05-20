@@ -216,7 +216,6 @@ struct ProjectPickerView: View {
             selectedPath = nil
             return
         }
-        // Derive a unique project name to avoid tmux project name conflicts
         let baseName = path.isEmpty ? "project" : URL(fileURLWithPath: path).lastPathComponent
         let existingNames = Set(controller.workspace.projects.map(\.name))
         let sessionName = uniqueSessionName(baseName, existing: existingNames)

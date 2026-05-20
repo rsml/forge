@@ -2,7 +2,6 @@ import SwiftUI
 import ForgeCore
 
 /// Draggable divider between split panes.
-/// Width matches tmux's 1-cell divider for pixel-perfect layout alignment.
 /// Visually renders a 1px line centered in the cell-sized hit target.
 struct PaneDivider: View {
     let direction: SplitDirection

@@ -71,8 +71,6 @@ struct ForgeConfig: Codable {
         var fontSize: Int?
         var scrollbackLines: Int?
         var tabBarPosition: String?
-        var useTmuxPersistence: Bool?
-        var tmuxConfigOverride: String?
     }
 
     struct AppearanceSettings: Codable {

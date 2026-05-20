@@ -12,7 +12,7 @@ import ForgeCore
 ///   POST /action        — execute an action (body: {"action": "...", "args": {...}})
 ///   GET  /logs          — recent log lines
 ///   GET  /ping          — health check
-///   GET  /pane-sizes    — sizing diagnostics: tmux pane dims, ghostty surface grid, SwiftUI frame, cell size
+///   GET  /pane-sizes    — sizing diagnostics: PTY dims, ghostty surface grid, SwiftUI frame, cell size
 @MainActor
 final class DebugServer {
     private var listener: NWListener?

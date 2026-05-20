@@ -80,7 +80,7 @@ Sources/
 - **WorkspaceController** — Thin orchestrator. Owns Workspace model, runs `connect()` lifecycle (load workspace.json → pre-fetch daemon fds → start watcher + git poller). Uses `(any AttentionPort)?` — not the concrete AttentionManager.
 - **PaneActivityWatcher** (`Features/Attention/`) — Event-driven attention detector. Hooks `GhosttyRenderer.onOutput` for BEL + content-match scanning; polls `PaneActivityPort` every 2s for command-completion (active→inactive transitions). Emits `AttentionEvent`s that the controller routes to AttentionManager + notifications.
 - **AttentionManager** (`Features/Attention/`) — Owns the attention queue. Conforms to `AttentionPort`. Receives events from PaneActivityWatcher via the controller. Also owns MacNotificationAdapter. NotificationPanel and NotificationCenterRow live here too.
-- **GitBranchPoller** (`Infrastructure/Git/`) — Polls `git rev-parse --abbrev-ref HEAD` every 5s for the active project. Posts `forgeWindowTitleChanged` on change. Independent of tmux/PTY.
+- **GitBranchPoller** (`Infrastructure/Git/`) — Polls `git rev-parse --abbrev-ref HEAD` every 5s for the active project. Posts `forgeWindowTitleChanged` on change.
 - **DaemonAdapter** (`Infrastructure/Process/`) — Unix-domain socket client for the `forged` daemon. Sends/receives PTY master fds via SCM_RIGHTS. Ops: store, retrieve, list, release, is_active.
 - **GhosttyRenderer** (`Infrastructure/Terminal/`) — libghostty surface bridge. Two init paths: EXEC (Ghostty forks the shell) and EXTERNAL_FD (reconnect to a PTY fd from the daemon). Exposes `onOutput` (PTY bytes), `onInput` (keyboard), and `setFocused`.
 - **AppState** (`Features/Shared/`) — `@Observable` cross-feature UI state: modals, sidebar, rename state, stack actions. Dispatches `AppCommand`s. Owns `renameText` and rename lifecycle helpers. Uses `(any AttentionPort)?` and `onModeChanged` closure — no direct refs to feature implementations.
@@ -215,3 +215,83 @@ Before claiming work is done:
 2. `swift test` passes
 3. If UI was changed: `make dev`, wait for launch, then `curl localhost:7654/screenshot > /tmp/forge-screenshot.png` and `Read /tmp/forge-screenshot.png` to visually inspect
 4. Check `tail -20 /tmp/forge.log` for errors after launch
+
+## Releases
+
+```bash
+make bump-patch        # 0.1.0 -> 0.1.1; auto-commits "chore(release): bump version to 0.1.1"
+make bump-minor        # 0.1.0 -> 0.2.0
+make bump-major        # 0.1.0 -> 1.0.0
+make release           # build + Developer-ID sign + notarize + staple + git push + gh release create
+make release-patch     # bump-patch + release
+make release-minor     # bump-minor + release
+make release-major     # bump-major + release
+```
+
+Credentials live in `.env` (gitignored): `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `SIGNING_IDENTITY`. See `.env.example`. The first three are the same values used by the `tutor` repo (same Apple Developer team `9CD626Q2L2`); copy from `~/code/personal/tutor/.env`. `SIGNING_IDENTITY` is `Developer ID Application: Serendipity Apps LLC (TN) (9CD626Q2L2)`.
+
+### Commit Conventions
+
+Conventional Commits — lowercase prefix + colon + short imperative summary in lowercase:
+
+- `feat:` — user-visible feature
+- `fix:` — bug fix
+- `refactor:` — internal restructure, no behavior change
+- `docs:` — documentation only
+- `chore:` — tooling, build, deps, version bumps (the bump targets write `chore(release): bump version to X.Y.Z`)
+- `test:` — test-only changes
+- Append `!` (e.g. `feat!:`) or include `BREAKING CHANGE:` in the body for breaking changes
+
+### Choosing the Bump Level
+
+When the user says "release a new version" without specifying patch/minor/major, decide from the commits since the last tag:
+
+```bash
+LAST_TAG=$(gh release view --json tagName -q .tagName 2>/dev/null || echo "")
+git log ${LAST_TAG:+${LAST_TAG}..}HEAD --oneline
+```
+
+| Commits since last tag include                    | Bump  |
+|---------------------------------------------------|-------|
+| `feat!:` or `BREAKING CHANGE:` (post-1.0 only)    | major |
+| any `feat:`                                       | minor |
+| only `fix:`, `chore:`, `docs:`, `refactor:`, `test:` | patch |
+
+Pre-1.0 (`0.X.Y`): never bump to major without explicit user confirmation — treat `feat!:` as minor. The first `1.0.0` is an intentional stability commitment, not a code-driven decision.
+
+State the chosen level and a one-line rationale ("3 feat: commits, 2 fix: commits — minor") to the user before running `make release-{level}`.
+
+### Release Notes
+
+Default: `gh release create --generate-notes` (GitHub auto-summarizes from commits + PRs). To override with AI-curated notes, write them to a file and set `RELEASE_NOTES_FILE`:
+
+```bash
+RELEASE_NOTES_FILE=/tmp/forge-notes.md make release
+```
+
+Curated-notes structure — group by category, omit empty sections, skip `chore(release): bump version` commits:
+
+```markdown
+### Features
+- One bullet per feat:, terse, user-perspective (not "added X" — describe the new capability).
+
+### Fixes
+- One bullet per fix:, describing what no longer breaks.
+
+### Other
+- Notable refactor/docs/chore/test items only if user-visible or operationally relevant.
+```
+
+### "Release a new version" workflow
+
+1. Get the last tag and the commits since:
+   ```bash
+   LAST_TAG=$(gh release view --json tagName -q .tagName 2>/dev/null || echo "")
+   git log ${LAST_TAG:+${LAST_TAG}..}HEAD --oneline
+   ```
+2. Classify commits via the table above; pick the bump level.
+3. State the plan to the user (level + commit summary). Wait for OK if anything is ambiguous (e.g. unclear whether a `feat:` is breaking, or whether to cut a 1.0).
+4. Either:
+   - `make release-{level}` for default auto-generated notes, or
+   - Draft curated notes to `/tmp/forge-notes.md`, then `make bump-{level} && RELEASE_NOTES_FILE=/tmp/forge-notes.md make release`.
+5. Report the release URL from the script's final output.

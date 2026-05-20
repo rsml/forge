@@ -34,7 +34,7 @@ struct AboutPane: View {
                     .font(.subheadline)
             }
 
-            Text("A native macOS frontend for tmux.")
+            Text("A native macOS terminal multiplexer.")
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
