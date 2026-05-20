@@ -205,6 +205,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         ga.applyConfig(fontFamily: fontFamily, fontSize: fontSize,
                        foreground: fgHex, background: bgHex, ansiColors: ansiHex)
+        // Font / cell metrics may have changed. Force each surface to re-derive
+        // cols/rows against the new cell size and push winsize to the PTY so
+        // running shells receive SIGWINCH and fresh TUIs see the right grid.
+        for renderer in controller.paneRenderers.values {
+            (renderer as? GhosttyRenderer)?.recomputeSize()
+        }
     }
 
     private func createMainWindow() {

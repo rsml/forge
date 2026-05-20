@@ -459,6 +459,28 @@ final class GhosttyRenderer: TerminalRenderer {
         ghostty_surface_set_focus(surface, focused)
     }
 
+    /// Re-pushes the current pixel size into libghostty so cols/rows are
+    /// recomputed against any updated cell metrics — e.g. after a font config
+    /// change via `ghostty_app_update_config`. Fires the existing resize path
+    /// so EXTERNAL_FD panes push `TIOCSWINSZ` to the daemon-owned PTY; EXEC
+    /// panes get their PTY winsize updated by libghostty internally.
+    ///
+    /// Resets `lastReportedSize` first: a font-family swap can yield the same
+    /// cols/rows yet still demand a winsize push so the foreground process
+    /// re-reads its dimensions.
+    func recomputeSize() {
+        guard let surface else { return }
+        let scale = nsView.window?.backingScaleFactor ?? 2.0
+        let w = UInt32(nsView.frame.width * scale)
+        let h = UInt32(nsView.frame.height * scale)
+        guard w > 0, h > 0 else { return }
+        ghostty_surface_set_size(surface, w, h)
+        let size = ghostty_surface_size(surface)
+        guard size.columns > 0, size.rows > 0 else { return }
+        lastReportedSize = nil
+        nsView.onSurfaceResize?(Int(size.columns), Int(size.rows))
+    }
+
     /// Exact cell size in points from ghostty's font metrics.
     /// This is the authoritative cell size — not derived from frame/cols math.
     var exactCellSize: CGSize {

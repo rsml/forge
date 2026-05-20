@@ -6,10 +6,15 @@ set -euo pipefail
 # app instead of an Electron app.
 #
 # Required env vars (loaded from .env if present):
-#   APPLE_ID                       Apple ID email used for notarization
-#   APPLE_TEAM_ID                  Apple Developer team ID (10 chars)
 #   APPLE_APP_SPECIFIC_PASSWORD    App-specific password from appleid.apple.com
 #   SIGNING_IDENTITY               e.g. "Developer ID Application: Name (TEAMID)"
+#
+# APPLE_ID and APPLE_TEAM_ID are hardcoded below — neither is secret
+# (the team ID is stamped on every signed binary, and the Apple ID is
+# just a login username).
+
+export APPLE_ID="admin@serendipityapps.com"
+export APPLE_TEAM_ID="9CD626Q2L2"
 
 if [ -f .env ]; then
   set -a
@@ -18,8 +23,6 @@ if [ -f .env ]; then
   set +a
 fi
 
-: "${APPLE_ID:?Set APPLE_ID in .env or environment}"
-: "${APPLE_TEAM_ID:?Set APPLE_TEAM_ID in .env or environment}"
 : "${APPLE_APP_SPECIFIC_PASSWORD:?Set APPLE_APP_SPECIFIC_PASSWORD in .env or environment}"
 : "${SIGNING_IDENTITY:?Set SIGNING_IDENTITY in .env or environment}"
 

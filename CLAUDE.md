@@ -228,7 +228,7 @@ make release-minor     # bump-minor + release
 make release-major     # bump-major + release
 ```
 
-Credentials live in `.env` (gitignored): `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `SIGNING_IDENTITY`. See `.env.example`. The first three are the same values used by the `tutor` repo (same Apple Developer team `9CD626Q2L2`); copy from `~/code/personal/tutor/.env`. `SIGNING_IDENTITY` is `Developer ID Application: Serendipity Apps LLC (TN) (9CD626Q2L2)`.
+`APPLE_ID` and `APPLE_TEAM_ID` are hardcoded in `scripts/release.sh` (`admin@serendipityapps.com` / `9CD626Q2L2` — same Apple Developer team as the `tutor` repo). Neither is secret. Only `APPLE_APP_SPECIFIC_PASSWORD` and `SIGNING_IDENTITY` live in `.env` (gitignored) — see `.env.example`. `SIGNING_IDENTITY` is `Developer ID Application: Serendipity Apps LLC (TN) (9CD626Q2L2)`.
 
 ### Commit Conventions
 
