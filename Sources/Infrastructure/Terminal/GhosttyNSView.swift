@@ -1,6 +1,7 @@
 @preconcurrency import AppKit
 import GhosttyKit
 import QuartzCore
+import UniformTypeIdentifiers
 
 /// NSView subclass that hosts a CAMetalLayer for ghostty GPU rendering.
 /// Forwards keyboard, mouse, and frame events to the ghostty surface.
@@ -273,18 +274,60 @@ final class GhosttyNSView: NSView {
         }
     }
 
-    /// Pick what to feed the terminal from the pasteboard, mirroring Ghostty's
-    /// "opinionated" behaviour: file URLs win over plain text so dragging a
-    /// screenshot/image (or any file) out of Finder pastes its shell-escaped
-    /// path. Falls back to the plain string for everything else. Raw image
-    /// bytes (e.g. a screen-capture to clipboard with no file backing) have no
-    /// shell-meaningful form and return nil.
+    /// Pick what to feed the terminal from the pasteboard. Priority:
+    ///  1. File / URL objects — paste their shell-escaped path or absolute URL
+    ///     (handles "copied a file from Finder" without re-materialising).
+    ///  2. Raw image data (`.tiff` / `.png` / any image-conforming UTType) —
+    ///     materialise it as a temp PNG and paste the file path. TUIs that
+    ///     accept image attachments by path (Claude Code, etc.) pick it up
+    ///     automatically. Matches cmux's behaviour.
+    ///  3. Plain `.string` — fall through for normal text paste.
     private func pasteboardContents(_ pb: NSPasteboard) -> String? {
         if let urls = pb.readObjects(forClasses: [NSURL.self]) as? [URL], !urls.isEmpty {
             return urls.map { $0.isFileURL ? shellEscape($0.path) : $0.absoluteString }
                        .joined(separator: " ")
         }
+        if hasImagePayload(pb), let imagePath = materializeImageToTempFile(from: pb) {
+            return shellEscape(imagePath)
+        }
         return pb.string(forType: .string)
+    }
+
+    private func hasImagePayload(_ pb: NSPasteboard) -> Bool {
+        let types = pb.types ?? []
+        if types.contains(.tiff) || types.contains(.png) { return true }
+        return types.contains { type in
+            UTType(type.rawValue)?.conforms(to: .image) ?? false
+        }
+    }
+
+    /// Write the pasteboard's image bytes to `$TMPDIR/clipboard-<ts>-<uuid>.png`
+    /// and return the file path. Prefers an already-PNG payload; otherwise
+    /// asks `NSImage` for a PNG representation of the TIFF data. Returns nil
+    /// if no image data can be extracted.
+    private func materializeImageToTempFile(from pb: NSPasteboard) -> String? {
+        let pngData: Data? = {
+            if let png = pb.data(forType: .png) { return png }
+            if let img = NSImage(pasteboard: pb),
+               let tiff = img.tiffRepresentation,
+               let rep = NSBitmapImageRep(data: tiff) {
+                return rep.representation(using: .png, properties: [:])
+            }
+            return nil
+        }()
+        guard let data = pngData else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd-HHmmss"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        let suffix = UUID().uuidString.prefix(8)
+        let filename = "clipboard-\(formatter.string(from: Date()))-\(suffix).png"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        do {
+            try data.write(to: url)
+            return url.path
+        } catch {
+            return nil
+        }
     }
 
     /// Backslash-escape shell metacharacters so a pasted path is safe to drop
