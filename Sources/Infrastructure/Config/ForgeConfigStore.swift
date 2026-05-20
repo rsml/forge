@@ -3,7 +3,7 @@ import ForgeCore
 
 extension ForgeConfig.FontConfig {
     func resolved(defaultSize: Int = 13) -> Font {
-        let family = self.family ?? ".AppleSystemUIFont"
+        let family = self.family ?? "SF Pro"
         let size = CGFloat(self.size ?? defaultSize)
         return .custom(family, size: size)
     }

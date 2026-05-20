@@ -19,23 +19,13 @@ final class GhosttyNSView: NSView {
     /// True when in EXEC mode — Ghostty handles keys natively.
     var execMode: Bool = false
 
-    // MARK: - Layer Setup
-
-    override var wantsLayer: Bool {
-        get { true }
-        set {} // swiftlint:disable:this unused_setter_value
-    }
-
-    override var wantsUpdateLayer: Bool { true }
-
-    override func makeBackingLayer() -> CALayer {
-        let layer = CAMetalLayer()
-        layer.pixelFormat = .bgra8Unorm
-        layer.isOpaque = false
-        layer.framebufferOnly = false
-        layer.contentsScale = window?.backingScaleFactor ?? 2.0
-        return layer
-    }
+    // libghostty installs its own IOSurfaceLayer as a layer-hosting layer
+    // via setProperty("layer", ...) + setProperty("wantsLayer", true).
+    // We must NOT pre-create a CAMetalLayer here — doing so makes this a
+    // layer-BACKED view and pins isOpaque=false, which silently disables
+    // subpixel anti-aliasing for the composited text and yields the thin
+    // rendering vs. Ghostty.app. See upstream SurfaceView_AppKit which
+    // overrides neither wantsLayer nor makeBackingLayer.
 
     override var acceptsFirstResponder: Bool { true }
 
@@ -257,6 +247,59 @@ final class GhosttyNSView: NSView {
         // character payload. Forwarding them to ghostty_surface_key with
         // unshifted_codepoint=0 produces stray `;5u` fragments at the prompt
         // when Kitty mode's report_all flag is set. Consume the event.
+    }
+
+    // MARK: - Standard Edit Selectors
+    //
+    // Stock AppKit Edit menu items (Cut, Copy, Paste, Select All) dispatch
+    // through the responder chain via NSText.* selectors. These IBActions
+    // are the terminus on this view — they delegate to libghostty's binding
+    // actions which read/write NSPasteboard.general directly.
+
+    @IBAction func paste(_ sender: Any?) {
+        guard let surface else { return }
+        guard let text = pasteboardContents(NSPasteboard.general), !text.isEmpty else { return }
+        text.withCString { cStr in
+            ghostty_surface_text_input(surface, cStr, UInt(text.utf8.count))
+        }
+    }
+
+    /// Pick what to feed the terminal from the pasteboard, mirroring Ghostty's
+    /// "opinionated" behaviour: file URLs win over plain text so dragging a
+    /// screenshot/image (or any file) out of Finder pastes its shell-escaped
+    /// path. Falls back to the plain string for everything else. Raw image
+    /// bytes (e.g. a screen-capture to clipboard with no file backing) have no
+    /// shell-meaningful form and return nil.
+    private func pasteboardContents(_ pb: NSPasteboard) -> String? {
+        if let urls = pb.readObjects(forClasses: [NSURL.self]) as? [URL], !urls.isEmpty {
+            return urls.map { $0.isFileURL ? shellEscape($0.path) : $0.absoluteString }
+                       .joined(separator: " ")
+        }
+        return pb.string(forType: .string)
+    }
+
+    /// Backslash-escape shell metacharacters so a pasted path is safe to drop
+    /// into a live prompt without re-quoting. Matches upstream Ghostty's
+    /// `Ghostty.Shell.escape`.
+    private func shellEscape(_ str: String) -> String {
+        let unsafe = "\\ ()[]{}<>\"'`!#$&;|*?\t"
+        var result = str
+        for ch in unsafe {
+            result = result.replacingOccurrences(of: String(ch), with: "\\\(ch)")
+        }
+        return result
+    }
+
+    @IBAction func copy(_ sender: Any?) {
+        guard let surface else { return }
+        let action = "copy_to_clipboard"
+        _ = ghostty_surface_binding_action(surface, action, UInt(action.utf8.count))
+    }
+
+    @IBAction override func selectAll(_ sender: Any?) {
+        guard let surface else { return }
+        let action = "select_all"
+        _ = ghostty_surface_binding_action(surface, action, UInt(action.utf8.count))
     }
 
     override func insertText(_ insertString: Any) {

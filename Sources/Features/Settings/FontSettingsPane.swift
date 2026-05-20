@@ -38,7 +38,7 @@ struct FontSettingsPane: View {
                 title: "Primary Font",
                 subtitle: "Used for project names and headings",
                 config: store.config.primaryFont,
-                defaultFamily: ".AppleSystemUIFont",
+                defaultFamily: "SF Pro",
                 defaultSize: 13,
                 keyPath: \ForgeConfig.primaryFont,
                 fontList: Self.allFonts
@@ -48,7 +48,7 @@ struct FontSettingsPane: View {
                 title: "Secondary Font",
                 subtitle: "Used for tab names and captions",
                 config: store.config.secondaryFont,
-                defaultFamily: ".AppleSystemUIFont",
+                defaultFamily: "SF Pro",
                 defaultSize: 11,
                 keyPath: \ForgeConfig.secondaryFont,
                 fontList: Self.allFonts
@@ -126,8 +126,7 @@ struct FontSettingsPane: View {
             // Live preview
             let family = config?.family ?? defaultFamily
             let size = CGFloat(config?.size ?? defaultSize)
-            let displayFamily = family == ".AppleSystemUIFont" ? "SF Pro" : family
-            Text("The quick brown fox jumps over the lazy dog — \(displayFamily) \(Int(size))pt")
+            Text("The quick brown fox jumps over the lazy dog — \(family) \(Int(size))pt")
                 .font(.custom(family, size: size))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)

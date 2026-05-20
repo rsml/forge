@@ -114,6 +114,25 @@ final class GhosttyRenderer: TerminalRenderer {
         }
     }
 
+    /// Write raw bytes directly to the PTY master, bypassing libghostty's
+    /// text-input encoder. Used for the three kernel signal bytes
+    /// (Ctrl+C/Z/\\) — `ghostty_surface_text` would re-encode them through
+    /// the Kitty keyboard protocol layer, so the literal \\x03/\\x1A/\\x1C
+    /// never reaches the kernel TTY discipline and SIGINT/SIGTSTP/SIGQUIT
+    /// are never delivered.
+    func sendRaw(_ data: Data) {
+        onUserInput?()
+        var fd: Int32 = externalFD
+        if fd < 0, let surface {
+            fd = ghostty_surface_pty_fd(surface)
+        }
+        guard fd >= 0 else { return }
+        data.withUnsafeBytes { buf in
+            guard let ptr = buf.baseAddress else { return }
+            _ = Darwin.write(fd, ptr, buf.count)
+        }
+    }
+
     /// PTY master fd for EXEC mode surfaces. -1 if unavailable.
     /// Used by DaemonAdapter to send fd for persistence.
     var ptyFD: Int32 {
@@ -134,7 +153,7 @@ final class GhosttyRenderer: TerminalRenderer {
         nsView = GhosttyNSView(frame: .zero)
         nsView.execMode = true // native key handling
         nsView.onUserInput = { [weak self] in self?.onUserInput?() }
-        nsView.onRawInput = { [weak self] data in self?.sendInput(data) }
+        nsView.onRawInput = { [weak self] data in self?.sendRaw(data) }
 
         guard let app = ghosttyApp.app else {
             ForgeLog.log("[ghostty] Cannot create EXTERNAL_FD renderer — app not initialized")
@@ -358,7 +377,7 @@ final class GhosttyRenderer: TerminalRenderer {
         nsView = GhosttyNSView(frame: .zero)
         nsView.execMode = true
         nsView.onUserInput = { [weak self] in self?.onUserInput?() }
-        nsView.onRawInput = { [weak self] data in self?.sendInput(data) }
+        nsView.onRawInput = { [weak self] data in self?.sendRaw(data) }
 
         guard let app = ghosttyApp.app else {
             ForgeLog.log("[ghostty] Cannot create EXEC renderer — app not initialized")

@@ -90,23 +90,6 @@ struct ForgeMenuCommands: Commands {
             .keyboardShortcut(KeyboardShortcuts.renameProject.key, modifiers: KeyboardShortcuts.renameProject.modifiers)
         }
 
-        // MARK: Edit
-        CommandGroup(replacing: .pasteboard) {
-            Button("Undo") { NSApp.sendAction(Selector(("undo:")), to: nil, from: nil) }
-                .keyboardShortcut("z", modifiers: .command)
-            Button("Redo") { NSApp.sendAction(Selector(("redo:")), to: nil, from: nil) }
-                .keyboardShortcut("z", modifiers: [.command, .shift])
-            Divider()
-            Button("Cut") { NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil) }
-                .keyboardShortcut("x", modifiers: .command)
-            Button("Copy") { NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil) }
-                .keyboardShortcut("c", modifiers: .command)
-            Button("Paste") { NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil) }
-                .keyboardShortcut("v", modifiers: .command)
-            Button("Select All") { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) }
-                .keyboardShortcut("a", modifiers: .command)
-        }
-
         // MARK: View
         CommandMenu("View") {
             Button("Tab Switcher") {
