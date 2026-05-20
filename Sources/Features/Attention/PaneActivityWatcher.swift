@@ -70,10 +70,12 @@ final class PaneActivityWatcher {
     /// the caller (Ghostty's I/O thread or the EXTERNAL_FD read thread) hops
     /// to main via DispatchQueue before invoking the renderer's onOutput.
     func processOutput(paneId: String, data: Data) {
-        // BEL detection — fire only on standalone 0x07, ignoring BELs that are
-        // OSC string terminators (e.g. OSC 133 semantic-prompt markers emitted
-        // by zsh on every prompt redraw, which are not user-facing alerts).
-        if BellDetector.containsStandaloneBell(data),
+        // Attention signals — standalone BEL or OSC 777 notify. Claude Code
+        // 2.1.141+ emits `ESC]777;notify;Claude Code;Claude is waiting for your
+        // input BEL` when it wants the user back. Other modern TUIs use the
+        // same OSC 777 protocol. OSC string-terminator BELs (e.g. OSC 133
+        // semantic prompts emitted on every shell prompt redraw) are ignored.
+        if BellDetector.containsAttentionSignal(data),
            let found = workspace.findTab(byPaneId: paneId) {
             for pane in found.tab.panes { pane.terminalState?.hasBell = true }
             onEvent?(.bell(tabUUID: found.tab.uuid))

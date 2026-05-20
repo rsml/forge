@@ -43,4 +43,44 @@ struct BellDetectorTests {
         let data = Data([0x1B, 0x5D, 0x30, 0x3B, 0x74, 0x69, 0x74, 0x6C, 0x65, 0x07])
         #expect(BellDetector.containsStandaloneBell(data) == false)
     }
+
+    @Test("OSC 777 notify sequence with BEL terminator counts as attention signal")
+    func testOSC777Notify() {
+        // ESC ] 7 7 7 ; n o t i f y ; X ; Y BEL
+        let payload: [UInt8] = [0x1B, 0x5D, 0x37, 0x37, 0x37, 0x3B,
+                                0x6E, 0x6F, 0x74, 0x69, 0x66, 0x79, 0x3B,
+                                0x58, 0x3B, 0x59, 0x07]
+        let data = Data(payload)
+        #expect(BellDetector.containsAttentionSignal(data) == true)
+        #expect(BellDetector.containsOSCNotify(data) == true)
+        #expect(BellDetector.containsStandaloneBell(data) == false)
+    }
+
+    @Test("OSC 777 with ESC\\ ST terminator counts as attention signal")
+    func testOSC777WithST() {
+        let payload: [UInt8] = [0x1B, 0x5D, 0x37, 0x37, 0x37, 0x3B,
+                                0x6E, 0x6F, 0x74, 0x69, 0x66, 0x79,
+                                0x1B, 0x5C]
+        let data = Data(payload)
+        #expect(BellDetector.containsAttentionSignal(data) == true)
+    }
+
+    @Test("OSC 133 (semantic prompt) is NOT an attention signal")
+    func testOSC133NotAttention() {
+        let data = Data([0x1B, 0x5D, 0x31, 0x33, 0x33, 0x3B, 0x41, 0x07])
+        #expect(BellDetector.containsAttentionSignal(data) == false)
+    }
+
+    @Test("real claude payload: full OSC 777 notify with title and body")
+    func testRealClaudePayload() {
+        let title = "Claude Code"
+        let body = "Claude is waiting for your input"
+        var bytes: [UInt8] = [0x1B, 0x5D, 0x37, 0x37, 0x37, 0x3B,
+                              0x6E, 0x6F, 0x74, 0x69, 0x66, 0x79, 0x3B]
+        bytes.append(contentsOf: title.utf8)
+        bytes.append(0x3B)
+        bytes.append(contentsOf: body.utf8)
+        bytes.append(0x07)
+        #expect(BellDetector.containsAttentionSignal(Data(bytes)) == true)
+    }
 }

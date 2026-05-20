@@ -297,6 +297,11 @@ final class GhosttyRenderer: TerminalRenderer {
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
               !data.isEmpty else { return }
         feed(data)
+        // Also push the tail through the attention watcher so OSC 777 / BEL
+        // events that fired before this reconnect still light the dot. Bounded
+        // to the last 4KB — enough to catch a recent prompt without replaying
+        // every BEL the user has already responded to.
+        onOutput?(data.suffix(4096))
         ForgeLog.log("[ghostty] Fed \(data.count) bytes of scrollback for pane \(paneId)")
     }
 
