@@ -267,11 +267,22 @@ final class GhosttyNSView: NSView {
     // actions which read/write NSPasteboard.general directly.
 
     @IBAction func paste(_ sender: Any?) {
-        guard let surface else { return }
+        guard surface != nil else { return }
         guard let text = pasteboardContents(NSPasteboard.general), !text.isEmpty else { return }
-        text.withCString { cStr in
-            ghostty_surface_text_input(surface, cStr, UInt(text.utf8.count))
-        }
+        // Frame the payload as a DEC bracketed paste (CSI 200 ~ … CSI 201 ~)
+        // and write the bytes directly to the PTY. libghostty's
+        // `ghostty_surface_text` *should* do this, but only conditionally
+        // on the terminal having sent `CSI ? 2004 h` — and Claude Code's
+        // TUI parses incoming brackets without first enabling that mode,
+        // so the conditional wrapping silently no-ops and the path arrives
+        // as literal keystrokes. Always emitting the brackets matches
+        // cmux's user-visible behaviour and turns pasted image paths into
+        // `[Image #N]` placeholders. Modern TUIs that watch for brackets
+        // handle the markers correctly; shells ignore them.
+        var bytes = Data([0x1B, 0x5B, 0x32, 0x30, 0x30, 0x7E])  // ESC[200~
+        bytes.append(contentsOf: text.utf8)
+        bytes.append(contentsOf: [0x1B, 0x5B, 0x32, 0x30, 0x31, 0x7E])  // ESC[201~
+        onRawInput?(bytes)
     }
 
     /// Pick what to feed the terminal from the pasteboard. Priority:
