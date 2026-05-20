@@ -132,6 +132,12 @@ final class GhosttyNSView: NSView {
     /// Wired by GhosttyRenderer to send to tmux via send-keys -H.
     var onKeyInput: ((Data) -> Void)?
 
+    /// Callback for raw bytes that must reach the PTY uninterpreted.
+    /// Used in EXEC mode to bypass Ghostty's Kitty-protocol encoder for the
+    /// three kernel-signal control bytes (Ctrl+C, Ctrl+Z, Ctrl+\) so the
+    /// kernel TTY discipline can deliver SIGINT/SIGTSTP/SIGQUIT.
+    var onRawInput: ((Data) -> Void)?
+
     /// Fires for any user-driven input event — keys, text insertion.
     /// Pure-modifier presses (Shift, Cmd alone) and key releases don't count.
     /// Used by the attention pipeline to clear stale bell / content-match flags
@@ -177,12 +183,65 @@ final class GhosttyNSView: NSView {
     /// be set for every key, not just typed text.
     private func sendExecKey(_ event: NSEvent) {
         guard let surface else { return }
-        let text = event.characters ?? ""
+
+        // Bypass Ghostty's key encoder for the kernel-signal control bytes.
+        // The kernel TTY discipline only translates the literal byte (\x03,
+        // \x1A, \x1C) to SIGINT/SIGTSTP/SIGQUIT — it never parses escape
+        // sequences. If a prior TUI left Kitty mode pushed on the terminal's
+        // stack and Ghostty's encoder emits ESC[99;5u for Ctrl+C, sleep is
+        // never killed. Sending the raw byte makes signals work regardless.
+        if let signalByte = kernelSignalByte(for: event) {
+            onRawInput?(Data([signalByte]))
+            return
+        }
+
+        let text = sanitizedCharacters(event) ?? ""
         text.withCString { cStr in
             var keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
             if !text.isEmpty { keyEvent.text = cStr }
             _ = ghostty_surface_key(surface, keyEvent)
         }
+    }
+
+    /// Returns the raw control byte for Ctrl+C / Ctrl+Z / Ctrl+\\ — the three
+    /// keys the kernel TTY discipline maps to signals. Returns nil for any
+    /// other combination so it falls through to the normal encoder.
+    private func kernelSignalByte(for event: NSEvent) -> UInt8? {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard flags.contains(.control) else { return nil }
+        // Allow Shift (Ctrl+Shift+C still ≡ Ctrl+C for signal purposes) and
+        // CapsLock, but bail if Cmd/Opt are also held — those are app shortcuts.
+        let blocking = flags.subtracting([.control, .shift, .capsLock])
+        guard blocking.isEmpty else { return nil }
+        guard let chars = event.characters(byApplyingModifiers: []),
+              let scalar = chars.unicodeScalars.first else { return nil }
+        let base = scalar.value
+        let lower = (base >= 0x41 && base <= 0x5A) ? base + 0x20 : base
+        switch lower {
+        case 0x63: return 0x03  // Ctrl+C → ETX  → SIGINT
+        case 0x7A: return 0x1A  // Ctrl+Z → SUB  → SIGTSTP
+        case 0x5C: return 0x1C  // Ctrl+\\ → FS   → SIGQUIT
+        default: return nil
+        }
+    }
+
+    /// Text payload for the Ghostty key event, matching Ghostty's own apprt
+    /// (`NSEvent+Extension.swift`). NSEvent.characters returns "\\u{03}" for
+    /// Ctrl+C — Ghostty's KeyEncoder does control-character mapping itself,
+    /// so we hand it the base character ("c") instead of the control byte.
+    private func sanitizedCharacters(_ event: NSEvent) -> String? {
+        guard let chars = event.characters, !chars.isEmpty else { return nil }
+        if chars.count == 1, let scalar = chars.unicodeScalars.first {
+            if scalar.value < 0x20 {
+                return event.characters(byApplyingModifiers: event.modifierFlags.subtracting(.control))
+            }
+            // PUA range = function keys; Ghostty's encoder handles them by
+            // keycode, not text.
+            if scalar.value >= 0xF700 && scalar.value <= 0xF8FF {
+                return nil
+            }
+        }
+        return chars
     }
 
     override func keyUp(with event: NSEvent) {
@@ -194,12 +253,10 @@ final class GhosttyNSView: NSView {
     }
 
     override func flagsChanged(with event: NSEvent) {
-        if execMode {
-            let keyEvent = buildKeyEvent(for: event, action: GHOSTTY_ACTION_PRESS)
-            if let surface { _ = ghostty_surface_key(surface, keyEvent) }
-            return
-        }
-        // No action needed — modifier-only events don't produce terminal bytes
+        // Modifier-only events (Ctrl, Shift, Cmd, Alt alone) carry no
+        // character payload. Forwarding them to ghostty_surface_key with
+        // unshifted_codepoint=0 produces stray `;5u` fragments at the prompt
+        // when Kitty mode's report_all flag is set. Consume the event.
     }
 
     override func insertText(_ insertString: Any) {
@@ -356,8 +413,14 @@ final class GhosttyNSView: NSView {
     /// Required by Ghostty's Kitty keyboard protocol encoder: for Ctrl+letter
     /// it builds `CSI <codepoint>;<mods> u` from this field. ASCII letters are
     /// lowercased so Ctrl+Shift+C reports base 'c' the same as Ctrl+C does.
+    ///
+    /// Uses `characters(byApplyingModifiers: [])` rather than
+    /// `charactersIgnoringModifiers` — the latter returns the control byte
+    /// (e.g. "\u{03}" for Ctrl+C) instead of the base letter, so unshifted
+    /// codepoint would be 3 instead of 99 and Ghostty would emit ESC[3;5u.
+    /// Mirrors Ghostty's own apprt (`NSEvent+Extension.swift`).
     private func unshiftedCodepoint(for event: NSEvent) -> UInt32 {
-        guard let chars = event.charactersIgnoringModifiers,
+        guard let chars = event.characters(byApplyingModifiers: []),
               let scalar = chars.unicodeScalars.first else { return 0 }
         if scalar.value >= 0x41, scalar.value <= 0x5A {
             return scalar.value + 0x20

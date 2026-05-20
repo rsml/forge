@@ -79,6 +79,16 @@ final class WorkspaceController {
                     self.attentionManager?.pruneResolved(activeAttentionUUIDs: activeUUIDs)
                 }
             }
+            // When a TUI exits and the shell becomes foreground again, pop
+            // any Kitty keyboard flags the TUI pushed but didn't clean up.
+            // Bytes: ESC [ < u  — Kitty protocol stack pop. Fed through
+            // ghostty_surface_process_output so the terminal emulator updates
+            // its own state; subsequent keypresses encode as legacy and the
+            // kernel TTY discipline can see \x03 again for SIGINT.
+            watcher.onShellResumed = { [weak self] paneId in
+                guard let renderer = self?.paneRenderers[paneId] as? TerminalRenderer else { return }
+                renderer.feed(Data([0x1B, 0x5B, 0x3C, 0x75]))
+            }
             paneActivityWatcher = watcher
         }
 

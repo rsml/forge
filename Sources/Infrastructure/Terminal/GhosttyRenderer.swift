@@ -134,6 +134,7 @@ final class GhosttyRenderer: TerminalRenderer {
         nsView = GhosttyNSView(frame: .zero)
         nsView.execMode = true // native key handling
         nsView.onUserInput = { [weak self] in self?.onUserInput?() }
+        nsView.onRawInput = { [weak self] data in self?.sendInput(data) }
 
         guard let app = ghosttyApp.app else {
             ForgeLog.log("[ghostty] Cannot create EXTERNAL_FD renderer — app not initialized")
@@ -352,6 +353,7 @@ final class GhosttyRenderer: TerminalRenderer {
         nsView = GhosttyNSView(frame: .zero)
         nsView.execMode = true
         nsView.onUserInput = { [weak self] in self?.onUserInput?() }
+        nsView.onRawInput = { [weak self] data in self?.sendInput(data) }
 
         guard let app = ghosttyApp.app else {
             ForgeLog.log("[ghostty] Cannot create EXEC renderer — app not initialized")

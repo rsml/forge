@@ -38,6 +38,12 @@ final class PaneActivityWatcher {
     /// + sendAttentionNotification.
     var onEvent: ((AttentionEvent) -> Void)?
 
+    /// Fired when the foreground process transitions back to the pane's shell.
+    /// The controller uses this to pop the Kitty keyboard stack so the shell
+    /// doesn't keep seeing Kitty-encoded keypresses left over from a TUI
+    /// (Claude Code etc.) that exited without resetting the terminal.
+    var onShellResumed: ((_ paneId: String) -> Void)?
+
     init(workspace: Workspace, activity: any PaneActivityPort, config: ForgeConfigStore) {
         self.workspace = workspace
         self.activity = activity
@@ -123,6 +129,7 @@ final class PaneActivityWatcher {
 
             // Transition active → inactive = user's long-running command finished.
             if wasActive && !result.isActive {
+                onShellResumed?(result.paneId)
                 if let found = workspace.findTab(byPaneId: result.paneId) {
                     onEvent?(.commandCompleted(tabUUID: found.tab.uuid))
                 }
