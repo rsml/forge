@@ -80,7 +80,6 @@ enum KeyboardShortcuts {
         ("clearScrollback", Shortcut("k", modifiers: .command, label: "Clear Scrollback"), "Terminal"),
         // Stack Mode
         ("stackDone", Shortcut(.return, modifiers: .command, label: "Done"), "Stack Mode"),
-        ("stackHide", Shortcut("h", modifiers: [.command, .shift], label: "Hide"), "Stack Mode"),
         ("stackMoveToBack", Shortcut("]", modifiers: [.control, .shift], label: "Move to Back"), "Stack Mode"),
     ]
 
