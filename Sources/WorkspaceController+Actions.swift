@@ -627,6 +627,7 @@ extension WorkspaceController {
         for pane in tab.panes {
             pane.terminalState?.hasBell = false
             pane.terminalState?.hasContentMatch = false
+            pane.terminalState?.isSilentWaiting = false
         }
     }
 }

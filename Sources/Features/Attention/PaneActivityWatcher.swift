@@ -28,6 +28,10 @@ final class PaneActivityWatcher {
     private var outputBuffers: [String: Data] = [:]
     private var lastActiveState: [String: Bool] = [:]
     private var pollTask: Task<Void, Never>?
+    /// Trailing-edge debounce — fires `silenceWaitingThreshold` seconds after
+    /// the last output chunk from an AI-agent foreground process and flips the
+    /// pane to `isSilentWaiting = true`. Cancelled on every new output chunk.
+    private var silenceTimers: [String: DispatchWorkItem] = [:]
 
     /// Per-pane buffer cap. Holds roughly the last screen-ish of output —
     /// enough for ContentDetector to find prompts near the bottom without
@@ -89,6 +93,37 @@ final class PaneActivityWatcher {
         }
         outputBuffers[paneId] = buf
 
+        // Track when this pane last produced output. The poll loop reads this
+        // to drive silence-based "AI agent waiting" detection.
+        if let found = workspace.findPane(byId: paneId) {
+            found.pane.terminalState?.lastOutputAt = Date()
+            // Fresh output cancels the silent-waiting state; if the agent
+            // goes quiet again, the poll loop will re-set it.
+            found.pane.terminalState?.isSilentWaiting = false
+        }
+
+        // Trailing-edge debounce for snappier UI: fire ~silenceThreshold after
+        // the last byte stops, independent of the 2s poll cadence. The poll
+        // loop catches the cases this debounce misses (e.g. zero live output
+        // on reconnect — claude is already idle from before Forge attached).
+        silenceTimers[paneId]?.cancel()
+        if let found = workspace.findPane(byId: paneId),
+           AttentionPolicy.isAIAgent(found.pane.terminalState?.currentCommand ?? "") {
+            let work = DispatchWorkItem { [weak self] in
+                guard let self,
+                      let found = self.workspace.findPane(byId: paneId),
+                      AttentionPolicy.isAIAgent(found.pane.terminalState?.currentCommand ?? "")
+                else { return }
+                found.pane.terminalState?.isSilentWaiting = true
+                self.onEvent?(.contentMatch(tabUUID: found.tab.uuid))
+            }
+            silenceTimers[paneId] = work
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + AttentionPolicy.silenceWaitingThreshold,
+                execute: work
+            )
+        }
+
         guard let content = String(data: buf, encoding: .utf8) else { return }
         let patterns = ContentDetector.defaultPatterns
             + (config.config.stackView?.contentPatterns ?? [])
@@ -127,6 +162,26 @@ final class PaneActivityWatcher {
             // → needsAttention stays true regardless of what's actually running.
             if let found = workspace.findPane(byId: result.paneId) {
                 found.pane.apply(activity: result)
+
+                // Silence-based "AI agent waiting" check. Independent of the
+                // debounced timer in processOutput, this fires even when the
+                // agent has been quiet since before we attached (no live
+                // output to drive the debounce).
+                if let ts = found.pane.terminalState,
+                   AttentionPolicy.isAIAgent(ts.currentCommand) {
+                    let silentLongEnough: Bool = {
+                        guard let last = ts.lastOutputAt else { return true }
+                        return Date().timeIntervalSince(last) >= AttentionPolicy.silenceWaitingThreshold
+                    }()
+                    if silentLongEnough, !ts.isSilentWaiting {
+                        ts.isSilentWaiting = true
+                        onEvent?(.contentMatch(tabUUID: found.tab.uuid))
+                    }
+                } else {
+                    // Foreground is no longer an AI agent — make sure the
+                    // flag doesn't stay sticky (e.g. user exited claude).
+                    found.pane.terminalState?.isSilentWaiting = false
+                }
             }
 
             // Transition active → inactive = user's long-running command finished.

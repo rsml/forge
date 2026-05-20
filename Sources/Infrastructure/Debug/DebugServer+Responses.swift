@@ -48,6 +48,9 @@ extension DebugServer {
                         "path": pane.terminalState?.currentPath ?? "",
                         "status": pane.terminalState?.status.rawValue ?? "",
                         "hasBell": pane.terminalState?.hasBell ?? false,
+                        "hasContentMatch": pane.terminalState?.hasContentMatch ?? false,
+                        "isSilentWaiting": pane.terminalState?.isSilentWaiting ?? false,
+                        "needsAttention": pane.needsAttention,
                         "size": pane.terminalState.map { "\($0.width)x\($0.height)" } ?? ""
                     ]
                 }
