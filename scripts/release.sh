@@ -34,7 +34,8 @@ RELEASE_DIR="release"
 
 VERSION=$(plutil -extract CFBundleShortVersionString raw "$PLIST")
 TAG="v${VERSION}"
-ZIP="${RELEASE_DIR}/Forge-${VERSION}.zip"
+APP_ZIP="${RELEASE_DIR}/Forge-${VERSION}-app.zip"   # intermediate, for .app notarization
+DMG="${RELEASE_DIR}/Forge-${VERSION}.dmg"           # published artifact
 
 if gh release view "$TAG" >/dev/null 2>&1; then
   echo "Error: GitHub release ${TAG} already exists. Bump the version (make bump-patch|minor|major) first." >&2
@@ -59,36 +60,65 @@ echo "==> Verifying signature..."
 codesign --verify --deep --strict --verbose=2 "$APP"
 
 mkdir -p "$RELEASE_DIR"
-rm -f "$ZIP"
-ditto -c -k --keepParent "$APP" "$ZIP"
+rm -f "$APP_ZIP"
+ditto -c -k --keepParent "$APP" "$APP_ZIP"
 
-echo "==> Submitting for notarization (this may take a few minutes)..."
-xcrun notarytool submit "$ZIP" \
+echo "==> Submitting .app for notarization (this may take a few minutes)..."
+xcrun notarytool submit "$APP_ZIP" \
   --apple-id "$APPLE_ID" \
   --team-id "$APPLE_TEAM_ID" \
   --password "$APPLE_APP_SPECIFIC_PASSWORD" \
   --wait
 
-echo "==> Stapling notarization ticket..."
+echo "==> Stapling notarization ticket to .app..."
 xcrun stapler staple "$APP"
 
-# Re-zip so the published artifact contains the stapled ticket.
-rm -f "$ZIP"
-ditto -c -k --keepParent "$APP" "$ZIP"
-
-echo "==> Verifying Gatekeeper acceptance..."
+echo "==> Verifying Gatekeeper acceptance of .app..."
 spctl --assess --type execute --verbose=2 "$APP"
+
+# Intermediate zip is no longer needed once .app is stapled.
+rm -f "$APP_ZIP"
+
+echo "==> Building DMG with Applications symlink..."
+DMG_STAGE=$(mktemp -d)
+trap 'rm -rf "$DMG_STAGE"' EXIT
+ditto "$APP" "$DMG_STAGE/Forge.app"
+ln -s /Applications "$DMG_STAGE/Applications"
+rm -f "$DMG"
+hdiutil create \
+  -volname "Forge ${VERSION}" \
+  -srcfolder "$DMG_STAGE" \
+  -ov -format UDZO \
+  "$DMG"
+rm -rf "$DMG_STAGE"
+trap - EXIT
+
+echo "==> Signing DMG..."
+codesign --force --sign "$SIGNING_IDENTITY" --timestamp "$DMG"
+
+echo "==> Submitting DMG for notarization..."
+xcrun notarytool submit "$DMG" \
+  --apple-id "$APPLE_ID" \
+  --team-id "$APPLE_TEAM_ID" \
+  --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+  --wait
+
+echo "==> Stapling notarization ticket to DMG..."
+xcrun stapler staple "$DMG"
+
+echo "==> Verifying Gatekeeper acceptance of DMG..."
+spctl --assess --type install --verbose=2 "$DMG"
 
 echo "==> Pushing HEAD so the release tag points to a reachable commit..."
 git push
 
 echo "==> Creating GitHub release ${TAG}..."
 if [ -n "${RELEASE_NOTES_FILE:-}" ] && [ -f "${RELEASE_NOTES_FILE}" ]; then
-  gh release create "$TAG" "$ZIP" \
+  gh release create "$TAG" "$DMG" \
     --title "Forge ${VERSION}" \
     --notes-file "${RELEASE_NOTES_FILE}"
 else
-  gh release create "$TAG" "$ZIP" \
+  gh release create "$TAG" "$DMG" \
     --title "Forge ${VERSION}" \
     --generate-notes
 fi
