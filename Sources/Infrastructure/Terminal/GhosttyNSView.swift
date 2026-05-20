@@ -174,14 +174,16 @@ final class GhosttyNSView: NSView {
     private func sendExecKey(_ event: NSEvent) {
         guard let surface else { return }
 
-        // Bypass Ghostty's key encoder for the kernel-signal control bytes.
-        // The kernel TTY discipline only translates the literal byte (\x03,
-        // \x1A, \x1C) to SIGINT/SIGTSTP/SIGQUIT — it never parses escape
-        // sequences. If a prior TUI left Kitty mode pushed on the terminal's
-        // stack and Ghostty's encoder emits ESC[99;5u for Ctrl+C, sleep is
-        // never killed. Sending the raw byte makes signals work regardless.
-        if let signalByte = kernelSignalByte(for: event) {
-            onRawInput?(Data([signalByte]))
+        // Bypass Ghostty's key encoder for control bytes that consumers
+        // depend on seeing as a literal byte rather than a Kitty-protocol
+        // escape sequence. With Kitty progressive enhancement enabled (which
+        // Claude Code 2.1+ turns on automatically), `ghostty_surface_key`
+        // emits e.g. `CSI 118;5u` for Ctrl+V — Claude Code's image-paste
+        // handler listens for raw \\x16 and so never fires. Same shape as
+        // the kernel-signal bypass: kernel TTY discipline only acts on
+        // literal \\x03/\\x1A/\\x1C; escape sequences silently no-op.
+        if let rawByte = rawControlByte(for: event) {
+            onRawInput?(Data([rawByte]))
             return
         }
 
@@ -193,10 +195,16 @@ final class GhosttyNSView: NSView {
         }
     }
 
-    /// Returns the raw control byte for Ctrl+C / Ctrl+Z / Ctrl+\\ — the three
-    /// keys the kernel TTY discipline maps to signals. Returns nil for any
-    /// other combination so it falls through to the normal encoder.
-    private func kernelSignalByte(for event: NSEvent) -> UInt8? {
+    /// Returns the raw control byte that should be sent verbatim to the PTY
+    /// instead of going through libghostty's Kitty-protocol encoder.
+    /// Currently covers:
+    ///  - Ctrl+C / Ctrl+Z / Ctrl+\\ — kernel TTY signal triggers.
+    ///  - Ctrl+V — Claude Code (and most TUI image-paste handlers) listen
+    ///    for literal `\\x16` to read the system clipboard for image data;
+    ///    a Kitty-encoded `CSI 118;5u` slips past that detection.
+    /// Returns nil for any other combination so it falls through to the
+    /// normal encoder.
+    private func rawControlByte(for event: NSEvent) -> UInt8? {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         guard flags.contains(.control) else { return nil }
         // Allow Shift (Ctrl+Shift+C still ≡ Ctrl+C for signal purposes) and
@@ -209,6 +217,7 @@ final class GhosttyNSView: NSView {
         let lower = (base >= 0x41 && base <= 0x5A) ? base + 0x20 : base
         switch lower {
         case 0x63: return 0x03  // Ctrl+C → ETX  → SIGINT
+        case 0x76: return 0x16  // Ctrl+V → SYN  → image-paste trigger
         case 0x7A: return 0x1A  // Ctrl+Z → SUB  → SIGTSTP
         case 0x5C: return 0x1C  // Ctrl+\\ → FS   → SIGQUIT
         default: return nil
