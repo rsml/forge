@@ -86,6 +86,14 @@ final class GhosttyApp {
         // ghostty takes ownership of the config via update; do NOT free it.
     }
 
+    /// Push the current theme's light/dark preference to libghostty.
+    /// libghostty stores this in its conditional state and emits a DEC mode 2031
+    /// report to any foreground process subscribed to it (modern TUIs).
+    func setColorScheme(isLight: Bool) {
+        guard let app else { return }
+        ghostty_app_set_color_scheme(app, isLight ? GHOSTTY_COLOR_SCHEME_LIGHT : GHOSTTY_COLOR_SCHEME_DARK)
+    }
+
     // MARK: - Wakeup (called from I/O thread)
 
     /// Called from ghostty's I/O thread. Must be nonisolated because

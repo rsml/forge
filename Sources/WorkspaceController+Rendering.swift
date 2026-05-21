@@ -7,7 +7,13 @@ extension WorkspaceController {
     /// Creates an EXEC mode renderer — Ghostty owns the PTY directly.
     func createExecRenderer(for pane: Pane, cwd: String) -> any TerminalRenderer {
         guard let ghosttyApp else { fatalError("createExecRenderer requires ghosttyApp") }
-        let renderer = GhosttyRenderer(ghosttyApp: ghosttyApp, cwd: cwd)
+        var env: [String: String] = [:]
+        var isLight: Bool? = nil
+        if let bg = config.resolvedTheme?.background {
+            env["COLORFGBG"] = ColorFGBG.value(red: bg.red, green: bg.green, blue: bg.blue)
+            isLight = BackgroundLuminance.isLight(red: bg.red, green: bg.green, blue: bg.blue)
+        }
+        let renderer = GhosttyRenderer(ghosttyApp: ghosttyApp, cwd: cwd, env: env, isLight: isLight)
         renderer.diagnosticPaneId = pane.id
         let paneId = pane.id
         renderer.nsView.onFocusGained = { [weak self] in
@@ -92,13 +98,16 @@ extension WorkspaceController {
             // Try daemon reconnect for ALL panes in a single Task
             // to avoid race conditions with concurrent updateRenderers calls.
             let paneIds = panesToCreate.map { ($0.pane.id, $0.cwd) }
+            let isLight: Bool? = config.resolvedTheme.map { theme in
+                BackgroundLuminance.isLight(red: theme.background.red, green: theme.background.green, blue: theme.background.blue)
+            }
             Task {
                 for (paneId, cwd) in paneIds {
                     if await MainActor.run(body: { paneRenderers[paneId] != nil }) { continue }
 
                     if let result = try? await daemon.retrieve(paneId: paneId) {
                         guard let ghosttyApp else { continue }
-                        let renderer = GhosttyRenderer(ghosttyApp: ghosttyApp, fd: result.fd)
+                        let renderer = GhosttyRenderer(ghosttyApp: ghosttyApp, fd: result.fd, isLight: isLight)
                         renderer.diagnosticPaneId = paneId
                         let pid = result.pid
                         await MainActor.run {

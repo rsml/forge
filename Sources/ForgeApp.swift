@@ -205,11 +205,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         ga.applyConfig(fontFamily: fontFamily, fontSize: fontSize,
                        foreground: fgHex, background: bgHex, ansiColors: ansiHex)
+        let isLight: Bool? = theme.map { t in
+            BackgroundLuminance.isLight(red: t.background.red, green: t.background.green, blue: t.background.blue)
+        }
+        if let isLight {
+            ga.setColorScheme(isLight: isLight)
+        }
         // Font / cell metrics may have changed. Force each surface to re-derive
         // cols/rows against the new cell size and push winsize to the PTY so
         // running shells receive SIGWINCH and fresh TUIs see the right grid.
+        // Also push the color-scheme update — libghostty emits a mode 2031
+        // report to any foreground process subscribed to it.
         for renderer in controller.paneRenderers.values {
-            (renderer as? GhosttyRenderer)?.recomputeSize()
+            guard let ghostty = renderer as? GhosttyRenderer else { continue }
+            ghostty.recomputeSize()
+            if let isLight { ghostty.setColorScheme(isLight: isLight) }
         }
     }
 
