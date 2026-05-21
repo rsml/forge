@@ -156,10 +156,13 @@ final class WorkspaceController {
                 // synchronously and URL loaded).
                 let allPanes = workspace.projects.flatMap { $0.tabs.flatMap { $0.panes } }
                                                  .filter { $0.kind == .terminal }
+                let isLight: Bool? = config.resolvedTheme.map { theme in
+                    BackgroundLuminance.isLight(red: theme.background.red, green: theme.background.green, blue: theme.background.blue)
+                }
                 for pane in allPanes {
                     if let result = try? await daemon.retrieve(paneId: pane.id) {
                         guard let ghosttyApp else { continue }
-                        let renderer = GhosttyRenderer(ghosttyApp: ghosttyApp, fd: result.fd)
+                        let renderer = GhosttyRenderer(ghosttyApp: ghosttyApp, fd: result.fd, isLight: isLight)
                         renderer.diagnosticPaneId = pane.id
                         renderer.configureForReconnect(paneId: pane.id, pid: result.pid)
                         let paneId = pane.id

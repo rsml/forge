@@ -149,7 +149,7 @@ final class GhosttyRenderer: TerminalRenderer {
     /// Creates a renderer for reconnecting to a pre-existing PTY fd.
     /// Uses MANUAL IO mode with a background read thread on the fd.
     /// Input is written directly to the fd.
-    init(ghosttyApp: GhosttyApp, fd: Int32) {
+    init(ghosttyApp: GhosttyApp, fd: Int32, isLight: Bool? = nil) {
         nsView = GhosttyNSView(frame: .zero)
         nsView.execMode = true // native key handling
         nsView.onUserInput = { [weak self] in self?.onUserInput?() }
@@ -204,6 +204,9 @@ final class GhosttyRenderer: TerminalRenderer {
         }
 
         if let surface {
+            if let isLight {
+                ghostty_surface_set_color_scheme(surface, isLight ? GHOSTTY_COLOR_SCHEME_LIGHT : GHOSTTY_COLOR_SCHEME_DARK)
+            }
             ForgeLog.log("[ghostty] EXTERNAL_FD surface created, read deferred to sizing (fd=\(fd))")
         } else {
             ForgeLog.log("[ghostty] Failed to create EXTERNAL_FD surface")
@@ -373,7 +376,7 @@ final class GhosttyRenderer: TerminalRenderer {
 
     /// Creates a renderer in EXEC mode: Ghostty forks a shell, owns the PTY,
     /// and handles all I/O natively. No onInput/onResize wiring needed.
-    init(ghosttyApp: GhosttyApp, cwd: String, env: [String: String] = [:]) {
+    init(ghosttyApp: GhosttyApp, cwd: String, env: [String: String] = [:], isLight: Bool? = nil) {
         nsView = GhosttyNSView(frame: .zero)
         nsView.execMode = true
         nsView.onUserInput = { [weak self] in self?.onUserInput?() }
@@ -443,6 +446,9 @@ final class GhosttyRenderer: TerminalRenderer {
         nsView.pendingSurface = surface
 
         if let surface {
+            if let isLight {
+                ghostty_surface_set_color_scheme(surface, isLight ? GHOSTTY_COLOR_SCHEME_LIGHT : GHOSTTY_COLOR_SCHEME_DARK)
+            }
             ForgeLog.log("[ghostty] EXEC surface created, deferred to window (cwd: \(cwd))")
         } else {
             ForgeLog.log("[ghostty] Failed to create EXEC surface")
@@ -476,6 +482,13 @@ final class GhosttyRenderer: TerminalRenderer {
     func setFocused(_ focused: Bool) {
         guard let surface else { return }
         ghostty_surface_set_focus(surface, focused)
+    }
+
+    /// Push a runtime light/dark update to this surface. libghostty emits a
+    /// DEC mode 2031 report to the foreground process if it's subscribed.
+    func setColorScheme(isLight: Bool) {
+        guard let surface else { return }
+        ghostty_surface_set_color_scheme(surface, isLight ? GHOSTTY_COLOR_SCHEME_LIGHT : GHOSTTY_COLOR_SCHEME_DARK)
     }
 
     /// Re-pushes the current pixel size into libghostty so cols/rows are
